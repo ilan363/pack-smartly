@@ -9,38 +9,85 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as LayoutRouteImport } from './routes/_layout'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as LayoutSuitcasesRouteImport } from './routes/_layout.suitcases'
+import { Route as LayoutDashboardRouteImport } from './routes/_layout.dashboard'
+import { Route as LayoutAssistantRouteImport } from './routes/_layout.assistant'
 
+const LayoutRoute = LayoutRouteImport.update({
+  id: '/_layout',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LayoutSuitcasesRoute = LayoutSuitcasesRouteImport.update({
+  id: '/suitcases',
+  path: '/suitcases',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutDashboardRoute = LayoutDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutAssistantRoute = LayoutAssistantRouteImport.update({
+  id: '/assistant',
+  path: '/assistant',
+  getParentRoute: () => LayoutRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/assistant': typeof LayoutAssistantRoute
+  '/dashboard': typeof LayoutDashboardRoute
+  '/suitcases': typeof LayoutSuitcasesRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/assistant': typeof LayoutAssistantRoute
+  '/dashboard': typeof LayoutDashboardRoute
+  '/suitcases': typeof LayoutSuitcasesRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_layout': typeof LayoutRouteWithChildren
+  '/_layout/assistant': typeof LayoutAssistantRoute
+  '/_layout/dashboard': typeof LayoutDashboardRoute
+  '/_layout/suitcases': typeof LayoutSuitcasesRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/assistant' | '/dashboard' | '/suitcases'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/assistant' | '/dashboard' | '/suitcases'
+  id:
+    | '__root__'
+    | '/'
+    | '/_layout'
+    | '/_layout/assistant'
+    | '/_layout/dashboard'
+    | '/_layout/suitcases'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  LayoutRoute: typeof LayoutRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/_layout': {
+      id: '/_layout'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof LayoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,22 +95,49 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_layout/suitcases': {
+      id: '/_layout/suitcases'
+      path: '/suitcases'
+      fullPath: '/suitcases'
+      preLoaderRoute: typeof LayoutSuitcasesRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/dashboard': {
+      id: '/_layout/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof LayoutDashboardRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/assistant': {
+      id: '/_layout/assistant'
+      path: '/assistant'
+      fullPath: '/assistant'
+      preLoaderRoute: typeof LayoutAssistantRouteImport
+      parentRoute: typeof LayoutRoute
+    }
   }
 }
 
+interface LayoutRouteChildren {
+  LayoutAssistantRoute: typeof LayoutAssistantRoute
+  LayoutDashboardRoute: typeof LayoutDashboardRoute
+  LayoutSuitcasesRoute: typeof LayoutSuitcasesRoute
+}
+
+const LayoutRouteChildren: LayoutRouteChildren = {
+  LayoutAssistantRoute: LayoutAssistantRoute,
+  LayoutDashboardRoute: LayoutDashboardRoute,
+  LayoutSuitcasesRoute: LayoutSuitcasesRoute,
+}
+
+const LayoutRouteWithChildren =
+  LayoutRoute._addFileChildren(LayoutRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  LayoutRoute: LayoutRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

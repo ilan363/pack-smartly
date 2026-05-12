@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as LayoutRouteImport } from './routes/_layout'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as LayoutSuitcasesRouteImport } from './routes/_layout.suitcases'
 import { Route as LayoutDashboardRouteImport } from './routes/_layout.dashboard'
 
 const LayoutRoute = LayoutRouteImport.update({
@@ -22,6 +23,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LayoutSuitcasesRoute = LayoutSuitcasesRouteImport.update({
+  id: '/suitcases',
+  path: '/suitcases',
+  getParentRoute: () => LayoutRoute,
+} as any)
 const LayoutDashboardRoute = LayoutDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -31,23 +37,31 @@ const LayoutDashboardRoute = LayoutDashboardRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dashboard': typeof LayoutDashboardRoute
+  '/suitcases': typeof LayoutSuitcasesRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/dashboard': typeof LayoutDashboardRoute
+  '/suitcases': typeof LayoutSuitcasesRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_layout': typeof LayoutRouteWithChildren
   '/_layout/dashboard': typeof LayoutDashboardRoute
+  '/_layout/suitcases': typeof LayoutSuitcasesRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/dashboard'
+  fullPaths: '/' | '/dashboard' | '/suitcases'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/dashboard'
-  id: '__root__' | '/' | '/_layout' | '/_layout/dashboard'
+  to: '/' | '/dashboard' | '/suitcases'
+  id:
+    | '__root__'
+    | '/'
+    | '/_layout'
+    | '/_layout/dashboard'
+    | '/_layout/suitcases'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -71,6 +85,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_layout/suitcases': {
+      id: '/_layout/suitcases'
+      path: '/suitcases'
+      fullPath: '/suitcases'
+      preLoaderRoute: typeof LayoutSuitcasesRouteImport
+      parentRoute: typeof LayoutRoute
+    }
     '/_layout/dashboard': {
       id: '/_layout/dashboard'
       path: '/dashboard'
@@ -83,10 +104,12 @@ declare module '@tanstack/react-router' {
 
 interface LayoutRouteChildren {
   LayoutDashboardRoute: typeof LayoutDashboardRoute
+  LayoutSuitcasesRoute: typeof LayoutSuitcasesRoute
 }
 
 const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutDashboardRoute: LayoutDashboardRoute,
+  LayoutSuitcasesRoute: LayoutSuitcasesRoute,
 }
 
 const LayoutRouteWithChildren =
@@ -99,3 +122,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

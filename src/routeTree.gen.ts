@@ -13,6 +13,7 @@ import { Route as LayoutRouteImport } from './routes/_layout'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as LayoutSuitcasesRouteImport } from './routes/_layout.suitcases'
 import { Route as LayoutDashboardRouteImport } from './routes/_layout.dashboard'
+import { Route as LayoutAssistantRouteImport } from './routes/_layout.assistant'
 
 const LayoutRoute = LayoutRouteImport.update({
   id: '/_layout',
@@ -33,14 +34,21 @@ const LayoutDashboardRoute = LayoutDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LayoutAssistantRoute = LayoutAssistantRouteImport.update({
+  id: '/assistant',
+  path: '/assistant',
+  getParentRoute: () => LayoutRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/assistant': typeof LayoutAssistantRoute
   '/dashboard': typeof LayoutDashboardRoute
   '/suitcases': typeof LayoutSuitcasesRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/assistant': typeof LayoutAssistantRoute
   '/dashboard': typeof LayoutDashboardRoute
   '/suitcases': typeof LayoutSuitcasesRoute
 }
@@ -48,18 +56,20 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_layout': typeof LayoutRouteWithChildren
+  '/_layout/assistant': typeof LayoutAssistantRoute
   '/_layout/dashboard': typeof LayoutDashboardRoute
   '/_layout/suitcases': typeof LayoutSuitcasesRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/dashboard' | '/suitcases'
+  fullPaths: '/' | '/assistant' | '/dashboard' | '/suitcases'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/dashboard' | '/suitcases'
+  to: '/' | '/assistant' | '/dashboard' | '/suitcases'
   id:
     | '__root__'
     | '/'
     | '/_layout'
+    | '/_layout/assistant'
     | '/_layout/dashboard'
     | '/_layout/suitcases'
   fileRoutesById: FileRoutesById
@@ -99,15 +109,24 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutDashboardRouteImport
       parentRoute: typeof LayoutRoute
     }
+    '/_layout/assistant': {
+      id: '/_layout/assistant'
+      path: '/assistant'
+      fullPath: '/assistant'
+      preLoaderRoute: typeof LayoutAssistantRouteImport
+      parentRoute: typeof LayoutRoute
+    }
   }
 }
 
 interface LayoutRouteChildren {
+  LayoutAssistantRoute: typeof LayoutAssistantRoute
   LayoutDashboardRoute: typeof LayoutDashboardRoute
   LayoutSuitcasesRoute: typeof LayoutSuitcasesRoute
 }
 
 const LayoutRouteChildren: LayoutRouteChildren = {
+  LayoutAssistantRoute: LayoutAssistantRoute,
   LayoutDashboardRoute: LayoutDashboardRoute,
   LayoutSuitcasesRoute: LayoutSuitcasesRoute,
 }
@@ -122,3 +141,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

@@ -15,7 +15,7 @@ function Navbar() {
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <BaggageClaim size={18} />
           </div>
-          <span className="text-lg font-bold tracking-tight">PackAI</span>
+          <span className="text-lg font-bold tracking-tight">Travel Wolf</span>
         </div>
         <div className="flex items-center gap-4">
           <Link to="/dashboard">

@@ -23,7 +23,7 @@ function AppLayout() {
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <BaggageClaim size={18} />
           </div>
-          <span className="text-lg font-bold">PackAI</span>
+          <span className="text-lg font-bold">Travel Wolf</span>
         </div>
         
         <nav className="flex-1 px-4 py-6 space-y-1">
@@ -63,7 +63,7 @@ function AppLayout() {
         <header className="h-16 border-b border-border bg-background flex items-center px-6 md:hidden">
           <div className="flex items-center gap-2">
             <BaggageClaim className="h-5 w-5" />
-            <span className="font-bold">PackAI</span>
+            <span className="font-bold">Travel Wolf</span>
           </div>
         </header>
         <div className="flex-1 overflow-auto p-6 md:p-8">

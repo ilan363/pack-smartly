@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet, Link, useLocation } from "@tanstack/react-router";
 import { BaggageClaim, Home, Bot, Settings, LogOut } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Toaster } from "@/components/ui/sonner";
 
 export const Route = createFileRoute("/_layout")({
   component: AppLayout,
@@ -70,6 +70,7 @@ function AppLayout() {
           <Outlet />
         </div>
       </main>
+      <Toaster richColors position="top-right" />
     </div>
   );
 }

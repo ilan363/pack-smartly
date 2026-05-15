@@ -33,7 +33,7 @@ type State = {
 
 type Actions = {
   setActive: (id: string | null) => void;
-  addSuitcase: (data: Omit<Suitcase, "id" | "items" | "createdAt"> & { items?: Item[] }) => string;
+  addSuitcase: (data: Omit<Suitcase, "id" | "items" | "createdAt"> & { items?: Omit<Item, "id">[] }) => string;
   updateSuitcase: (id: string, patch: Partial<Omit<Suitcase, "id" | "items" | "createdAt">>) => void;
   removeSuitcase: (id: string) => void;
   addItem: (suitcaseId: string, item: Omit<Item, "id">) => void;

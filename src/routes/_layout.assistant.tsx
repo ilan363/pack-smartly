@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useRef, useEffect } from "react";
-import { Bot, Send, User, Sparkles, Plus, Trash2 } from "lucide-react";
+import { Bot, Send, User, Sparkles, Plus, Trash2, BookmarkPlus, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { useSuitcasesStore, type SuitcaseType } from "@/lib/suitcases-store";
+import { useChecklistsStore } from "@/lib/checklists-store";
 
 export const Route = createFileRoute("/_layout/assistant")({
   component: AssistantPage,
@@ -31,6 +32,8 @@ type SuggestionItem = { category: string; name: string; weight: number; quantity
 type Suggestion = {
   destination: string;
   weather: string;
+  days?: number;
+  occasion?: string;
   items: SuggestionItem[];
   totalWeight: number;
 };

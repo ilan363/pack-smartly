@@ -11,8 +11,10 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as LayoutRouteImport } from './routes/_layout'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiPackRouteImport } from './routes/api/pack'
 import { Route as LayoutSuitcasesRouteImport } from './routes/_layout.suitcases'
 import { Route as LayoutDashboardRouteImport } from './routes/_layout.dashboard'
+import { Route as LayoutChecklistsRouteImport } from './routes/_layout.checklists'
 import { Route as LayoutAssistantRouteImport } from './routes/_layout.assistant'
 
 const LayoutRoute = LayoutRouteImport.update({
@@ -22,6 +24,11 @@ const LayoutRoute = LayoutRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPackRoute = ApiPackRouteImport.update({
+  id: '/api/pack',
+  path: '/api/pack',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LayoutSuitcasesRoute = LayoutSuitcasesRouteImport.update({
@@ -34,6 +41,11 @@ const LayoutDashboardRoute = LayoutDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LayoutChecklistsRoute = LayoutChecklistsRouteImport.update({
+  id: '/checklists',
+  path: '/checklists',
+  getParentRoute: () => LayoutRoute,
+} as any)
 const LayoutAssistantRoute = LayoutAssistantRouteImport.update({
   id: '/assistant',
   path: '/assistant',
@@ -43,40 +55,61 @@ const LayoutAssistantRoute = LayoutAssistantRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/assistant': typeof LayoutAssistantRoute
+  '/checklists': typeof LayoutChecklistsRoute
   '/dashboard': typeof LayoutDashboardRoute
   '/suitcases': typeof LayoutSuitcasesRoute
+  '/api/pack': typeof ApiPackRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/assistant': typeof LayoutAssistantRoute
+  '/checklists': typeof LayoutChecklistsRoute
   '/dashboard': typeof LayoutDashboardRoute
   '/suitcases': typeof LayoutSuitcasesRoute
+  '/api/pack': typeof ApiPackRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_layout': typeof LayoutRouteWithChildren
   '/_layout/assistant': typeof LayoutAssistantRoute
+  '/_layout/checklists': typeof LayoutChecklistsRoute
   '/_layout/dashboard': typeof LayoutDashboardRoute
   '/_layout/suitcases': typeof LayoutSuitcasesRoute
+  '/api/pack': typeof ApiPackRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/assistant' | '/dashboard' | '/suitcases'
+  fullPaths:
+    | '/'
+    | '/assistant'
+    | '/checklists'
+    | '/dashboard'
+    | '/suitcases'
+    | '/api/pack'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/assistant' | '/dashboard' | '/suitcases'
+  to:
+    | '/'
+    | '/assistant'
+    | '/checklists'
+    | '/dashboard'
+    | '/suitcases'
+    | '/api/pack'
   id:
     | '__root__'
     | '/'
     | '/_layout'
     | '/_layout/assistant'
+    | '/_layout/checklists'
     | '/_layout/dashboard'
     | '/_layout/suitcases'
+    | '/api/pack'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LayoutRoute: typeof LayoutRouteWithChildren
+  ApiPackRoute: typeof ApiPackRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -95,6 +128,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/pack': {
+      id: '/api/pack'
+      path: '/api/pack'
+      fullPath: '/api/pack'
+      preLoaderRoute: typeof ApiPackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_layout/suitcases': {
       id: '/_layout/suitcases'
       path: '/suitcases'
@@ -109,6 +149,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutDashboardRouteImport
       parentRoute: typeof LayoutRoute
     }
+    '/_layout/checklists': {
+      id: '/_layout/checklists'
+      path: '/checklists'
+      fullPath: '/checklists'
+      preLoaderRoute: typeof LayoutChecklistsRouteImport
+      parentRoute: typeof LayoutRoute
+    }
     '/_layout/assistant': {
       id: '/_layout/assistant'
       path: '/assistant'
@@ -121,12 +168,14 @@ declare module '@tanstack/react-router' {
 
 interface LayoutRouteChildren {
   LayoutAssistantRoute: typeof LayoutAssistantRoute
+  LayoutChecklistsRoute: typeof LayoutChecklistsRoute
   LayoutDashboardRoute: typeof LayoutDashboardRoute
   LayoutSuitcasesRoute: typeof LayoutSuitcasesRoute
 }
 
 const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutAssistantRoute: LayoutAssistantRoute,
+  LayoutChecklistsRoute: LayoutChecklistsRoute,
   LayoutDashboardRoute: LayoutDashboardRoute,
   LayoutSuitcasesRoute: LayoutSuitcasesRoute,
 }
@@ -137,6 +186,7 @@ const LayoutRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LayoutRoute: LayoutRouteWithChildren,
+  ApiPackRoute: ApiPackRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

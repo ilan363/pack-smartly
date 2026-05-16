@@ -357,18 +357,20 @@ function AssistantPage() {
         <div className="p-4 border-t border-border bg-background">
           <div className="flex gap-2 mx-auto">
             <Input
-              placeholder="Ej: Viajo 7 días a Bariloche en invierno..."
+              placeholder="Ej: Voy 3 días a un casamiento en España..."
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSend()}
+              disabled={loading}
               className="rounded-full bg-muted/30 border-border focus-visible:ring-primary/20 h-12"
             />
             <Button
               size="icon"
               className="rounded-full h-12 w-12 shrink-0 bg-primary hover:bg-primary/90"
               onClick={handleSend}
+              disabled={loading}
             >
-              <Send className="h-5 w-5" />
+              {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
             </Button>
           </div>
           <div className="text-center mt-3 flex justify-center gap-2 flex-wrap">

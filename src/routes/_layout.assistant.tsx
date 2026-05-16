@@ -316,9 +316,17 @@ function AssistantPage() {
                         {msg.suggestion.totalWeight.toFixed(2)} kg
                       </span>
                     </div>
-                    <div className="p-4 border-t border-border flex gap-2">
-                      <Button className="w-full" size="sm" onClick={() => openCreate(msg)}>
+                    <div className="p-4 border-t border-border flex flex-wrap gap-2">
+                      <Button className="flex-1 min-w-[180px]" size="sm" onClick={() => openCreate(msg)}>
                         Crear valija con esta lista
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => saveAsChecklist(msg)}
+                      >
+                        <BookmarkPlus className="h-4 w-4 mr-1" />
+                        Guardar lista
                       </Button>
                       <Button
                         variant="outline"
@@ -333,6 +341,17 @@ function AssistantPage() {
               </div>
             </div>
           ))}
+          {loading && (
+            <div className="flex gap-4">
+              <div className="h-8 w-8 shrink-0 rounded-lg flex items-center justify-center bg-muted text-foreground border border-border">
+                <Bot size={16} />
+              </div>
+              <div className="px-4 py-3 rounded-2xl bg-muted/50 text-foreground border border-border rounded-tl-sm flex items-center gap-2 text-sm">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Armando tu valija...
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="p-4 border-t border-border bg-background">

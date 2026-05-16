@@ -66,15 +66,15 @@ const CATEGORIES = [
 function AssistantPage() {
   const [messages, setMessages] = useState<Message[]>([INITIAL_MESSAGE]);
   const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
   const addSuitcase = useSuitcasesStore((s) => s.addSuitcase);
   const setActive = useSuitcasesStore((s) => s.setActive);
+  const addChecklist = useChecklistsStore((s) => s.addChecklist);
 
-  // Editing the list before creation
   const [editingMsgId, setEditingMsgId] = useState<string | null>(null);
-  // Naming/typing the suitcase on create
   const [createMsgId, setCreateMsgId] = useState<string | null>(null);
   const [createForm, setCreateForm] = useState<{
     name: string;
@@ -88,36 +88,95 @@ function AssistantPage() {
     }
   }, [messages]);
 
-  const handleSend = () => {
-    if (!input.trim()) return;
+  const handleSend = async () => {
+    if (!input.trim() || loading) return;
 
-    const userMsg: Message = { id: Date.now().toString(), role: "user", content: input };
+    const userText = input;
+    const userMsg: Message = { id: Date.now().toString(), role: "user", content: userText };
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
+    setLoading(true);
 
-    setTimeout(() => {
+    try {
+      const res = await fetch("/api/pack", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: userText }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Error" }));
+        if (res.status === 429) {
+          toast.error("Demasiadas consultas, esperá un momento.");
+        } else if (res.status === 402) {
+          toast.error("Sin créditos de IA. Agregalos en Settings → Usage.");
+        } else {
+          toast.error(err.error || "No pude generar la lista");
+        }
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            content: "Tuve un problema generando la lista. ¿Probamos de nuevo?",
+          },
+        ]);
+        return;
+      }
+      const data = (await res.json()) as {
+        destination: string;
+        weather: string;
+        days: number;
+        occasion: string;
+        items: SuggestionItem[];
+      };
+      const totalWeight = data.items.reduce(
+        (acc, it) => acc + it.weight * (it.quantity ?? 1),
+        0,
+      );
       const aiMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content:
-          "Basado en tu viaje, armé una lista optimizada. Podés modificarla o crear directamente la valija.",
+        content: `Armé una valija para ${data.days} día${data.days === 1 ? "" : "s"} en ${data.destination} (${data.occasion}). Podés modificarla, guardarla como checklist o crearla como valija.`,
         suggestion: {
-          destination: "Ushuaia, Argentina",
-          weather: "Frío extremo, Nieve (-2°C a -8°C)",
-          totalWeight: 8.5,
-          items: [
-            { category: "Remeras", name: "Remeras térmicas", weight: 0.3, quantity: 5 },
-            { category: "Pantalones", name: "Pantalones impermeables", weight: 0.9, quantity: 2 },
-            { category: "Abrigos", name: "Campera de nieve", weight: 2.0, quantity: 1 },
-            { category: "Zapatillas", name: "Botas de trekking", weight: 1.5, quantity: 1 },
-            { category: "Accesorios", name: "Guantes, bufanda, gorro", weight: 0.8, quantity: 1 },
-            { category: "Higiene", name: "Kit básico", weight: 0.9, quantity: 1 },
-          ],
+          destination: data.destination,
+          weather: data.weather,
+          days: data.days,
+          occasion: data.occasion,
+          items: data.items,
+          totalWeight,
         },
       };
       setMessages((prev) => [...prev, aiMsg]);
-    }, 1200);
+    } catch {
+      toast.error("No pude conectar con el asistente.");
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const saveAsChecklist = (msg: Message) => {
+    if (!msg.suggestion) return;
+    const s = msg.suggestion;
+    const id = addChecklist({
+      title: `${s.destination}${s.days ? ` · ${s.days}d` : ""}${s.occasion ? ` · ${s.occasion}` : ""}`,
+      destination: s.destination,
+      days: s.days ?? 1,
+      weather: s.weather,
+      occasion: s.occasion ?? "Viaje",
+      items: s.items.map((it) => ({
+        name: it.name,
+        category: it.category,
+        quantity: it.quantity ?? 1,
+        weight: it.weight,
+      })),
+    });
+    toast.success("Lista guardada", {
+      description: "La podés tachar a medida que la metes en la valija.",
+      action: { label: "Ver", onClick: () => navigate({ to: "/checklists" }) },
+    });
+    return id;
+  };
+
 
   const updateMessageSuggestion = (msgId: string, suggestion: Suggestion) => {
     const total = suggestion.items.reduce(

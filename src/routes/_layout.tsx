@@ -1,5 +1,5 @@
 import { createFileRoute, Outlet, Link, useLocation } from "@tanstack/react-router";
-import { BaggageClaim, Home, Bot, Settings, LogOut } from "lucide-react";
+import { BaggageClaim, Home, Bot, Settings, LogOut, ListChecks } from "lucide-react";
 import { Toaster } from "@/components/ui/sonner";
 
 export const Route = createFileRoute("/_layout")({
@@ -13,6 +13,7 @@ function AppLayout() {
     { name: "Dashboard", href: "/dashboard", icon: Home },
     { name: "Mis Valijas", href: "/suitcases", icon: BaggageClaim },
     { name: "Asistente IA", href: "/assistant", icon: Bot },
+    { name: "Listas", href: "/checklists", icon: ListChecks },
   ];
 
   return (

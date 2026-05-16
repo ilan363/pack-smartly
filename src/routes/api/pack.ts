@@ -103,10 +103,15 @@ function extractTripContext(prompt: string) {
   const destinationMatch = normalized.match(
     /(?:viaje a|viajo a|voy a|me voy a|destino a|para|hacia|en)\s+([a-zñ ]+?)(?=\s+(?:por|durante|a un|a una|para un|para una|con|del|de|y|,|\.|$)|$)/,
   );
-  const destination = destinationMatch?.[1]
+  const rawDestination = destinationMatch?.[1]
     ?.replace(/\b(?:un|una|el|la|los|las)\b/g, "")
     .replace(/\s+/g, " ")
     .trim();
+  const destination = rawDestination && /\b(boda|casamiento|matrimonio)\b/.test(rawDestination)
+    ? rawDestination.includes("playa")
+      ? "playa"
+      : undefined
+    : rawDestination;
 
   const occasion = /casamiento|boda|matrimonio/.test(normalized)
     ? "Casamiento"
@@ -161,14 +166,32 @@ function normalizeCategory(category: string | undefined, name: string): Category
   return "Otros";
 }
 
+function normalizeWeight(category: Category, quantity: number, rawWeight: number) {
+  const maxPerUnit: Record<Category, number> = {
+    Remeras: 0.45,
+    Pantalones: 0.75,
+    Abrigos: 1.4,
+    Zapatillas: 1.2,
+    Accesorios: 0.5,
+    Higiene: 0.7,
+    Electrónica: 0.8,
+    Otros: 0.9,
+  };
+  const perUnit = quantity > 1 && rawWeight > maxPerUnit[category]
+    ? rawWeight / quantity
+    : rawWeight;
+  return Math.max(0.02, Math.min(perUnit, 8));
+}
+
 function normalizeItem(item: RawPackItem): PackItem | null {
   const name = item.name?.trim();
   if (!name) return null;
   const quantity = Math.max(1, Math.min(Number(item.quantity ?? 1), 20));
-  const weight = Math.max(0.02, Math.min(Number(item.weight ?? 0.2), 8));
+  const category = normalizeCategory(item.category, name);
+  const weight = normalizeWeight(category, quantity, Number(item.weight ?? 0.2));
   return {
     name,
-    category: normalizeCategory(item.category, name),
+    category,
     quantity,
     weight: Number(weight.toFixed(2)),
   };

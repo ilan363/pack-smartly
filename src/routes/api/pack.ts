@@ -32,6 +32,13 @@ type PackSuggestion = {
   items: PackItem[];
 };
 
+type RawPackItem = {
+  category?: string;
+  name?: string;
+  quantity?: number;
+  weight?: number;
+};
+
 const RawSuggestionSchema = z.object({
   destination: z.string().optional(),
   days: z.coerce.number().int().min(1).max(90).optional(),
@@ -154,7 +161,7 @@ function normalizeCategory(category: string | undefined, name: string): Category
   return "Otros";
 }
 
-function normalizeItem(item: z.infer<typeof RawSuggestionSchema>["items"] extends Array<infer T> ? T : never): PackItem | null {
+function normalizeItem(item: RawPackItem): PackItem | null {
   const name = item.name?.trim();
   if (!name) return null;
   const quantity = Math.max(1, Math.min(Number(item.quantity ?? 1), 20));

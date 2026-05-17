@@ -23,34 +23,15 @@ import {
 import { toast } from "sonner";
 import { useSuitcasesStore, type SuitcaseType } from "@/lib/suitcases-store";
 import { useChecklistsStore } from "@/lib/checklists-store";
+import { useChatStore, type ChatMessage, type ChatSuggestion } from "@/lib/chat-store";
 
 export const Route = createFileRoute("/_layout/assistant")({
   component: AssistantPage,
 });
 
 type SuggestionItem = { category: string; name: string; weight: number; quantity?: number };
-type Suggestion = {
-  destination: string;
-  weather: string;
-  days?: number;
-  occasion?: string;
-  items: SuggestionItem[];
-  totalWeight: number;
-};
-
-type Message = {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  suggestion?: Suggestion;
-};
-
-const INITIAL_MESSAGE: Message = {
-  id: "1",
-  role: "assistant",
-  content:
-    "¡Hola! Soy tu asistente de equipaje. Contame sobre tu próximo viaje (destino, clima, días, eventos) y te armo la valija ideal.",
-};
+type Suggestion = ChatSuggestion;
+type Message = ChatMessage;
 
 const CATEGORIES = [
   "Remeras",
@@ -64,7 +45,10 @@ const CATEGORIES = [
 ];
 
 function AssistantPage() {
-  const [messages, setMessages] = useState<Message[]>([INITIAL_MESSAGE]);
+  const messages = useChatStore((s) => s.messages);
+  const addMessage = useChatStore((s) => s.addMessage);
+  const updateSuggestionInStore = useChatStore((s) => s.updateSuggestion);
+  const resetChat = useChatStore((s) => s.reset);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -92,8 +76,7 @@ function AssistantPage() {
     if (!input.trim() || loading) return;
 
     const userText = input;
-    const userMsg: Message = { id: Date.now().toString(), role: "user", content: userText };
-    setMessages((prev) => [...prev, userMsg]);
+    addMessage({ id: Date.now().toString(), role: "user", content: userText });
     setInput("");
     setLoading(true);
 
@@ -112,14 +95,11 @@ function AssistantPage() {
         } else {
           toast.error(err.error || "No pude generar la lista");
         }
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: (Date.now() + 1).toString(),
-            role: "assistant",
-            content: "Tuve un problema generando la lista. ¿Probamos de nuevo?",
-          },
-        ]);
+        addMessage({
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: "Tuve un problema generando la lista. ¿Probamos de nuevo?",
+        });
         return;
       }
       const data = (await res.json()) as {
@@ -133,7 +113,7 @@ function AssistantPage() {
         (acc, it) => acc + it.weight * (it.quantity ?? 1),
         0,
       );
-      const aiMsg: Message = {
+      addMessage({
         id: (Date.now() + 1).toString(),
         role: "assistant",
         content: `Armé una valija para ${data.days} día${data.days === 1 ? "" : "s"} en ${data.destination} (${data.occasion}). Podés modificarla, guardarla como checklist o crearla como valija.`,
@@ -145,8 +125,7 @@ function AssistantPage() {
           items: data.items,
           totalWeight,
         },
-      };
-      setMessages((prev) => [...prev, aiMsg]);
+      });
     } catch {
       toast.error("No pude conectar con el asistente.");
     } finally {
@@ -183,11 +162,7 @@ function AssistantPage() {
       (acc, it) => acc + it.weight * (it.quantity ?? 1),
       0,
     );
-    setMessages((prev) =>
-      prev.map((m) =>
-        m.id === msgId ? { ...m, suggestion: { ...suggestion, totalWeight: total } } : m,
-      ),
-    );
+    updateSuggestionInStore(msgId, { ...suggestion, totalWeight: total });
   };
 
   const editingMsg = messages.find((m) => m.id === editingMsgId);
@@ -237,7 +212,7 @@ function AssistantPage() {
         <Button
           variant="outline"
           size="sm"
-          onClick={() => setMessages([INITIAL_MESSAGE])}
+          onClick={() => resetChat()}
         >
           <Plus className="h-4 w-4 mr-2" />
           Nueva consulta

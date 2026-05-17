@@ -1,8 +1,20 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plane, Calendar, MapPin, BaggageClaim } from "lucide-react";
+import { Plane, Calendar, MapPin, BaggageClaim, LogIn, LogOut, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSuitcasesStore, totalWeight } from "@/lib/suitcases-store";
+import { useAuthStore } from "@/lib/auth-store";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { useState } from "react";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_layout/dashboard")({
   component: DashboardPage,
@@ -12,6 +24,24 @@ function DashboardPage() {
   const navigate = useNavigate();
   const suitcases = useSuitcasesStore((s) => s.suitcases);
   const setActive = useSuitcasesStore((s) => s.setActive);
+  const authedEmail = useAuthStore((s) => s.email);
+  const login = useAuthStore((s) => s.login);
+  const logout = useAuthStore((s) => s.logout);
+  const [loginOpen, setLoginOpen] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  const handleLogin = () => {
+    const res = login(email, password);
+    if (res.ok) {
+      toast.success("Sesión iniciada", { description: email });
+      setLoginOpen(false);
+      setEmail("");
+      setPassword("");
+    } else {
+      toast.error(res.error);
+    }
+  };
 
   const totalItems = suitcases.reduce(
     (acc, s) => acc + s.items.reduce((a, i) => a + i.quantity, 0),
@@ -27,11 +57,27 @@ function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Bienvenido de nuevo</h1>
-        <p className="text-muted-foreground mt-1">
-          Aquí está el resumen de tus próximos viajes y equipajes.
-        </p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Bienvenido de nuevo</h1>
+          <p className="text-muted-foreground mt-1">
+            Aquí está el resumen de tus próximos viajes y equipajes.
+          </p>
+        </div>
+        {authedEmail ? (
+          <div className="flex items-center gap-2 border border-border rounded-lg px-3 py-2 bg-card">
+            <ShieldCheck className="h-4 w-4 text-primary" />
+            <span className="text-sm font-medium">{authedEmail}</span>
+            <Button variant="ghost" size="sm" onClick={() => { logout(); toast.success("Sesión cerrada"); }}>
+              <LogOut className="h-4 w-4 mr-1" /> Salir
+            </Button>
+          </div>
+        ) : (
+          <Button onClick={() => setLoginOpen(true)} variant="outline">
+            <LogIn className="h-4 w-4 mr-2" />
+            Iniciar sesión admin
+          </Button>
+        )}
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
@@ -156,6 +202,41 @@ function DashboardPage() {
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={loginOpen} onOpenChange={setLoginOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Iniciar sesión</DialogTitle>
+            <DialogDescription>Acceso restringido al administrador.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Email</label>
+              <Input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="tu@email.com"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Contraseña</label>
+              <Input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLoginOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleLogin}>Ingresar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

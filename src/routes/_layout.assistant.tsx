@@ -76,8 +76,7 @@ function AssistantPage() {
     if (!input.trim() || loading) return;
 
     const userText = input;
-    const userMsg: Message = { id: Date.now().toString(), role: "user", content: userText };
-    setMessages((prev) => [...prev, userMsg]);
+    addMessage({ id: Date.now().toString(), role: "user", content: userText });
     setInput("");
     setLoading(true);
 
@@ -96,14 +95,11 @@ function AssistantPage() {
         } else {
           toast.error(err.error || "No pude generar la lista");
         }
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: (Date.now() + 1).toString(),
-            role: "assistant",
-            content: "Tuve un problema generando la lista. ¿Probamos de nuevo?",
-          },
-        ]);
+        addMessage({
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: "Tuve un problema generando la lista. ¿Probamos de nuevo?",
+        });
         return;
       }
       const data = (await res.json()) as {
@@ -117,7 +113,7 @@ function AssistantPage() {
         (acc, it) => acc + it.weight * (it.quantity ?? 1),
         0,
       );
-      const aiMsg: Message = {
+      addMessage({
         id: (Date.now() + 1).toString(),
         role: "assistant",
         content: `Armé una valija para ${data.days} día${data.days === 1 ? "" : "s"} en ${data.destination} (${data.occasion}). Podés modificarla, guardarla como checklist o crearla como valija.`,
@@ -129,8 +125,7 @@ function AssistantPage() {
           items: data.items,
           totalWeight,
         },
-      };
-      setMessages((prev) => [...prev, aiMsg]);
+      });
     } catch {
       toast.error("No pude conectar con el asistente.");
     } finally {
@@ -167,11 +162,7 @@ function AssistantPage() {
       (acc, it) => acc + it.weight * (it.quantity ?? 1),
       0,
     );
-    setMessages((prev) =>
-      prev.map((m) =>
-        m.id === msgId ? { ...m, suggestion: { ...suggestion, totalWeight: total } } : m,
-      ),
-    );
+    updateSuggestionInStore(msgId, { ...suggestion, totalWeight: total });
   };
 
   const editingMsg = messages.find((m) => m.id === editingMsgId);
@@ -221,7 +212,7 @@ function AssistantPage() {
         <Button
           variant="outline"
           size="sm"
-          onClick={() => setMessages([INITIAL_MESSAGE])}
+          onClick={() => resetChat()}
         >
           <Plus className="h-4 w-4 mr-2" />
           Nueva consulta

@@ -30,28 +30,8 @@ export const Route = createFileRoute("/_layout/assistant")({
 });
 
 type SuggestionItem = { category: string; name: string; weight: number; quantity?: number };
-type Suggestion = {
-  destination: string;
-  weather: string;
-  days?: number;
-  occasion?: string;
-  items: SuggestionItem[];
-  totalWeight: number;
-};
-
-type Message = {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  suggestion?: Suggestion;
-};
-
-const INITIAL_MESSAGE: Message = {
-  id: "1",
-  role: "assistant",
-  content:
-    "¡Hola! Soy tu asistente de equipaje. Contame sobre tu próximo viaje (destino, clima, días, eventos) y te armo la valija ideal.",
-};
+type Suggestion = ChatSuggestion;
+type Message = ChatMessage;
 
 const CATEGORIES = [
   "Remeras",
@@ -65,7 +45,10 @@ const CATEGORIES = [
 ];
 
 function AssistantPage() {
-  const [messages, setMessages] = useState<Message[]>([INITIAL_MESSAGE]);
+  const messages = useChatStore((s) => s.messages);
+  const addMessage = useChatStore((s) => s.addMessage);
+  const updateSuggestionInStore = useChatStore((s) => s.updateSuggestion);
+  const resetChat = useChatStore((s) => s.reset);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);

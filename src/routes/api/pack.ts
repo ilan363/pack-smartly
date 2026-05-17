@@ -24,12 +24,22 @@ type PackItem = {
   weight: number;
 };
 
+type ForecastDay = {
+  day: number;
+  label: string;
+  tempMin: number;
+  tempMax: number;
+  conditions: string;
+  icon: "sun" | "cloud" | "rain" | "snow" | "storm" | "partly";
+};
+
 type PackSuggestion = {
   destination: string;
   days: number;
   weather: string;
   occasion: string;
   items: PackItem[];
+  forecast: ForecastDay[];
 };
 
 type RawPackItem = {
@@ -219,6 +229,84 @@ function inferWeather(prompt: string, destination: string, warm: boolean, cold: 
   return `${RANGES[zone][season]} — pronóstico aproximado para tu estadía de ${days} día${days === 1 ? "" : "s"} (${season}).`;
 }
 
+function buildForecast(destination: string, days: number, warm: boolean, cold: boolean): ForecastDay[] {
+  const promptCold = cold;
+  const { zone, hemisphere } = detectClimate(destination);
+  const month = new Date().getUTCMonth();
+  const season = monthSeason(month, hemisphere);
+
+  type Range = { min: [number, number]; max: [number, number]; conds: { c: string; i: ForecastDay["icon"]; w: number }[] };
+  const BY_ZONE: Record<ClimateZone, Record<string, Range>> = {
+    tropical: {
+      verano: { min: [23, 26], max: [30, 34], conds: [{ c: "Soleado y húmedo", i: "sun", w: 3 }, { c: "Parcialmente nublado", i: "partly", w: 3 }, { c: "Lluvias breves", i: "rain", w: 2 }, { c: "Tormenta tropical", i: "storm", w: 1 }] },
+      invierno: { min: [18, 22], max: [25, 30], conds: [{ c: "Soleado", i: "sun", w: 4 }, { c: "Parcialmente nublado", i: "partly", w: 3 }, { c: "Llovizna", i: "rain", w: 1 }] },
+      primavera: { min: [20, 24], max: [27, 32], conds: [{ c: "Soleado", i: "sun", w: 3 }, { c: "Parcialmente nublado", i: "partly", w: 3 }, { c: "Chubascos", i: "rain", w: 2 }] },
+      otoño: { min: [19, 23], max: [26, 31], conds: [{ c: "Nublado", i: "cloud", w: 3 }, { c: "Lluvias", i: "rain", w: 3 }, { c: "Parcialmente nublado", i: "partly", w: 2 }] },
+    },
+    mediterranean: {
+      verano: { min: [19, 23], max: [28, 34], conds: [{ c: "Soleado", i: "sun", w: 5 }, { c: "Parcialmente nublado", i: "partly", w: 2 }] },
+      invierno: { min: [4, 9], max: [9, 15], conds: [{ c: "Nublado", i: "cloud", w: 3 }, { c: "Lluvia", i: "rain", w: 3 }, { c: "Parcialmente nublado", i: "partly", w: 2 }] },
+      primavera: { min: [10, 15], max: [17, 23], conds: [{ c: "Soleado", i: "sun", w: 3 }, { c: "Parcialmente nublado", i: "partly", w: 3 }, { c: "Lluvias dispersas", i: "rain", w: 2 }] },
+      otoño: { min: [11, 16], max: [18, 24], conds: [{ c: "Parcialmente nublado", i: "partly", w: 3 }, { c: "Lluvias", i: "rain", w: 2 }, { c: "Soleado", i: "sun", w: 2 }] },
+    },
+    temperate: {
+      verano: { min: [15, 19], max: [22, 28], conds: [{ c: "Soleado", i: "sun", w: 3 }, { c: "Parcialmente nublado", i: "partly", w: 3 }, { c: "Chubascos", i: "rain", w: 1 }] },
+      invierno: { min: [-3, 3], max: [3, 9], conds: [{ c: "Nublado", i: "cloud", w: 3 }, { c: "Lluvia", i: "rain", w: 2 }, { c: "Nieve", i: "snow", w: 2 }] },
+      primavera: { min: [6, 12], max: [13, 21], conds: [{ c: "Variable", i: "partly", w: 3 }, { c: "Lluvia", i: "rain", w: 2 }, { c: "Soleado", i: "sun", w: 2 }] },
+      otoño: { min: [5, 10], max: [11, 18], conds: [{ c: "Nublado", i: "cloud", w: 3 }, { c: "Lluvia", i: "rain", w: 2 }, { c: "Parcialmente nublado", i: "partly", w: 2 }] },
+    },
+    cold: {
+      verano: { min: [2, 6], max: [8, 14], conds: [{ c: "Nublado y ventoso", i: "cloud", w: 3 }, { c: "Lluvia", i: "rain", w: 2 }, { c: "Parcialmente nublado", i: "partly", w: 2 }] },
+      invierno: { min: [-12, -5], max: [-5, 2], conds: [{ c: "Nieve", i: "snow", w: 5 }, { c: "Nublado", i: "cloud", w: 2 }] },
+      primavera: { min: [-3, 2], max: [3, 9], conds: [{ c: "Nieve", i: "snow", w: 3 }, { c: "Nublado", i: "cloud", w: 3 }, { c: "Lluvia fría", i: "rain", w: 1 }] },
+      otoño: { min: [0, 5], max: [5, 11], conds: [{ c: "Viento intenso", i: "cloud", w: 3 }, { c: "Lluvia", i: "rain", w: 2 }, { c: "Nieve temprana", i: "snow", w: 1 }] },
+    },
+    desert: {
+      verano: { min: [22, 27], max: [36, 45], conds: [{ c: "Soleado extremo", i: "sun", w: 6 }] },
+      invierno: { min: [6, 12], max: [18, 25], conds: [{ c: "Soleado", i: "sun", w: 4 }, { c: "Parcialmente nublado", i: "partly", w: 2 }] },
+      primavera: { min: [12, 17], max: [25, 33], conds: [{ c: "Soleado", i: "sun", w: 5 }, { c: "Viento con polvo", i: "cloud", w: 1 }] },
+      otoño: { min: [13, 18], max: [24, 32], conds: [{ c: "Soleado", i: "sun", w: 5 }, { c: "Parcialmente nublado", i: "partly", w: 1 }] },
+    },
+    unknown: {
+      verano: { min: warm ? [20, 24] : [16, 20], max: warm ? [28, 32] : [22, 27], conds: [{ c: "Soleado", i: "sun", w: 3 }, { c: "Parcialmente nublado", i: "partly", w: 2 }] },
+      invierno: { min: promptCold ? [-3, 2] : [4, 9], max: promptCold ? [3, 8] : [10, 15], conds: [{ c: "Nublado", i: "cloud", w: 2 }, { c: "Parcialmente nublado", i: "partly", w: 2 }, { c: "Lluvia", i: "rain", w: 1 }] },
+      primavera: { min: [10, 14], max: [16, 22], conds: [{ c: "Variable", i: "partly", w: 3 }, { c: "Lluvia", i: "rain", w: 1 }] },
+      otoño: { min: [8, 13], max: [14, 20], conds: [{ c: "Nublado", i: "cloud", w: 2 }, { c: "Parcialmente nublado", i: "partly", w: 2 }, { c: "Lluvia", i: "rain", w: 1 }] },
+    },
+  };
+
+  const range = BY_ZONE[zone][season];
+  const totalW = range.conds.reduce((a, c) => a + c.w, 0);
+  // Deterministic pseudo-random per destination so the same trip stays stable
+  const seedBase = Array.from(destination).reduce((a, c) => a + c.charCodeAt(0), 0) + month;
+  const rand = (i: number) => {
+    const x = Math.sin(seedBase * 9301 + i * 49297) * 233280;
+    return x - Math.floor(x);
+  };
+  const today = new Date();
+  const dayNames = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+
+  const out: ForecastDay[] = [];
+  for (let i = 0; i < Math.min(days, 14); i++) {
+    const r1 = rand(i + 1);
+    const r2 = rand(i + 50);
+    const r3 = rand(i + 99);
+    const tempMin = Math.round(range.min[0] + (range.min[1] - range.min[0]) * r1);
+    const tempMax = Math.round(range.max[0] + (range.max[1] - range.max[0]) * r2);
+    let acc = r3 * totalW;
+    let picked = range.conds[0];
+    for (const c of range.conds) {
+      acc -= c.w;
+      if (acc <= 0) { picked = c; break; }
+    }
+    const date = new Date(today);
+    date.setDate(today.getDate() + i);
+    const label = `${dayNames[date.getDay()]} ${date.getDate()}/${date.getMonth() + 1}`;
+    out.push({ day: i + 1, label, tempMin, tempMax: Math.max(tempMax, tempMin + 2), conditions: picked.c, icon: picked.i });
+  }
+  return out;
+}
+
 function normalizeCategory(category: string | undefined, name: string): Category {
   if (CATEGORIES.includes(category as Category)) return category as Category;
   const text = normalizeText(`${category ?? ""} ${name}`);
@@ -337,6 +425,7 @@ function normalizeSuggestion(raw: unknown, prompt: string): PackSuggestion {
     weather,
     occasion,
     items: merged.slice(0, 22),
+    forecast: buildForecast(destination, days, context.warm, context.cold),
   };
 }
 

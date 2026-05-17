@@ -139,18 +139,84 @@ function titleCase(value: string) {
   return value.replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
-function inferWeather(prompt: string, destination: string, warm: boolean, cold: boolean) {
-  const normalized = normalizeText(`${prompt} ${destination}`);
-  if (/calor|calido|cálido|playa|verano/.test(prompt.toLowerCase()) || warm) {
-    return "Cálido, con prendas livianas y protección solar sugerida";
+type ClimateZone = "tropical" | "mediterranean" | "temperate" | "cold" | "desert" | "unknown";
+
+const DESTINATION_CLIMATE: { match: RegExp; zone: ClimateZone; hemisphere: "N" | "S" }[] = [
+  { match: /brasil|rio|salvador|fortaleza|recife|caribe|cancun|cuba|punta cana|cartagena|miami|hawaii|bali|tailandia|phuket|maldivas/, zone: "tropical", hemisphere: "N" },
+  { match: /espana|españa|madrid|barcelona|valencia|sevilla|italia|roma|grecia|portugal|lisboa|marsella/, zone: "mediterranean", hemisphere: "N" },
+  { match: /ushuaia|patagonia|bariloche|calafate|islandia|noruega|alaska|finlandia|laponia/, zone: "cold", hemisphere: "N" },
+  { match: /paris|londres|berlin|amsterdam|nueva york|new york|chicago|toronto|moscu/, zone: "temperate", hemisphere: "N" },
+  { match: /buenos aires|santiago|montevideo|cordoba|mendoza|rosario|lima/, zone: "temperate", hemisphere: "S" },
+  { match: /dubai|egipto|cairo|marruecos|sahara|arizona|las vegas/, zone: "desert", hemisphere: "N" },
+];
+
+function detectClimate(destination: string): { zone: ClimateZone; hemisphere: "N" | "S" } {
+  const n = normalizeText(destination);
+  for (const c of DESTINATION_CLIMATE) if (c.match.test(n)) return { zone: c.zone, hemisphere: c.hemisphere };
+  return { zone: "unknown", hemisphere: "N" };
+}
+
+function monthSeason(month: number, hemisphere: "N" | "S"): "verano" | "invierno" | "primavera" | "otoño" {
+  const map = ["invierno", "invierno", "primavera", "primavera", "primavera", "verano", "verano", "verano", "otoño", "otoño", "otoño", "invierno"] as const;
+  const s = map[month];
+  if (hemisphere === "N") return s;
+  const flip: Record<string, "verano" | "invierno" | "primavera" | "otoño"> = { verano: "invierno", invierno: "verano", primavera: "otoño", otoño: "primavera" };
+  return flip[s];
+}
+
+function inferWeather(prompt: string, destination: string, warm: boolean, cold: boolean, days = 3) {
+  const promptLower = prompt.toLowerCase();
+  if (/calor|calido|cálido|playa|verano/.test(promptLower) && !cold) {
+    return `Cálido durante los ${days} días: prendas livianas, hidratación y protección solar.`;
   }
-  if (/frio|frío|nieve|invierno|ushuaia|patagonia|ski|esqui/.test(normalized) || cold) {
-    return "Frío, conviene llevar abrigo térmico y capas";
+  if (/frio|frío|nieve|invierno|ski|esqui/.test(promptLower) || cold) {
+    return `Frío intenso a lo largo de los ${days} días: abrigo térmico, capas y guantes.`;
   }
-  if (/espana|españa|madrid|barcelona|valencia/.test(normalized)) {
-    return "Templado variable; ideal llevar capas livianas y una campera fina";
-  }
-  return "Templado variable; lista pensada para adaptar capas según el día";
+
+  const { zone, hemisphere } = detectClimate(destination);
+  const month = new Date().getUTCMonth();
+  const season = monthSeason(month, hemisphere);
+
+  const RANGES: Record<ClimateZone, Record<string, string>> = {
+    tropical: {
+      verano: "Caluroso y húmedo (28–34°C), lluvias breves posibles",
+      invierno: "Cálido y seco (22–29°C), noches frescas",
+      primavera: "Cálido (25–31°C), humedad moderada",
+      otoño: "Cálido con chubascos (24–30°C)",
+    },
+    mediterranean: {
+      verano: "Caluroso y seco (26–34°C), noches templadas",
+      invierno: "Templado fresco (6–14°C), lluvias dispersas",
+      primavera: "Agradable (14–22°C), ideal para capas livianas",
+      otoño: "Templado (15–24°C), tardes cálidas y noches frescas",
+    },
+    temperate: {
+      verano: "Templado cálido (20–28°C)",
+      invierno: "Frío (-2 a 8°C), abrigo necesario",
+      primavera: "Variable (10–20°C), llevar capas",
+      otoño: "Fresco (8–18°C), posibles lluvias",
+    },
+    cold: {
+      verano: "Fresco (5–14°C), viento y lluvia probable",
+      invierno: "Frío extremo (-10 a 2°C), nieve frecuente",
+      primavera: "Frío (0–8°C), aún con nieve",
+      otoño: "Frío (2–10°C), viento intenso",
+    },
+    desert: {
+      verano: "Muy caluroso de día (35–45°C), noches frescas",
+      invierno: "Templado de día (18–25°C), noches frías",
+      primavera: "Cálido seco (25–33°C)",
+      otoño: "Cálido seco (24–32°C)",
+    },
+    unknown: {
+      verano: warm ? "Cálido (24–30°C)" : "Templado cálido (20–26°C)",
+      invierno: cold ? "Frío (0–8°C)" : "Templado fresco (8–15°C)",
+      primavera: "Templado variable (14–22°C)",
+      otoño: "Templado variable (12–20°C)",
+    },
+  };
+
+  return `${RANGES[zone][season]} — pronóstico aproximado para tu estadía de ${days} día${days === 1 ? "" : "s"} (${season}).`;
 }
 
 function normalizeCategory(category: string | undefined, name: string): Category {

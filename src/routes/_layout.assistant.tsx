@@ -23,6 +23,7 @@ import {
 import { toast } from "sonner";
 import { useSuitcasesStore, type SuitcaseType } from "@/lib/suitcases-store";
 import { useChecklistsStore } from "@/lib/checklists-store";
+import { useChatStore, type ChatMessage, type ChatSuggestion } from "@/lib/chat-store";
 
 export const Route = createFileRoute("/_layout/assistant")({
   component: AssistantPage,

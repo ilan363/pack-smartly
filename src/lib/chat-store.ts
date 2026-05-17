@@ -8,6 +8,15 @@ export type ChatSuggestionItem = {
   quantity?: number;
 };
 
+export type ForecastDay = {
+  day: number;
+  label: string;
+  tempMin: number;
+  tempMax: number;
+  conditions: string;
+  icon: "sun" | "cloud" | "rain" | "snow" | "storm" | "partly";
+};
+
 export type ChatSuggestion = {
   destination: string;
   weather: string;
@@ -15,6 +24,7 @@ export type ChatSuggestion = {
   occasion?: string;
   items: ChatSuggestionItem[];
   totalWeight: number;
+  forecast?: ForecastDay[];
 };
 
 export type ChatMessage = {

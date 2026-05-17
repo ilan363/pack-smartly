@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useRef, useEffect } from "react";
-import { Bot, Send, User, Sparkles, Plus, Trash2, BookmarkPlus, Loader2 } from "lucide-react";
+import { Bot, Send, User, Sparkles, Plus, Trash2, BookmarkPlus, Loader2, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -108,6 +108,7 @@ function AssistantPage() {
         days: number;
         occasion: string;
         items: SuggestionItem[];
+        forecast?: import("@/lib/chat-store").ForecastDay[];
       };
       const totalWeight = data.items.reduce(
         (acc, it) => acc + it.weight * (it.quantity ?? 1),
@@ -116,7 +117,7 @@ function AssistantPage() {
       addMessage({
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: `Armé una valija para ${data.days} día${data.days === 1 ? "" : "s"} en ${data.destination} (${data.occasion}). Podés modificarla, guardarla como checklist o crearla como valija.`,
+        content: `Armé una valija para ${data.days} día${data.days === 1 ? "" : "s"} en ${data.destination} (${data.occasion}). Mirá el cronograma del clima abajo.`,
         suggestion: {
           destination: data.destination,
           weather: data.weather,
@@ -124,6 +125,7 @@ function AssistantPage() {
           occasion: data.occasion,
           items: data.items,
           totalWeight,
+          forecast: data.forecast,
         },
       });
     } catch {
@@ -262,6 +264,28 @@ function AssistantPage() {
                         Clima: {msg.suggestion.weather}
                       </div>
                     </div>
+                    {msg.suggestion.forecast && msg.suggestion.forecast.length > 0 && (
+                      <div className="p-4 border-b border-border bg-muted/20">
+                        <div className="font-semibold text-xs uppercase tracking-wider text-muted-foreground mb-3">
+                          Cronograma del clima ({msg.suggestion.forecast.length} día{msg.suggestion.forecast.length === 1 ? "" : "s"})
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                          {msg.suggestion.forecast.map((f) => {
+                            const Icon = f.icon === "sun" ? Sun : f.icon === "cloud" ? Cloud : f.icon === "rain" ? CloudRain : f.icon === "snow" ? CloudSnow : f.icon === "storm" ? CloudLightning : CloudSun;
+                            const tone = f.icon === "snow" ? "text-sky-500" : f.icon === "rain" || f.icon === "storm" ? "text-blue-500" : f.icon === "cloud" ? "text-muted-foreground" : "text-amber-500";
+                            return (
+                              <div key={f.day} className="border border-border rounded-lg p-2 bg-background flex flex-col items-center text-center">
+                                <div className="text-[11px] font-semibold text-muted-foreground">Día {f.day}</div>
+                                <div className="text-[10px] text-muted-foreground">{f.label}</div>
+                                <Icon className={`h-6 w-6 my-1 ${tone}`} />
+                                <div className="text-sm font-bold">{f.tempMax}° / <span className="text-muted-foreground font-medium">{f.tempMin}°</span></div>
+                                <div className="text-[10px] text-muted-foreground leading-tight mt-0.5">{f.conditions}</div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                     <div className="p-4 space-y-3">
                       <div className="font-semibold text-xs uppercase tracking-wider text-muted-foreground mb-2">
                         Prendas recomendadas

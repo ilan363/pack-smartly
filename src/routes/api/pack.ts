@@ -318,7 +318,7 @@ function normalizeSuggestion(raw: unknown, prompt: string): PackSuggestion {
   const destination = context.destination !== "Destino indicado" ? context.destination : data.destination?.trim() || context.destination;
   const days = context.days || data.days || 3;
   const occasion = context.occasion !== "Viaje urbano" ? context.occasion : data.occasion?.trim() || context.occasion;
-  const weather = data.weather?.trim() || inferWeather(prompt, destination, context.warm, context.cold);
+  const weather = data.weather?.trim() || inferWeather(prompt, destination, context.warm, context.cold, days);
   const aiItems = (data.items ?? []).map(normalizeItem).filter((item): item is PackItem => Boolean(item));
   const blockedSnow = !context.cold && !/nieve|ski|esqui|ushuaia|patagonia/i.test(prompt);
   const filteredItems = blockedSnow

@@ -108,6 +108,7 @@ function AssistantPage() {
         days: number;
         occasion: string;
         items: SuggestionItem[];
+        forecast?: import("@/lib/chat-store").ForecastDay[];
       };
       const totalWeight = data.items.reduce(
         (acc, it) => acc + it.weight * (it.quantity ?? 1),
@@ -116,7 +117,7 @@ function AssistantPage() {
       addMessage({
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: `Armé una valija para ${data.days} día${data.days === 1 ? "" : "s"} en ${data.destination} (${data.occasion}). Podés modificarla, guardarla como checklist o crearla como valija.`,
+        content: `Armé una valija para ${data.days} día${data.days === 1 ? "" : "s"} en ${data.destination} (${data.occasion}). Mirá el cronograma del clima abajo.`,
         suggestion: {
           destination: data.destination,
           weather: data.weather,
@@ -124,6 +125,7 @@ function AssistantPage() {
           occasion: data.occasion,
           items: data.items,
           totalWeight,
+          forecast: data.forecast,
         },
       });
     } catch {

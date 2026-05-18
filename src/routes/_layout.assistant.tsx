@@ -49,7 +49,13 @@ function AssistantPage() {
   const addMessage = useChatStore((s) => s.addMessage);
   const updateSuggestionInStore = useChatStore((s) => s.updateSuggestion);
   const resetChat = useChatStore((s) => s.reset);
-  const [input, setInput] = useState("");
+  const [form, setForm] = useState({
+    destination: "",
+    from: "",
+    to: "",
+    occasion: "",
+    notes: "",
+  });
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();

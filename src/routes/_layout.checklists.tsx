@@ -101,6 +101,7 @@ function ChecklistsPage() {
                       </div>
                       <div className="text-xs text-muted-foreground">{pct}%</div>
                     </div>
+                    <ShareChecklistButton checklist={c} />
                     <Button
                       variant="ghost"
                       size="icon"

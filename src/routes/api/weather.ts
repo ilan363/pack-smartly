@@ -1,0 +1,257 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { z } from "zod";
+import type {
+  WeatherForecastResponse,
+  WeatherHour,
+  WeatherDaySummary,
+  WeatherSpot,
+} from "@/lib/weather/types";
+
+/**
+ * Server route: /api/weather
+ *
+ * Devuelve un pronóstico normalizado (estilo Windguru) para cualquier
+ * ubicación buscada por nombre o por lat/lon.
+ *
+ * Provider actual: Open-Meteo (gratis, sin API key, soporta datos marinos).
+ *
+ * ────────────────────────────────────────────────────────────────────
+ * CÓMO SWAPPEAR A WINDGURU REAL:
+ * ────────────────────────────────────────────────────────────────────
+ * 1. Pedile a Lovable que agregue los secrets:
+ *      WINDGURU_STATION_ID, WINDGURU_PASSWORD, WINDGURU_UID
+ * 2. Reemplazá fetchOpenMeteo() por una llamada a:
+ *      https://www.windguru.cz/int/iapi.php?q=forecast&id_model=3
+ *        &id_spot={station}&uid={uid}&password={pw}
+ *    (Windguru entrega CSV/XML — parsealo y mapealo a WeatherHour[].)
+ * 3. NO uses process.env.WINDGURU_* fuera del handler — el server route
+ *    los inyecta solo en runtime.
+ * ────────────────────────────────────────────────────────────────────
+ */
+
+const QuerySchema = z.object({
+  q: z.string().min(1).max(120).optional(),
+  lat: z.coerce.number().min(-90).max(90).optional(),
+  lon: z.coerce.number().min(-180).max(180).optional(),
+  days: z.coerce.number().int().min(1).max(14).optional().default(5),
+});
+
+const CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+} as const;
+
+export const Route = createFileRoute("/api/weather")({
+  server: {
+    handlers: {
+      OPTIONS: async () => new Response(null, { status: 204, headers: CORS }),
+      GET: async ({ request }) => {
+        try {
+          const url = new URL(request.url);
+          const parsed = QuerySchema.safeParse({
+            q: url.searchParams.get("q") ?? undefined,
+            lat: url.searchParams.get("lat") ?? undefined,
+            lon: url.searchParams.get("lon") ?? undefined,
+            days: url.searchParams.get("days") ?? undefined,
+          });
+          if (!parsed.success) {
+            return json({ error: "Parámetros inválidos" }, 400);
+          }
+          const { q, lat, lon, days } = parsed.data;
+
+          let spot: WeatherSpot;
+          if (typeof lat === "number" && typeof lon === "number") {
+            spot = { name: q ?? `${lat.toFixed(2)}, ${lon.toFixed(2)}`, latitude: lat, longitude: lon };
+          } else if (q) {
+            const geo = await geocode(q);
+            if (!geo) return json({ error: `No encontré "${q}"` }, 404);
+            spot = geo;
+          } else {
+            return json({ error: "Indicá un destino o coordenadas" }, 400);
+          }
+
+          const data = await fetchOpenMeteo(spot, days);
+          return json(data, 200, {
+            "Cache-Control": "public, max-age=600", // 10 min
+          });
+        } catch (err) {
+          console.error("weather route error", err);
+          return json({ error: "No pude obtener el clima ahora" }, 502);
+        }
+      },
+    },
+  },
+});
+
+function json(body: unknown, status = 200, extra: Record<string, string> = {}) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json", ...CORS, ...extra },
+  });
+}
+
+// ── Geocoding (Open-Meteo, gratis) ────────────────────────────────
+async function geocode(name: string): Promise<WeatherSpot | null> {
+  const url = new URL("https://geocoding-api.open-meteo.com/v1/search");
+  url.searchParams.set("name", name);
+  url.searchParams.set("count", "1");
+  url.searchParams.set("language", "es");
+  url.searchParams.set("format", "json");
+  const res = await fetch(url.toString());
+  if (!res.ok) return null;
+  const data = (await res.json()) as {
+    results?: Array<{
+      name: string;
+      latitude: number;
+      longitude: number;
+      country?: string;
+      timezone?: string;
+    }>;
+  };
+  const r = data.results?.[0];
+  if (!r) return null;
+  return {
+    name: r.name,
+    latitude: r.latitude,
+    longitude: r.longitude,
+    country: r.country,
+    timezone: r.timezone,
+  };
+}
+
+// ── Forecast fetcher ──────────────────────────────────────────────
+async function fetchOpenMeteo(spot: WeatherSpot, days: number): Promise<WeatherForecastResponse> {
+  const fc = new URL("https://api.open-meteo.com/v1/forecast");
+  fc.searchParams.set("latitude", String(spot.latitude));
+  fc.searchParams.set("longitude", String(spot.longitude));
+  fc.searchParams.set("timezone", "auto");
+  fc.searchParams.set("forecast_days", String(days));
+  fc.searchParams.set(
+    "hourly",
+    "temperature_2m,precipitation,wind_speed_10m,wind_gusts_10m,wind_direction_10m",
+  );
+  fc.searchParams.set(
+    "daily",
+    "temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,wind_gusts_10m_max",
+  );
+  fc.searchParams.set("current", "temperature_2m,precipitation,wind_speed_10m,wind_gusts_10m,wind_direction_10m");
+
+  // API marina (olas) — endpoint separado en Open-Meteo
+  const mr = new URL("https://marine-api.open-meteo.com/v1/marine");
+  mr.searchParams.set("latitude", String(spot.latitude));
+  mr.searchParams.set("longitude", String(spot.longitude));
+  mr.searchParams.set("timezone", "auto");
+  mr.searchParams.set("forecast_days", String(days));
+  mr.searchParams.set("hourly", "wave_height,wave_period,wave_direction");
+
+  const [fr, mrRes] = await Promise.all([
+    fetch(fc.toString()),
+    fetch(mr.toString()).catch(() => null), // olas pueden no existir tierra adentro
+  ]);
+  if (!fr.ok) throw new Error(`open-meteo ${fr.status}`);
+  const fJson = (await fr.json()) as OpenMeteoForecast;
+  const mJson = mrRes && mrRes.ok ? ((await mrRes.json()) as OpenMeteoMarine) : null;
+
+  const hourly: WeatherHour[] = fJson.hourly.time.map((t, i) => ({
+    time: t,
+    temperature: round(fJson.hourly.temperature_2m[i]),
+    precipitation: round(fJson.hourly.precipitation[i] ?? 0),
+    windSpeed: round(fJson.hourly.wind_speed_10m[i]),
+    windGust: round(fJson.hourly.wind_gusts_10m[i]),
+    windDirection: Math.round(fJson.hourly.wind_direction_10m[i]),
+    waveHeight: mJson ? pickByTime(mJson.hourly.time, mJson.hourly.wave_height, t) : null,
+    wavePeriod: mJson ? pickByTime(mJson.hourly.time, mJson.hourly.wave_period, t) : null,
+    waveDirection: mJson ? pickByTime(mJson.hourly.time, mJson.hourly.wave_direction, t) : null,
+  }));
+
+  const daily: WeatherDaySummary[] = fJson.daily.time.map((d, i) => ({
+    date: d,
+    tempMin: round(fJson.daily.temperature_2m_min[i]),
+    tempMax: round(fJson.daily.temperature_2m_max[i]),
+    precipitation: round(fJson.daily.precipitation_sum[i] ?? 0),
+    windMax: round(fJson.daily.wind_speed_10m_max[i]),
+    gustMax: round(fJson.daily.wind_gusts_10m_max[i]),
+    waveMax: mJson ? maxWaveForDay(mJson, d) : null,
+  }));
+
+  const current: WeatherHour = {
+    time: fJson.current.time,
+    temperature: round(fJson.current.temperature_2m),
+    precipitation: round(fJson.current.precipitation ?? 0),
+    windSpeed: round(fJson.current.wind_speed_10m),
+    windGust: round(fJson.current.wind_gusts_10m),
+    windDirection: Math.round(fJson.current.wind_direction_10m),
+    waveHeight: hourly[0]?.waveHeight ?? null,
+    wavePeriod: hourly[0]?.wavePeriod ?? null,
+    waveDirection: hourly[0]?.waveDirection ?? null,
+  };
+
+  return {
+    spot: { ...spot, timezone: fJson.timezone ?? spot.timezone },
+    current,
+    hourly,
+    daily,
+    provider: "open-meteo",
+    fetchedAt: new Date().toISOString(),
+  };
+}
+
+function pickByTime(times: string[], values: (number | null)[], t: string): number | null {
+  const idx = times.indexOf(t);
+  if (idx === -1) return null;
+  const v = values[idx];
+  return v == null ? null : round(v);
+}
+
+function maxWaveForDay(m: OpenMeteoMarine, date: string): number | null {
+  const heights: number[] = [];
+  m.hourly.time.forEach((t, i) => {
+    if (t.startsWith(date)) {
+      const v = m.hourly.wave_height[i];
+      if (typeof v === "number") heights.push(v);
+    }
+  });
+  if (!heights.length) return null;
+  return round(Math.max(...heights));
+}
+
+const round = (n: number) => Math.round(n * 10) / 10;
+
+// ── Tipos del provider (Open-Meteo) ───────────────────────────────
+type OpenMeteoForecast = {
+  timezone?: string;
+  current: {
+    time: string;
+    temperature_2m: number;
+    precipitation: number;
+    wind_speed_10m: number;
+    wind_gusts_10m: number;
+    wind_direction_10m: number;
+  };
+  hourly: {
+    time: string[];
+    temperature_2m: number[];
+    precipitation: number[];
+    wind_speed_10m: number[];
+    wind_gusts_10m: number[];
+    wind_direction_10m: number[];
+  };
+  daily: {
+    time: string[];
+    temperature_2m_max: number[];
+    temperature_2m_min: number[];
+    precipitation_sum: number[];
+    wind_speed_10m_max: number[];
+    wind_gusts_10m_max: number[];
+  };
+};
+
+type OpenMeteoMarine = {
+  hourly: {
+    time: string[];
+    wave_height: (number | null)[];
+    wave_period: (number | null)[];
+    wave_direction: (number | null)[];
+  };
+};

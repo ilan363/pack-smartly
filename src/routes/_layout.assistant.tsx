@@ -49,7 +49,13 @@ function AssistantPage() {
   const addMessage = useChatStore((s) => s.addMessage);
   const updateSuggestionInStore = useChatStore((s) => s.updateSuggestion);
   const resetChat = useChatStore((s) => s.reset);
-  const [input, setInput] = useState("");
+  const [form, setForm] = useState({
+    destination: "",
+    from: "",
+    to: "",
+    occasion: "",
+    notes: "",
+  });
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
@@ -72,19 +78,58 @@ function AssistantPage() {
     }
   }, [messages]);
 
-  const handleSend = async () => {
-    if (!input.trim() || loading) return;
+  const computeDays = () => {
+    if (!form.from || !form.to) return 0;
+    const a = new Date(form.from).getTime();
+    const b = new Date(form.to).getTime();
+    if (isNaN(a) || isNaN(b) || b < a) return 0;
+    return Math.max(1, Math.round((b - a) / 86400000) + 1);
+  };
 
-    const userText = input;
+  const handleSend = async () => {
+    if (loading) return;
+    const destination = form.destination.trim();
+    if (!destination) {
+      toast.error("Indicá el destino");
+      return;
+    }
+    if (!form.from || !form.to) {
+      toast.error("Indicá las fechas del viaje");
+      return;
+    }
+    const days = computeDays();
+    if (days <= 0) {
+      toast.error("Las fechas no son válidas");
+      return;
+    }
+    const occasion = form.occasion.trim();
+    const notes = form.notes.trim();
+    const userText = [
+      `Destino: ${destination}`,
+      `Desde: ${form.from}`,
+      `Hasta: ${form.to}`,
+      `Días: ${days}`,
+      occasion ? `Ocasión: ${occasion}` : null,
+      notes ? `Notas: ${notes}` : null,
+    ]
+      .filter(Boolean)
+      .join("\n");
+
     addMessage({ id: Date.now().toString(), role: "user", content: userText });
-    setInput("");
     setLoading(true);
 
     try {
       const res = await fetch("/api/pack", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: userText }),
+        body: JSON.stringify({
+          prompt: userText,
+          destination,
+          days,
+          occasion: occasion || undefined,
+          from: form.from,
+          to: form.to,
+        }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: "Error" }));
@@ -354,39 +399,80 @@ function AssistantPage() {
         </div>
 
         <div className="p-4 border-t border-border bg-background">
-          <div className="flex gap-2 mx-auto">
-            <Input
-              placeholder="Ej: Voy 3 días a un casamiento en España..."
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSend()}
-              disabled={loading}
-              className="rounded-full bg-muted/30 border-border focus-visible:ring-primary/20 h-12"
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="sm:col-span-2">
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Destino</label>
+              <Input
+                placeholder="Ej: Madrid, España"
+                value={form.destination}
+                onChange={(e) => setForm({ ...form, destination: e.target.value })}
+                disabled={loading}
+                className="mt-1"
+                maxLength={120}
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Desde</label>
+              <Input
+                type="date"
+                value={form.from}
+                onChange={(e) => setForm({ ...form, from: e.target.value })}
+                disabled={loading}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Hasta</label>
+              <Input
+                type="date"
+                value={form.to}
+                min={form.from || undefined}
+                onChange={(e) => setForm({ ...form, to: e.target.value })}
+                disabled={loading}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Ocasión</label>
+              <Input
+                placeholder="Ej: Casamiento, trabajo, playa..."
+                value={form.occasion}
+                onChange={(e) => setForm({ ...form, occasion: e.target.value })}
+                disabled={loading}
+                className="mt-1"
+                maxLength={120}
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Notas (opcional)</label>
+              <Input
+                placeholder="Algo más a tener en cuenta"
+                value={form.notes}
+                onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                disabled={loading}
+                className="mt-1"
+                maxLength={300}
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between mt-4 gap-3 flex-wrap">
+            <div className="text-xs text-muted-foreground">
+              {form.from && form.to && computeDays() > 0
+                ? `${computeDays()} día${computeDays() === 1 ? "" : "s"} de viaje`
+                : "Completá las fechas para calcular los días"}
+            </div>
             <Button
-              size="icon"
-              className="rounded-full h-12 w-12 shrink-0 bg-primary hover:bg-primary/90"
+              className="bg-primary hover:bg-primary/90"
               onClick={handleSend}
               disabled={loading}
             >
-              {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+              {loading ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Armando...</>
+              ) : (
+                <><Send className="h-4 w-4 mr-2" /> Armar valija</>
+              )}
             </Button>
-          </div>
-          <div className="text-center mt-3 flex justify-center gap-2 flex-wrap">
-            <Badge
-              variant="secondary"
-              className="cursor-pointer hover:bg-muted font-normal"
-              onClick={() => setInput("Voy a una boda en la playa")}
-            >
-              Voy a una boda en la playa
-            </Badge>
-            <Badge
-              variant="secondary"
-              className="cursor-pointer hover:bg-muted font-normal"
-              onClick={() => setInput("Solo llevo equipaje de mano")}
-            >
-              Solo equipaje de mano
-            </Badge>
           </div>
         </div>
       </Card>

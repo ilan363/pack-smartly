@@ -161,3 +161,149 @@ function ChecklistsPage() {
     </div>
   );
 }
+
+function buildShareText(c: Checklist) {
+  const header = `🧳 Lista de equipaje: ${c.title}\n📍 ${c.destination} · ${c.days} días · ${c.occasion} · ${c.weather}\n\n`;
+  const byCat = c.items.reduce<Record<string, typeof c.items>>((acc, it) => {
+    (acc[it.category] ||= []).push(it);
+    return acc;
+  }, {});
+  const body = Object.entries(byCat)
+    .map(([cat, items]) => {
+      const lines = items
+        .map((i) => `  ${i.checked ? "✅" : "⬜"} ${i.name}${i.quantity > 1 ? ` (x${i.quantity})` : ""}`)
+        .join("\n");
+      return `▸ ${cat}\n${lines}`;
+    })
+    .join("\n\n");
+  const total = c.items.reduce((s, i) => s + i.weight * i.quantity, 0);
+  return `${header}${body}\n\nPeso total: ${total.toFixed(2)} kg\n\nCompartido desde Travel Wolf 🐺`;
+}
+
+function ShareChecklistButton({ checklist }: { checklist: Checklist }) {
+  const [open, setOpen] = useState(false);
+  const [emails, setEmails] = useState("");
+  const text = buildShareText(checklist);
+
+  const copy = async (value: string, label = "Copiado al portapapeles") => {
+    try {
+      await navigator.clipboard.writeText(value);
+      toast.success(label);
+    } catch {
+      toast.error("No se pudo copiar");
+    }
+  };
+
+  const nativeShare = async () => {
+    if (typeof navigator !== "undefined" && "share" in navigator) {
+      try {
+        await (navigator as Navigator & { share: (d: ShareData) => Promise<void> }).share({
+          title: `Travel Wolf · ${checklist.title}`,
+          text,
+        });
+        return;
+      } catch {
+        // user cancelled or unsupported, fallback below
+      }
+    }
+    copy(text, "Lista copiada — pegala donde quieras compartirla");
+  };
+
+  const sendEmails = () => {
+    const list = emails
+      .split(/[\s,;]+/)
+      .map((e) => e.trim())
+      .filter(Boolean);
+    if (list.length === 0) {
+      toast.error("Agregá al menos un email");
+      return;
+    }
+    const subject = encodeURIComponent(`Lista de equipaje: ${checklist.title}`);
+    const body = encodeURIComponent(text);
+    window.location.href = `mailto:${list.join(",")}?subject=${subject}&body=${body}`;
+    setOpen(false);
+  };
+
+  const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
+
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={() => setOpen(true)}
+        title="Compartir lista"
+      >
+        <Share2 className="h-4 w-4 text-primary" />
+      </Button>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Share2 className="h-5 w-5" /> Compartir lista
+            </DialogTitle>
+            <DialogDescription>
+              Enviá "{checklist.title}" a otros usuarios por email, WhatsApp o
+              copiando el contenido.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-2">
+              <Button variant="outline" onClick={nativeShare}>
+                <Share2 className="h-4 w-4 mr-2" /> Compartir…
+              </Button>
+              <Button variant="outline" asChild>
+                <a href={whatsappUrl} target="_blank" rel="noreferrer">
+                  <MessageCircle className="h-4 w-4 mr-2" /> WhatsApp
+                </a>
+              </Button>
+              <Button variant="outline" onClick={() => copy(text)}>
+                <Copy className="h-4 w-4 mr-2" /> Copiar lista
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => copy(window.location.href, "Link copiado")}
+              >
+                <LinkIcon className="h-4 w-4 mr-2" /> Copiar link
+              </Button>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium flex items-center gap-2">
+                <Mail className="h-4 w-4" /> Enviar por email
+              </label>
+              <Input
+                placeholder="amigo@mail.com, otro@mail.com"
+                value={emails}
+                onChange={(e) => setEmails(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Separá varios destinatarios con coma.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Vista previa</label>
+              <Textarea
+                readOnly
+                value={text}
+                className="h-40 text-xs font-mono"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setOpen(false)}>
+              Cerrar
+            </Button>
+            <Button onClick={sendEmails}>
+              <Mail className="h-4 w-4 mr-2" /> Enviar email
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}

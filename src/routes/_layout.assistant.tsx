@@ -399,39 +399,80 @@ function AssistantPage() {
         </div>
 
         <div className="p-4 border-t border-border bg-background">
-          <div className="flex gap-2 mx-auto">
-            <Input
-              placeholder="Ej: Voy 3 días a un casamiento en España..."
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSend()}
-              disabled={loading}
-              className="rounded-full bg-muted/30 border-border focus-visible:ring-primary/20 h-12"
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="sm:col-span-2">
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Destino</label>
+              <Input
+                placeholder="Ej: Madrid, España"
+                value={form.destination}
+                onChange={(e) => setForm({ ...form, destination: e.target.value })}
+                disabled={loading}
+                className="mt-1"
+                maxLength={120}
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Desde</label>
+              <Input
+                type="date"
+                value={form.from}
+                onChange={(e) => setForm({ ...form, from: e.target.value })}
+                disabled={loading}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Hasta</label>
+              <Input
+                type="date"
+                value={form.to}
+                min={form.from || undefined}
+                onChange={(e) => setForm({ ...form, to: e.target.value })}
+                disabled={loading}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Ocasión</label>
+              <Input
+                placeholder="Ej: Casamiento, trabajo, playa..."
+                value={form.occasion}
+                onChange={(e) => setForm({ ...form, occasion: e.target.value })}
+                disabled={loading}
+                className="mt-1"
+                maxLength={120}
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Notas (opcional)</label>
+              <Input
+                placeholder="Algo más a tener en cuenta"
+                value={form.notes}
+                onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                disabled={loading}
+                className="mt-1"
+                maxLength={300}
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between mt-4 gap-3 flex-wrap">
+            <div className="text-xs text-muted-foreground">
+              {form.from && form.to && computeDays() > 0
+                ? `${computeDays()} día${computeDays() === 1 ? "" : "s"} de viaje`
+                : "Completá las fechas para calcular los días"}
+            </div>
             <Button
-              size="icon"
-              className="rounded-full h-12 w-12 shrink-0 bg-primary hover:bg-primary/90"
+              className="bg-primary hover:bg-primary/90"
               onClick={handleSend}
               disabled={loading}
             >
-              {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+              {loading ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Armando...</>
+              ) : (
+                <><Send className="h-4 w-4 mr-2" /> Armar valija</>
+              )}
             </Button>
-          </div>
-          <div className="text-center mt-3 flex justify-center gap-2 flex-wrap">
-            <Badge
-              variant="secondary"
-              className="cursor-pointer hover:bg-muted font-normal"
-              onClick={() => setInput("Voy a una boda en la playa")}
-            >
-              Voy a una boda en la playa
-            </Badge>
-            <Badge
-              variant="secondary"
-              className="cursor-pointer hover:bg-muted font-normal"
-              onClick={() => setInput("Solo llevo equipaje de mano")}
-            >
-              Solo equipaje de mano
-            </Badge>
           </div>
         </div>
       </Card>

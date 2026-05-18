@@ -11,7 +11,6 @@ function AppLayout() {
 
   const navigation = [
     { name: "Dashboard", href: "/dashboard", icon: Home },
-    { name: "Mis Valijas", href: "/suitcases", icon: BaggageClaim },
     { name: "Asistente IA", href: "/assistant", icon: Bot },
     { name: "Listas", href: "/checklists", icon: ListChecks },
   ];

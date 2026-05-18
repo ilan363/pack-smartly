@@ -78,11 +78,6 @@ function AssistantPage() {
     }
   }, [messages]);
 
-  const handleSend = async () => {
-    if (!input.trim() || loading) return;
-
-    const userText = input;
-    addMessage({ id: Date.now().toString(), role: "user", content: userText });
   const computeDays = () => {
     if (!form.from || !form.to) return 0;
     const a = new Date(form.from).getTime();

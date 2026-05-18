@@ -83,14 +83,58 @@ function AssistantPage() {
 
     const userText = input;
     addMessage({ id: Date.now().toString(), role: "user", content: userText });
-    setInput("");
+  const computeDays = () => {
+    if (!form.from || !form.to) return 0;
+    const a = new Date(form.from).getTime();
+    const b = new Date(form.to).getTime();
+    if (isNaN(a) || isNaN(b) || b < a) return 0;
+    return Math.max(1, Math.round((b - a) / 86400000) + 1);
+  };
+
+  const handleSend = async () => {
+    if (loading) return;
+    const destination = form.destination.trim();
+    if (!destination) {
+      toast.error("Indicá el destino");
+      return;
+    }
+    if (!form.from || !form.to) {
+      toast.error("Indicá las fechas del viaje");
+      return;
+    }
+    const days = computeDays();
+    if (days <= 0) {
+      toast.error("Las fechas no son válidas");
+      return;
+    }
+    const occasion = form.occasion.trim();
+    const notes = form.notes.trim();
+    const userText = [
+      `Destino: ${destination}`,
+      `Desde: ${form.from}`,
+      `Hasta: ${form.to}`,
+      `Días: ${days}`,
+      occasion ? `Ocasión: ${occasion}` : null,
+      notes ? `Notas: ${notes}` : null,
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    addMessage({ id: Date.now().toString(), role: "user", content: userText });
     setLoading(true);
 
     try {
       const res = await fetch("/api/pack", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: userText }),
+        body: JSON.stringify({
+          prompt: userText,
+          destination,
+          days,
+          occasion: occasion || undefined,
+          from: form.from,
+          to: form.to,
+        }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: "Error" }));

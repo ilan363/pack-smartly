@@ -250,165 +250,37 @@ function AssistantPage() {
     navigate({ to: "/suitcases" });
   };
 
+  const iconFor = (i: string) => i === "sun" ? Sun : i === "cloud" ? Cloud : i === "rain" ? CloudRain : i === "snow" ? CloudSnow : i === "storm" ? CloudLightning : CloudSun;
+  const toneFor = (i: string) => i === "snow" ? "text-sky-500" : i === "rain" || i === "storm" ? "text-blue-500" : i === "cloud" ? "text-muted-foreground" : "text-amber-500";
+
   return (
-    <div className="flex flex-col h-[calc(100vh-8rem)] max-w-4xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
+    <div className="max-w-7xl mx-auto pb-10">
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Asistente IA</h1>
           <p className="text-muted-foreground mt-1">Arma tu valija automáticamente</p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => resetChat()}
-        >
+        <Button variant="outline" size="sm" onClick={() => resetChat()}>
           <Plus className="h-4 w-4 mr-2" />
           Nueva consulta
         </Button>
       </div>
 
-      <Card className="flex-1 flex flex-col overflow-hidden bg-background border-border shadow-sm">
-        <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-6">
-          {messages.map((msg) => (
-            <div
-              key={msg.id}
-              className={`flex gap-4 ${msg.role === "user" ? "flex-row-reverse" : ""}`}
-            >
-              <div
-                className={`h-8 w-8 shrink-0 rounded-lg flex items-center justify-center ${
-                  msg.role === "user"
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-foreground border border-border"
-                }`}
-              >
-                {msg.role === "user" ? <User size={16} /> : <Bot size={16} />}
-              </div>
-
-              <div
-                className={`flex flex-col gap-2 max-w-[80%] ${
-                  msg.role === "user" ? "items-end" : "items-start"
-                }`}
-              >
-                <div
-                  className={`px-4 py-3 rounded-2xl ${
-                    msg.role === "user"
-                      ? "bg-primary text-primary-foreground rounded-tr-sm"
-                      : "bg-muted/50 text-foreground border border-border rounded-tl-sm"
-                  }`}
-                >
-                  {msg.content}
-                </div>
-
-                {msg.suggestion && (
-                  <div className="mt-2 w-full border border-border rounded-xl bg-card overflow-hidden text-sm">
-                    <div className="bg-primary/5 p-4 border-b border-border">
-                      <div className="flex items-center gap-2 font-bold mb-1">
-                        <Sparkles className="h-4 w-4 text-primary" />
-                        Lista sugerida: {msg.suggestion.destination}
-                      </div>
-                      <div className="text-muted-foreground">
-                        Clima: {msg.suggestion.weather}
-                      </div>
-                    </div>
-                    {msg.suggestion.forecast && msg.suggestion.forecast.length > 0 && (
-                      <Collapsible defaultOpen>
-                        <CollapsibleTrigger className="w-full flex items-center justify-between px-4 py-3 border-b border-border bg-muted/20 hover:bg-muted/30 transition-colors group">
-                          <span className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">
-                            Cronograma del clima ({msg.suggestion.forecast.length} día{msg.suggestion.forecast.length === 1 ? "" : "s"})
-                          </span>
-                          <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform group-data-[state=closed]:rotate-[-90deg]" />
-                        </CollapsibleTrigger>
-                        <CollapsibleContent>
-                          <div className="p-4 border-b border-border bg-muted/10">
-                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                              {msg.suggestion.forecast.map((f) => {
-                                const Icon = f.icon === "sun" ? Sun : f.icon === "cloud" ? Cloud : f.icon === "rain" ? CloudRain : f.icon === "snow" ? CloudSnow : f.icon === "storm" ? CloudLightning : CloudSun;
-                                const tone = f.icon === "snow" ? "text-sky-500" : f.icon === "rain" || f.icon === "storm" ? "text-blue-500" : f.icon === "cloud" ? "text-muted-foreground" : "text-amber-500";
-                                return (
-                                  <div key={f.day} className="border border-border rounded-lg p-2 bg-background flex flex-col items-center text-center">
-                                    <div className="text-[11px] font-semibold text-muted-foreground">Día {f.day}</div>
-                                    <div className="text-[10px] text-muted-foreground">{f.label}</div>
-                                    <Icon className={`h-6 w-6 my-1 ${tone}`} />
-                                    <div className="text-sm font-bold">{f.tempMax}° / <span className="text-muted-foreground font-medium">{f.tempMin}°</span></div>
-                                    <div className="text-[10px] text-muted-foreground leading-tight mt-0.5">{f.conditions}</div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        </CollapsibleContent>
-                      </Collapsible>
-                    )}
-                    <div className="p-4 space-y-3">
-                      <div className="font-semibold text-xs uppercase tracking-wider text-muted-foreground mb-2">
-                        Prendas recomendadas
-                      </div>
-                      {msg.suggestion.items.map((item, i) => (
-                        <div key={i} className="flex justify-between items-center">
-                          <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="text-[10px] h-5">
-                              {item.category}
-                            </Badge>
-                            <span>
-                              {item.name}
-                              {item.quantity && item.quantity > 1
-                                ? ` (x${item.quantity})`
-                                : ""}
-                            </span>
-                          </div>
-                          <span className="text-muted-foreground text-xs">
-                            {(item.weight * (item.quantity ?? 1)).toFixed(2)} kg
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="bg-muted/30 p-4 border-t border-border flex justify-between items-center">
-                      <span className="font-medium">Peso estimado:</span>
-                      <span className="font-bold text-primary">
-                        {msg.suggestion.totalWeight.toFixed(2)} kg
-                      </span>
-                    </div>
-                    <div className="p-4 border-t border-border flex flex-wrap gap-2">
-                      <Button className="flex-1 min-w-[180px]" size="sm" onClick={() => openCreate(msg)}>
-                        Crear valija con esta lista
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => saveAsChecklist(msg)}
-                      >
-                        <BookmarkPlus className="h-4 w-4 mr-1" />
-                        Guardar lista
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setEditingMsgId(msg.id)}
-                      >
-                        Modificar
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </div>
+      <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-6 items-start">
+        {/* LEFT: Form */}
+        <Card className="p-5 lg:sticky lg:top-4 bg-background border-border shadow-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="h-9 w-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+              <Sparkles className="h-4 w-4" />
             </div>
-          ))}
-          {loading && (
-            <div className="flex gap-4">
-              <div className="h-8 w-8 shrink-0 rounded-lg flex items-center justify-center bg-muted text-foreground border border-border">
-                <Bot size={16} />
-              </div>
-              <div className="px-4 py-3 rounded-2xl bg-muted/50 text-foreground border border-border rounded-tl-sm flex items-center gap-2 text-sm">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Armando tu valija...
-              </div>
+            <div>
+              <div className="font-semibold leading-tight">Nuevo viaje</div>
+              <div className="text-xs text-muted-foreground">Completá los datos y armo todo</div>
             </div>
-          )}
-        </div>
+          </div>
 
-        <div className="p-4 border-t border-border bg-background">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="sm:col-span-2">
+          <div className="space-y-3">
+            <div>
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Destino</label>
               <Input
                 placeholder="Ej: Madrid, España"
@@ -419,71 +291,189 @@ function AssistantPage() {
                 maxLength={120}
               />
             </div>
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Desde</label>
-              <Input
-                type="date"
-                value={form.from}
-                onChange={(e) => setForm({ ...form, from: e.target.value })}
-                disabled={loading}
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Hasta</label>
-              <Input
-                type="date"
-                value={form.to}
-                min={form.from || undefined}
-                onChange={(e) => setForm({ ...form, to: e.target.value })}
-                disabled={loading}
-                className="mt-1"
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Desde</label>
+                <Input type="date" value={form.from} onChange={(e) => setForm({ ...form, from: e.target.value })} disabled={loading} className="mt-1" />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Hasta</label>
+                <Input type="date" value={form.to} min={form.from || undefined} onChange={(e) => setForm({ ...form, to: e.target.value })} disabled={loading} className="mt-1" />
+              </div>
             </div>
             <div>
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Ocasión</label>
-              <Input
-                placeholder="Ej: Casamiento, trabajo, playa..."
-                value={form.occasion}
-                onChange={(e) => setForm({ ...form, occasion: e.target.value })}
-                disabled={loading}
-                className="mt-1"
-                maxLength={120}
-              />
+              <Input placeholder="Casamiento, trabajo, playa..." value={form.occasion} onChange={(e) => setForm({ ...form, occasion: e.target.value })} disabled={loading} className="mt-1" maxLength={120} />
             </div>
             <div>
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Notas (opcional)</label>
-              <Input
-                placeholder="Algo más a tener en cuenta"
-                value={form.notes}
-                onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                disabled={loading}
-                className="mt-1"
-                maxLength={300}
-              />
+              <Input placeholder="Algo más a tener en cuenta" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} disabled={loading} className="mt-1" maxLength={300} />
             </div>
           </div>
 
-          <div className="flex items-center justify-between mt-4 gap-3 flex-wrap">
-            <div className="text-xs text-muted-foreground">
-              {form.from && form.to && computeDays() > 0
-                ? `${computeDays()} día${computeDays() === 1 ? "" : "s"} de viaje`
-                : "Completá las fechas para calcular los días"}
-            </div>
-            <Button
-              className="bg-primary hover:bg-primary/90"
-              onClick={handleSend}
-              disabled={loading}
-            >
-              {loading ? (
-                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Armando...</>
-              ) : (
-                <><Send className="h-4 w-4 mr-2" /> Armar valija</>
-              )}
-            </Button>
+          <div className="mt-4 p-3 rounded-lg bg-muted/40 border border-border text-xs text-muted-foreground">
+            {form.from && form.to && computeDays() > 0
+              ? `${computeDays()} día${computeDays() === 1 ? "" : "s"} de viaje`
+              : "Completá las fechas para calcular los días"}
           </div>
+
+          <Button className="w-full mt-4 bg-primary hover:bg-primary/90" onClick={handleSend} disabled={loading} size="lg">
+            {loading ? (
+              <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Armando...</>
+            ) : (
+              <><Send className="h-4 w-4 mr-2" /> Armar valija</>
+            )}
+          </Button>
+        </Card>
+
+        {/* RIGHT: Conversation + Results */}
+        <div ref={scrollRef} className="space-y-6 min-h-[60vh]">
+          {messages.map((msg) => (
+            <div key={msg.id} className="space-y-4">
+              <div className={`flex gap-3 ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
+                <div className={`h-8 w-8 shrink-0 rounded-lg flex items-center justify-center ${msg.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted text-foreground border border-border"}`}>
+                  {msg.role === "user" ? <User size={16} /> : <Bot size={16} />}
+                </div>
+                <div className={`px-4 py-3 rounded-2xl max-w-[85%] text-sm whitespace-pre-line ${msg.role === "user" ? "bg-primary text-primary-foreground rounded-tr-sm" : "bg-muted/50 text-foreground border border-border rounded-tl-sm"}`}>
+                  {msg.content}
+                </div>
+              </div>
+
+              {msg.suggestion && (
+                <div className="space-y-4">
+                  {/* HEADER summary */}
+                  <Card className="p-5 bg-gradient-to-br from-primary/10 via-primary/5 to-background border-primary/20">
+                    <div className="flex items-start justify-between gap-4 flex-wrap">
+                      <div>
+                        <div className="text-xs uppercase tracking-wider text-primary/80 font-semibold">Lista sugerida</div>
+                        <h2 className="text-2xl font-bold mt-1">{msg.suggestion.destination}</h2>
+                        <div className="flex items-center gap-2 mt-2 flex-wrap">
+                          <Badge variant="secondary">{msg.suggestion.days} día{msg.suggestion.days === 1 ? "" : "s"}</Badge>
+                          <Badge variant="secondary">{msg.suggestion.occasion}</Badge>
+                          <Badge className="bg-primary/15 text-primary border-primary/20 hover:bg-primary/20">{msg.suggestion.items.length} items</Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground mt-3 max-w-xl">{msg.suggestion.weather}</p>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Peso total</div>
+                        <div className="text-3xl font-bold text-primary">{msg.suggestion.totalWeight.toFixed(2)}<span className="text-base font-medium text-muted-foreground ml-1">kg</span></div>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2 mt-5">
+                      <Button onClick={() => openCreate(msg)} className="flex-1 min-w-[180px]">
+                        Crear valija con esta lista
+                      </Button>
+                      <Button variant="secondary" onClick={() => saveAsChecklist(msg)}>
+                        <BookmarkPlus className="h-4 w-4 mr-1" /> Guardar lista
+                      </Button>
+                      <Button variant="outline" onClick={() => setEditingMsgId(msg.id)}>
+                        Modificar
+                      </Button>
+                    </div>
+                  </Card>
+
+                  {/* WEATHER SCHEDULE — prominent */}
+                  {msg.suggestion.forecast && msg.suggestion.forecast.length > 0 && (
+                    <Card className="overflow-hidden border-border">
+                      <Collapsible defaultOpen>
+                        <CollapsibleTrigger className="w-full flex items-center justify-between p-4 hover:bg-muted/30 transition-colors group border-b border-border">
+                          <div className="flex items-center gap-3">
+                            <div className="h-9 w-9 rounded-lg bg-sky-500/10 text-sky-500 flex items-center justify-center">
+                              <CloudSun className="h-5 w-5" />
+                            </div>
+                            <div className="text-left">
+                              <div className="font-bold">Cronograma del clima</div>
+                              <div className="text-xs text-muted-foreground">{msg.suggestion.forecast.length} día{msg.suggestion.forecast.length === 1 ? "" : "s"} de pronóstico</div>
+                            </div>
+                          </div>
+                          <ChevronDown className="h-5 w-5 text-muted-foreground transition-transform group-data-[state=closed]:rotate-[-90deg]" />
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                          <div className="p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3">
+                            {msg.suggestion.forecast.map((f) => {
+                              const Icon = iconFor(f.icon);
+                              return (
+                                <div key={f.day} className="border border-border rounded-xl p-3 bg-card hover:shadow-md transition-shadow flex flex-col items-center text-center">
+                                  <div className="text-[11px] font-bold uppercase tracking-wider text-primary">Día {f.day}</div>
+                                  <div className="text-xs text-muted-foreground">{f.label}</div>
+                                  <Icon className={`h-10 w-10 my-2 ${toneFor(f.icon)}`} />
+                                  <div className="text-lg font-bold">{f.tempMax}°<span className="text-muted-foreground font-medium text-sm"> / {f.tempMin}°</span></div>
+                                  <div className="text-xs text-muted-foreground leading-tight mt-1">{f.conditions}</div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </CollapsibleContent>
+                      </Collapsible>
+                    </Card>
+                  )}
+
+                  {/* ITEMS — grouped by category */}
+                  <Card className="overflow-hidden border-border">
+                    <Collapsible defaultOpen>
+                      <CollapsibleTrigger className="w-full flex items-center justify-between p-4 hover:bg-muted/30 transition-colors group border-b border-border">
+                        <div className="flex items-center gap-3">
+                          <div className="h-9 w-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                            <Sparkles className="h-5 w-5" />
+                          </div>
+                          <div className="text-left">
+                            <div className="font-bold">Prendas recomendadas</div>
+                            <div className="text-xs text-muted-foreground">{msg.suggestion.items.length} items agrupados por categoría</div>
+                          </div>
+                        </div>
+                        <ChevronDown className="h-5 w-5 text-muted-foreground transition-transform group-data-[state=closed]:rotate-[-90deg]" />
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {CATEGORIES.map((cat) => {
+                            const items = msg.suggestion!.items.filter((it) => it.category === cat);
+                            if (items.length === 0) return null;
+                            const catWeight = items.reduce((a, it) => a + it.weight * (it.quantity ?? 1), 0);
+                            return (
+                              <div key={cat} className="border border-border rounded-xl bg-muted/20 overflow-hidden">
+                                <div className="flex items-center justify-between px-3 py-2 bg-muted/40 border-b border-border">
+                                  <div className="flex items-center gap-2">
+                                    <Badge variant="outline" className="text-[11px]">{cat}</Badge>
+                                    <span className="text-xs text-muted-foreground">{items.length}</span>
+                                  </div>
+                                  <span className="text-xs font-semibold text-muted-foreground">{catWeight.toFixed(2)} kg</span>
+                                </div>
+                                <ul className="divide-y divide-border">
+                                  {items.map((it, i) => (
+                                    <li key={i} className="flex justify-between items-center px-3 py-2 text-sm">
+                                      <span className="truncate pr-2">
+                                        {it.name}
+                                        {it.quantity && it.quantity > 1 ? <span className="text-muted-foreground"> × {it.quantity}</span> : null}
+                                      </span>
+                                      <span className="text-xs text-muted-foreground shrink-0">{(it.weight * (it.quantity ?? 1)).toFixed(2)} kg</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  </Card>
+                </div>
+              )}
+            </div>
+          ))}
+          {loading && (
+            <div className="flex gap-3">
+              <div className="h-8 w-8 shrink-0 rounded-lg flex items-center justify-center bg-muted text-foreground border border-border">
+                <Bot size={16} />
+              </div>
+              <div className="px-4 py-3 rounded-2xl bg-muted/50 text-foreground border border-border rounded-tl-sm flex items-center gap-2 text-sm">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Armando tu valija...
+              </div>
+            </div>
+          )}
         </div>
-      </Card>
+      </div>
 
       {/* Modify suggestion dialog */}
       <Dialog open={!!editingMsgId} onOpenChange={(o) => !o && setEditingMsgId(null)}>

@@ -2,7 +2,7 @@ import "@tanstack/react-start";
 import { createFileRoute } from "@tanstack/react-router";
 import { generateText } from "ai";
 import { z } from "zod";
-import { createLovableAiGatewayProvider } from "@/lib/ai-gateway";
+import { createOpenRouterProvider } from "@/lib/ai-gateway";
 
 const CATEGORIES = [
   "Remeras",
@@ -38,6 +38,7 @@ type PackSuggestion = {
   days: number;
   weather: string;
   occasion: string;
+  suitcaseCapacityKg?: number;
   items: PackItem[];
   forecast: ForecastDay[];
 };
@@ -54,6 +55,7 @@ const RawSuggestionSchema = z.object({
   days: z.coerce.number().int().min(1).max(90).optional(),
   weather: z.string().optional(),
   occasion: z.string().optional(),
+  suitcaseCapacityKg: z.coerce.number().int().min(5).max(60).optional(),
   items: z
     .array(
       z.object({
@@ -399,7 +401,140 @@ function requiredItems(context: ReturnType<typeof extractTripContext>, destinati
   return items;
 }
 
-function normalizeSuggestion(raw: unknown, prompt: string): PackSuggestion {
+function clampCapacityKg(value: unknown): number | undefined {
+  const n = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
+  if (!Number.isFinite(n)) return undefined;
+  const rounded = Math.round(n);
+  if (rounded < 5 || rounded > 60) return undefined;
+  return rounded;
+}
+
+function perUnitVolumeLiters(item: Pick<PackItem, "category" | "name" | "weight">): number {
+  // Very rough heuristic, good enough to prioritize "bulky" items.
+  const t = normalizeText(`${item.category} ${item.name}`);
+  if (/campera|abrigo|tapado|piloto|impermeable/.test(t)) return 12;
+  if (/buzo|sweater|sueter|hoodie/.test(t)) return 8;
+  if (/pantalon|jean|cargo/.test(t)) return 5;
+  if (/zapatilla|zapato|bota|sandalia|ojota/.test(t)) return 10;
+  if (/traje de bano|traje de baño|malla|bikini/.test(t)) return 2;
+  if (/toalla/.test(t)) return 6;
+  if (/neceser|higiene|shampoo|perfume|cosmet/.test(t)) return 4;
+  if (/laptop|notebook/.test(t)) return 7;
+  if (/cargador|adaptador|auricular/.test(t)) return 1.2;
+  if (/remera|camisa|blusa|top|chomba/.test(t)) return 2.2;
+  if (/ropa interior|calzon|bombacha|boxer|braga/.test(t)) return 0.5;
+  if (/media|medias|calcetin|calcetines/.test(t)) return 0.4;
+  return Math.max(0.8, Math.min(9, item.weight * 5)); // fallback: correlate with weight
+}
+
+function budgetItemLimit(capacityKg: number, days: number) {
+  // Cap by weight capacity, with a small bump for longer trips.
+  const base = capacityKg <= 12 ? 15 : capacityKg <= 20 ? 18 : capacityKg <= 30 ? 22 : capacityKg <= 45 ? 28 : 34;
+  const bump = Math.min(6, Math.floor((Math.max(1, days) - 3) / 4));
+  return Math.min(45, base + bump);
+}
+
+function weightOf(items: PackItem[]) {
+  return items.reduce((acc, it) => acc + it.weight * it.quantity, 0);
+}
+
+function adjustRequiredToFitWeight(required: PackItem[], capacityKg: number) {
+  const weightBudget = capacityKg * 0.95; // leave a bit of headroom
+  const fixed = required.filter((it) => !/remera|tops|pantalon|jean|jean versátil|ropa interior|medias/.test(normalizeText(`${it.category} ${it.name}`)));
+  const adjustable = required.filter((it) =>
+    /remera|tops|pantalon|jean|ropa interior|medias/.test(normalizeText(`${it.category} ${it.name}`)),
+  );
+
+  const fixedWeight = weightOf(fixed);
+  const adjustableWeight = weightOf(adjustable);
+  const total = fixedWeight + adjustableWeight;
+  if (total <= weightBudget) return required;
+  if (adjustable.length === 0) return required;
+
+  // Scale down adjustable quantities proportionally, but never below 1.
+  const targetAdjustableWeight = Math.max(0, weightBudget - fixedWeight);
+  const ratio = adjustableWeight > 0 ? targetAdjustableWeight / adjustableWeight : 0;
+
+  const adjusted = required.map((it) => {
+    const isAdjustable = adjustable.some((a) => a.name === it.name && a.category === it.category);
+    if (!isAdjustable) return it;
+    const newQty = Math.max(1, Math.floor(it.quantity * ratio));
+    return { ...it, quantity: newQty };
+  });
+
+  // If rounding still overshoots budget, decrement until it fits (or we hit min quantities).
+  let current = weightOf(adjusted);
+  if (current <= weightBudget) return adjusted;
+
+  const decOrder = [...adjusted]
+    .filter((it) => /remera|tops|pantalon|jean|ropa interior|medias/.test(normalizeText(`${it.category} ${it.name}`)) && it.quantity > 1)
+    .sort((a, b) => b.weight - a.weight); // reduce heavier units first
+
+  while (current > weightBudget) {
+    const next = decOrder.find((it) => it.quantity > 1);
+    if (!next) break;
+    next.quantity -= 1;
+    current -= next.weight;
+  }
+
+  return adjusted;
+}
+
+function applyCapacityBudget(input: {
+  items: PackItem[];
+  required: PackItem[];
+  capacityKg: number;
+  days: number;
+  prompt: string;
+}) {
+  const requiredKeys = new Set(input.required.map((it) => normalizeText(`${it.category}|${it.name}`)));
+  const isRequired = (it: PackItem) => requiredKeys.has(normalizeText(`${it.category}|${it.name}`));
+
+  const capKg = input.capacityKg;
+  const maxItems = budgetItemLimit(capKg, input.days);
+  const weightBudget = capKg * 0.95; // headroom
+
+  const requiredAdjusted = adjustRequiredToFitWeight(input.required, capKg);
+  const requiredWeight = weightOf(requiredAdjusted);
+
+  const score = (it: PackItem) => {
+    const t = normalizeText(`${it.category} ${it.name} ${input.prompt}`);
+    let s = 0;
+    if (isRequired(it)) s += 1000;
+    if (/documento|pasaporte|reserva|tarjeta|dinero|llaves/.test(t)) s += 60;
+    if (/cargador|adaptador|medic|receta|lentes|anteojo/.test(t)) s += 40;
+    if (/protector solar/.test(t)) s += 25;
+    if (/traje de bano|traje de baño|malla|bikini/.test(t)) s += 25;
+    if (/campera|abrigo|termic|guantes|gorro/.test(t)) s += 25;
+    if (it.category === "Higiene") s += 20;
+    if (it.category === "Zapatillas") s += 15;
+    // penalize bulky optional items a bit
+    s -= perUnitVolumeLiters(it) * 0.8;
+    return s;
+  };
+
+  const sorted = [...input.items].sort((a, b) => score(b) - score(a));
+  const picked: PackItem[] = [...requiredAdjusted];
+  let currentWeight = requiredWeight;
+
+  for (const it of sorted) {
+    // required items already included/adjusted
+    const alreadyIncluded = picked.some(
+      (p) => p.category === it.category && normalizeText(p.name) === normalizeText(it.name),
+    );
+    if (alreadyIncluded) continue;
+    if (picked.length >= maxItems) continue;
+    const addWeight = it.weight * it.quantity;
+    if (currentWeight + addWeight > weightBudget && !isRequired(it)) continue;
+    picked.push(it);
+    currentWeight += addWeight;
+  }
+
+  // If required items are already overweight, we still return them (can't satisfy capacity perfectly).
+  return picked.slice(0, Math.max(maxItems, requiredAdjusted.length));
+}
+
+function normalizeSuggestion(raw: unknown, prompt: string, suitcaseCapacityKg?: number): PackSuggestion {
   const context = extractTripContext(prompt);
   const parsed = RawSuggestionSchema.safeParse(raw);
   const data = parsed.success ? parsed.data : {};
@@ -414,24 +549,45 @@ function normalizeSuggestion(raw: unknown, prompt: string): PackSuggestion {
     : aiItems;
   const merged = [...filteredItems];
 
-  for (const required of requiredItems(context, destination)) {
-    const exists = merged.some((item) => normalizeText(item.name).includes(normalizeText(required.name).slice(0, 10)));
-    if (!exists) merged.push(required);
+  const required = requiredItems(context, destination);
+  for (const req of required) {
+    const exists = merged.some((item) => normalizeText(item.name).includes(normalizeText(req.name).slice(0, 10)));
+    if (!exists) merged.push(req);
   }
+
+  const capacity =
+    clampCapacityKg(suitcaseCapacityKg) ??
+    clampCapacityKg((data as { suitcaseCapacityKg?: unknown }).suitcaseCapacityKg);
+
+  const items = capacity
+    ? applyCapacityBudget({
+        items: merged,
+        required,
+        capacityKg: capacity,
+        days,
+        prompt,
+      })
+    : merged.slice(0, 22);
 
   return {
     destination,
     days,
     weather,
     occasion,
-    items: merged.slice(0, 22),
+    suitcaseCapacityKg: capacity,
+    items,
     forecast: buildForecast(destination, days, context.warm, context.cold),
   };
 }
 
-async function generatePackSuggestion(prompt: string, key: string): Promise<PackSuggestion> {
-  const gateway = createLovableAiGatewayProvider(key);
-  const context = extractTripContext(prompt);
+async function generatePackSuggestion(input: {
+  prompt: string;
+  key: string;
+  suitcaseCapacityKg?: number;
+}): Promise<PackSuggestion> {
+  const gateway = createOpenRouterProvider(key);
+  const context = extractTripContext(input.prompt);
+  const capacity = clampCapacityKg(input.suitcaseCapacityKg);
   let lastError: unknown;
 
   for (const modelName of MODEL_FALLBACKS) {
@@ -441,10 +597,10 @@ async function generatePackSuggestion(prompt: string, key: string): Promise<Pack
         model,
         system: `Sos un asistente experto en equipaje. Respondé SOLO JSON válido, sin markdown.
 Formato exacto: {"destination":"Ciudad o país","days":3,"weather":"resumen breve","occasion":"motivo","items":[{"category":"Remeras|Pantalones|Abrigos|Zapatillas|Accesorios|Higiene|Electrónica|Otros","name":"item","quantity":1,"weight":0.2}]}.
-Reglas críticas: respetá destino y días del usuario; no cambies España por Ushuaia; si hay casamiento/boda incluí conjunto y zapatos formales; si es playa incluí traje de baño/protector; si no hay nieve no sugieras ropa de nieve; cantidades realistas para la duración.`,
-        prompt: `Solicitud del usuario: ${prompt}\nContexto detectado: destino=${context.destination}, días=${context.days}, ocasión=${context.occasion}.`,
+Reglas críticas: respetá destino y días del usuario; no cambies España por Ushuaia; si hay casamiento/boda incluí conjunto y zapatos formales; si es playa incluí traje de baño/protector; si no hay nieve no sugieras ropa de nieve; cantidades realistas para la duración; si el usuario indicó capacidad de valija en kg, mantené la lista compacta y priorizá lo esencial.`,
+        prompt: `Solicitud del usuario: ${input.prompt}\nContexto detectado: destino=${context.destination}, días=${context.days}, ocasión=${context.occasion}${capacity ? `, capacidad=${capacity}kg` : ""}.`,
       });
-      return normalizeSuggestion(JSON.parse(stripJson(text)), prompt);
+      return normalizeSuggestion(JSON.parse(stripJson(text)), input.prompt, capacity);
     } catch (error) {
       lastError = error;
       const message = error instanceof Error ? error.message : String(error);
@@ -454,7 +610,7 @@ Reglas críticas: respetá destino y días del usuario; no cambies España por U
   }
 
   console.warn("Pack AI unavailable, using deterministic fallback", lastError);
-  return normalizeSuggestion({}, prompt);
+  return normalizeSuggestion({}, input.prompt, capacity);
 }
 
 export const Route = createFileRoute("/api/pack")({
@@ -462,7 +618,10 @@ export const Route = createFileRoute("/api/pack")({
     handlers: {
       POST: async ({ request }: { request: Request }) => {
         try {
-          const { prompt } = (await request.json()) as { prompt?: string };
+          const { prompt, suitcaseCapacityKg } = (await request.json()) as {
+            prompt?: string;
+            suitcaseCapacityKg?: number;
+          };
           if (!prompt || typeof prompt !== "string") {
             return new Response(JSON.stringify({ error: "prompt requerido" }), {
               status: 400,
@@ -470,15 +629,25 @@ export const Route = createFileRoute("/api/pack")({
             });
           }
 
-          const key = process.env.LOVABLE_API_KEY;
+          // Cloudflare Workers doesn't provide `process.env` at runtime.
+          // In dev/build, secrets may come from `.dev.vars` or host env.
+          const key =
+            (globalThis as unknown as { process?: { env?: Record<string, string | undefined> } })
+              .process?.env?.OPENROUTER_API_KEY ??
+            (import.meta as unknown as { env?: Record<string, string | undefined> }).env
+              ?.OPENROUTER_API_KEY;
           if (!key) {
-            return new Response(JSON.stringify({ error: "Falta LOVABLE_API_KEY" }), {
+            return new Response(JSON.stringify({ error: "Falta OPENROUTER_API_KEY (configurala en .dev.vars para dev, o como secret en tu deploy)" }), {
               status: 500,
               headers: { "Content-Type": "application/json" },
             });
           }
 
-          const output = await generatePackSuggestion(prompt, key);
+          const output = await generatePackSuggestion({
+            prompt,
+            key,
+            suitcaseCapacityKg,
+          });
 
           return new Response(JSON.stringify(output), {
             status: 200,

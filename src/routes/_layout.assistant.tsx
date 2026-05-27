@@ -56,6 +56,7 @@ function AssistantPage() {
     to: "",
     occasion: "",
     notes: "",
+    suitcaseCapacityKg: 23,
   });
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -103,6 +104,10 @@ function AssistantPage() {
       toast.error("Las fechas no son válidas");
       return;
     }
+    if (!Number.isFinite(form.suitcaseCapacityKg) || form.suitcaseCapacityKg < 5) {
+      toast.error("Indicá la capacidad de la valija (mín. 5 kg)");
+      return;
+    }
     const occasion = form.occasion.trim();
     const notes = form.notes.trim();
     const userText = [
@@ -110,6 +115,7 @@ function AssistantPage() {
       `Desde: ${form.from}`,
       `Hasta: ${form.to}`,
       `Días: ${days}`,
+      `Capacidad de valija: ${Math.round(form.suitcaseCapacityKg)} kg`,
       occasion ? `Ocasión: ${occasion}` : null,
       notes ? `Notas: ${notes}` : null,
     ]
@@ -127,6 +133,7 @@ function AssistantPage() {
           prompt: userText,
           destination,
           days,
+          suitcaseCapacityKg: Math.round(form.suitcaseCapacityKg),
           occasion: occasion || undefined,
           from: form.from,
           to: form.to,
@@ -154,6 +161,7 @@ function AssistantPage() {
         days: number;
         occasion: string;
         items: SuggestionItem[];
+        suitcaseCapacityKg?: number;
         forecast?: import("@/lib/chat-store").ForecastDay[];
       };
       const totalWeight = data.items.reduce(
@@ -171,6 +179,7 @@ function AssistantPage() {
           occasion: data.occasion,
           items: data.items,
           totalWeight,
+          suitcaseCapacityKg: data.suitcaseCapacityKg,
           forecast: data.forecast,
         },
       });
@@ -306,6 +315,27 @@ function AssistantPage() {
               <Input placeholder="Casamiento, trabajo, playa..." value={form.occasion} onChange={(e) => setForm({ ...form, occasion: e.target.value })} disabled={loading} className="mt-1" maxLength={120} />
             </div>
             <div>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Capacidad de la valija (kg)</label>
+              <Input
+                type="number"
+                min={5}
+                max={60}
+                step={0.5}
+                value={form.suitcaseCapacityKg}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    suitcaseCapacityKg: parseFloat(e.target.value) || 0,
+                  })
+                }
+                disabled={loading}
+                className="mt-1"
+              />
+              <div className="text-xs text-muted-foreground mt-1">
+                Ej: cabina 10–12 kg · bodega 20–23 kg
+              </div>
+            </div>
+            <div>
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Notas (opcional)</label>
               <Input placeholder="Algo más a tener en cuenta" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} disabled={loading} className="mt-1" maxLength={300} />
             </div>
@@ -350,6 +380,9 @@ function AssistantPage() {
                         <div className="flex items-center gap-2 mt-2 flex-wrap">
                           <Badge variant="secondary">{msg.suggestion.days} día{msg.suggestion.days === 1 ? "" : "s"}</Badge>
                           <Badge variant="secondary">{msg.suggestion.occasion}</Badge>
+                          {msg.suggestion.suitcaseCapacityKg ? (
+                            <Badge variant="secondary">{msg.suggestion.suitcaseCapacityKg} kg</Badge>
+                          ) : null}
                           <Badge className="bg-primary/15 text-primary border-primary/20 hover:bg-primary/20">{msg.suggestion.items.length} items</Badge>
                         </div>
                         <p className="text-sm text-muted-foreground mt-3 max-w-xl">{msg.suggestion.weather}</p>

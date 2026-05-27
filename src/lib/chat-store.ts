@@ -22,6 +22,7 @@ export type ChatSuggestion = {
   weather: string;
   days?: number;
   occasion?: string;
+  suitcaseCapacityKg?: number;
   items: ChatSuggestionItem[];
   totalWeight: number;
   forecast?: ForecastDay[];

@@ -1,11 +1,10 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 
-export const createLovableAiGatewayProvider = (lovableApiKey: string) =>
+export const createOpenRouterProvider = (openRouterApiKey: string) =>
   createOpenAICompatible({
-    name: "lovable",
-    baseURL: "https://ai.gateway.lovable.dev/v1",
+    name: "openrouter",
+    baseURL: "https://openrouter.ai/api/v1",
     headers: {
-      "Lovable-API-Key": lovableApiKey,
-      "X-Lovable-AIG-SDK": "vercel-ai-sdk",
+      Authorization: `Bearer ${openRouterApiKey}`,
     },
   });

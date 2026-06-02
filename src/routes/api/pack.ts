@@ -2,7 +2,7 @@ import "@tanstack/react-start";
 import { createFileRoute } from "@tanstack/react-router";
 import { generateText } from "ai";
 import { z } from "zod";
-import { createOpenRouterProvider } from "@/lib/ai-gateway";
+import { createLovableAiGatewayProvider } from "@/lib/ai-gateway";
 
 const CATEGORIES = [
   "Remeras",
@@ -585,7 +585,7 @@ async function generatePackSuggestion(input: {
   key: string;
   suitcaseCapacityKg?: number;
 }): Promise<PackSuggestion> {
-  const gateway = createOpenRouterProvider(key);
+  const gateway = createLovableAiGatewayProvider(input.key);
   const context = extractTripContext(input.prompt);
   const capacity = clampCapacityKg(input.suitcaseCapacityKg);
   let lastError: unknown;
@@ -629,15 +629,13 @@ export const Route = createFileRoute("/api/pack")({
             });
           }
 
-          // Cloudflare Workers doesn't provide `process.env` at runtime.
-          // In dev/build, secrets may come from `.dev.vars` or host env.
           const key =
             (globalThis as unknown as { process?: { env?: Record<string, string | undefined> } })
-              .process?.env?.OPENROUTER_API_KEY ??
+              .process?.env?.LOVABLE_API_KEY ??
             (import.meta as unknown as { env?: Record<string, string | undefined> }).env
-              ?.OPENROUTER_API_KEY;
+              ?.LOVABLE_API_KEY;
           if (!key) {
-            return new Response(JSON.stringify({ error: "Falta OPENROUTER_API_KEY (configurala en .dev.vars para dev, o como secret en tu deploy)" }), {
+            return new Response(JSON.stringify({ error: "Falta LOVABLE_API_KEY. Activá Lovable Cloud para habilitar la IA." }), {
               status: 500,
               headers: { "Content-Type": "application/json" },
             });

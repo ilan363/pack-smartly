@@ -60,6 +60,14 @@ export const Route = createFileRoute("/api/weather")({
           }
           const { q, lat, lon, days } = parsed.data;
 
+          // Cache en memoria del worker: fresh 10 min, stale-on-429 hasta 1h.
+          const cacheKey = `${q ?? ""}|${lat ?? ""}|${lon ?? ""}|${days}`;
+          const cached = MEMO.get(cacheKey);
+          const now = Date.now();
+          if (cached && now - cached.at < 10 * 60_000) {
+            return json(cached.data, 200, { "Cache-Control": "public, max-age=600" });
+          }
+
           let spot: WeatherSpot;
           if (typeof lat === "number" && typeof lon === "number") {
             spot = { name: q ?? `${lat.toFixed(2)}, ${lon.toFixed(2)}`, latitude: lat, longitude: lon };
@@ -71,10 +79,24 @@ export const Route = createFileRoute("/api/weather")({
             return json({ error: "Indicá un destino o coordenadas" }, 400);
           }
 
-          const data = await fetchOpenMeteo(spot, days);
-          return json(data, 200, {
-            "Cache-Control": "public, max-age=600", // 10 min
-          });
+          try {
+            const data = await fetchOpenMeteo(spot, days);
+            MEMO.set(cacheKey, { at: now, data });
+            return json(data, 200, { "Cache-Control": "public, max-age=600" });
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            // Si Open-Meteo rate-limitea, servimos cache vieja si la hay.
+            if (msg.includes("429") && cached && now - cached.at < 60 * 60_000) {
+              return json(cached.data, 200, { "Cache-Control": "public, max-age=60" });
+            }
+            if (msg.includes("429")) {
+              return json(
+                { error: "El servicio del clima está saturado. Probá de nuevo en unos segundos." },
+                503,
+              );
+            }
+            throw err;
+          }
         } catch (err) {
           console.error("weather route error", err);
           return json({ error: "No pude obtener el clima ahora" }, 502);
@@ -83,6 +105,9 @@ export const Route = createFileRoute("/api/weather")({
     },
   },
 });
+
+// Cache en memoria del worker (best-effort; se reinicia con cold starts).
+const MEMO = new Map<string, { at: number; data: WeatherForecastResponse }>();
 
 function json(body: unknown, status = 200, extra: Record<string, string> = {}) {
   return new Response(JSON.stringify(body), {

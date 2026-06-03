@@ -626,35 +626,39 @@ function normalizeSuggestion(raw: unknown, prompt: string, suitcaseCapacityKg?: 
 
 async function generatePackSuggestion(input: {
   prompt: string;
-  key: string;
   suitcaseCapacityKg?: number;
-}): Promise<PackSuggestion> {
-  const gateway = createLovableAiGatewayProvider(input.key);
+}): Promise<{ suggestion: PackSuggestion; providerUsed: string }> {
   const context = extractTripContext(input.prompt);
   const capacity = clampCapacityKg(input.suitcaseCapacityKg);
+  const chain = buildProviderChain();
   let lastError: unknown;
 
-  for (const modelName of MODEL_FALLBACKS) {
+  for (const attempt of chain) {
     try {
-      const model = gateway(modelName);
       const { text } = await generateText({
-        model,
+        model: attempt.model,
         system: `Sos un asistente experto en equipaje. Respondé SOLO JSON válido, sin markdown.
 Formato exacto: {"destination":"Ciudad o país","days":3,"weather":"resumen breve","occasion":"motivo","items":[{"category":"Remeras|Pantalones|Abrigos|Zapatillas|Accesorios|Higiene|Electrónica|Otros","name":"item","quantity":1,"weight":0.2}]}.
 Reglas críticas: respetá destino y días del usuario; no cambies España por Ushuaia; si hay casamiento/boda incluí conjunto y zapatos formales; si es playa incluí traje de baño/protector; si no hay nieve no sugieras ropa de nieve; cantidades realistas para la duración; si el usuario indicó capacidad de valija en kg, mantené la lista compacta y priorizá lo esencial.`,
         prompt: `Solicitud del usuario: ${input.prompt}\nContexto detectado: destino=${context.destination}, días=${context.days}, ocasión=${context.occasion}${capacity ? `, capacidad=${capacity}kg` : ""}.`,
       });
-      return normalizeSuggestion(JSON.parse(stripJson(text)), input.prompt, capacity);
+      return {
+        suggestion: normalizeSuggestion(JSON.parse(stripJson(text)), input.prompt, capacity),
+        providerUsed: attempt.provider,
+      };
     } catch (error) {
       lastError = error;
-      const message = error instanceof Error ? error.message : String(error);
-      if (/429|rate limit/i.test(message) || /402|credit/i.test(message)) throw error;
-      console.warn(`Pack AI model ${modelName} failed, trying fallback`, error);
+      // En 429 (rate limit) o 402 (sin créditos) seguimos con el próximo
+      // proveedor en lugar de fallar — esa es la razón de ser de la cadena.
+      console.warn(`[pack] ${attempt.provider} falló, probando siguiente`, error);
     }
   }
 
-  console.warn("Pack AI unavailable, using deterministic fallback", lastError);
-  return normalizeSuggestion({}, input.prompt, capacity);
+  console.warn("[pack] Sin proveedores IA disponibles, usando fallback determinista", lastError);
+  return {
+    suggestion: normalizeSuggestion({}, input.prompt, capacity),
+    providerUsed: "fallback-local",
+  };
 }
 
 export const Route = createFileRoute("/api/pack")({
@@ -673,29 +677,19 @@ export const Route = createFileRoute("/api/pack")({
             });
           }
 
-          const key = process.env.LOVABLE_API_KEY;
-          if (!key) {
-            return new Response(JSON.stringify({ error: "Falta LOVABLE_API_KEY. Activá Lovable Cloud para habilitar la IA." }), {
-              status: 500,
-              headers: { "Content-Type": "application/json" },
-            });
-          }
-
-          const output = await generatePackSuggestion({
+          const { suggestion, providerUsed } = await generatePackSuggestion({
             prompt,
-            key,
             suitcaseCapacityKg,
           });
 
-          return new Response(JSON.stringify(output), {
+          return new Response(JSON.stringify({ ...suggestion, providerUsed }), {
             status: 200,
             headers: { "Content-Type": "application/json" },
           });
         } catch (err) {
           const message = err instanceof Error ? err.message : "Error inesperado";
-          const status = /429/.test(message) ? 429 : /402/.test(message) ? 402 : 500;
           return new Response(JSON.stringify({ error: message }), {
-            status,
+            status: 500,
             headers: { "Content-Type": "application/json" },
           });
         }
@@ -703,3 +697,4 @@ export const Route = createFileRoute("/api/pack")({
     },
   },
 });
+

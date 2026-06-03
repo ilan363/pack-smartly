@@ -629,11 +629,7 @@ export const Route = createFileRoute("/api/pack")({
             });
           }
 
-          const key =
-            (globalThis as unknown as { process?: { env?: Record<string, string | undefined> } })
-              .process?.env?.LOVABLE_API_KEY ??
-            (import.meta as unknown as { env?: Record<string, string | undefined> }).env
-              ?.LOVABLE_API_KEY;
+          const key = process.env.LOVABLE_API_KEY;
           if (!key) {
             return new Response(JSON.stringify({ error: "Falta LOVABLE_API_KEY. Activá Lovable Cloud para habilitar la IA." }), {
               status: 500,

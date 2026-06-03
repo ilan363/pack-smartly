@@ -117,11 +117,6 @@ const RawSuggestionSchema = z.object({
     .optional(),
 });
 
-const MODEL_FALLBACKS = [
-  "google/gemini-3-flash-preview",
-  "google/gemini-2.5-flash",
-  "openai/gpt-5-mini",
-] as const;
 
 const NUMBER_WORDS: Record<string, number> = {
   un: 1,

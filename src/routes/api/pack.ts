@@ -1,10 +1,57 @@
 import "@tanstack/react-start";
 import { createFileRoute } from "@tanstack/react-router";
-import { generateText } from "ai";
+import { generateText, type LanguageModel } from "ai";
 import { z } from "zod";
-import { createLovableAiGatewayProvider } from "@/lib/ai-gateway";
+import {
+  createGroqProvider,
+  createLovableAiGatewayProvider,
+  createOpenRouterProvider,
+} from "@/lib/ai-gateway";
 
 declare const process: { env: Record<string, string | undefined> };
+
+type ProviderAttempt = { provider: string; model: LanguageModel };
+
+// Cadena de proveedores: si Lovable se queda sin créditos, cae a OpenRouter
+// (modelos :free) y luego a Groq (Llama gratis). Si ninguno está disponible,
+// se usa el fallback determinista local.
+function buildProviderChain(): ProviderAttempt[] {
+  const chain: ProviderAttempt[] = [];
+
+  const lovableKey = process.env.LOVABLE_API_KEY;
+  if (lovableKey) {
+    const gw = createLovableAiGatewayProvider(lovableKey);
+    for (const m of [
+      "google/gemini-3-flash-preview",
+      "google/gemini-2.5-flash",
+      "openai/gpt-5-mini",
+    ]) {
+      chain.push({ provider: `lovable:${m}`, model: gw(m) });
+    }
+  }
+
+  const openrouterKey = process.env.OPENROUTER_API_KEY;
+  if (openrouterKey) {
+    const or = createOpenRouterProvider(openrouterKey);
+    for (const m of [
+      "meta-llama/llama-3.3-70b-instruct:free",
+      "google/gemini-2.0-flash-exp:free",
+      "deepseek/deepseek-chat-v3.1:free",
+    ]) {
+      chain.push({ provider: `openrouter:${m}`, model: or(m) });
+    }
+  }
+
+  const groqKey = process.env.GROQ_API_KEY;
+  if (groqKey) {
+    const gq = createGroqProvider(groqKey);
+    for (const m of ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]) {
+      chain.push({ provider: `groq:${m}`, model: gq(m) });
+    }
+  }
+
+  return chain;
+}
 
 const CATEGORIES = [
   "Remeras",

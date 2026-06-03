@@ -4,6 +4,8 @@ import { generateText } from "ai";
 import { z } from "zod";
 import { createLovableAiGatewayProvider } from "@/lib/ai-gateway";
 
+declare const process: { env: Record<string, string | undefined> };
+
 const CATEGORIES = [
   "Remeras",
   "Pantalones",

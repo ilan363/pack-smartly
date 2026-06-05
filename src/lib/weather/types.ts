@@ -39,7 +39,7 @@ export type WeatherForecastResponse = {
   hourly: WeatherHour[];
   daily: WeatherDaySummary[];
   /** "open-meteo" | "windguru" — para mostrar en la UI */
-  provider: "open-meteo" | "windguru";
+  provider: "open-meteo" | "windguru" | "wttr.in";
   fetchedAt: string;
 };
 

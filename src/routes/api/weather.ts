@@ -292,3 +292,109 @@ type OpenMeteoMarine = {
     wave_direction: (number | null)[];
   };
 };
+
+// ── Retry con backoff para mitigar 429 ─────────────────────────────
+async function fetchWithRetry<T>(fn: () => Promise<T>, tries = 3): Promise<T> {
+  let lastErr: unknown;
+  for (let i = 0; i < tries; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      const msg = err instanceof Error ? err.message : String(err);
+      if (!msg.includes("429") || i === tries - 1) throw err;
+      const delay = 400 * Math.pow(2, i) + Math.random() * 200;
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
+  throw lastErr;
+}
+
+// ── Fallback provider: wttr.in (gratis, sin API key) ──────────────
+async function fetchWttr(spot: WeatherSpot, days: number): Promise<WeatherForecastResponse> {
+  const loc = `${spot.latitude},${spot.longitude}`;
+  const res = await fetch(`https://wttr.in/${loc}?format=j1`, {
+    headers: { "User-Agent": "curl/8" },
+  });
+  if (!res.ok) throw new Error(`wttr ${res.status}`);
+  const j = (await res.json()) as WttrResponse;
+
+  const cc = j.current_condition?.[0];
+  const nowIso = new Date().toISOString();
+
+  const hourly: WeatherHour[] = [];
+  for (const d of j.weather.slice(0, days)) {
+    for (const h of d.hourly) {
+      // "time" en wttr es "0","300","600"... (HHMM sin ceros)
+      const hh = String(h.time).padStart(4, "0").slice(0, 2);
+      const iso = `${d.date}T${hh}:00`;
+      hourly.push({
+        time: iso,
+        temperature: Number(h.tempC),
+        precipitation: Number(h.precipMM),
+        windSpeed: Number(h.windspeedKmph),
+        windGust: Number(h.WindGustKmph ?? h.windspeedKmph),
+        windDirection: Number(h.winddirDegree),
+        waveHeight: null,
+        wavePeriod: null,
+        waveDirection: null,
+      });
+    }
+  }
+
+  const daily: WeatherDaySummary[] = j.weather.slice(0, days).map((d) => ({
+    date: d.date,
+    tempMin: Number(d.mintempC),
+    tempMax: Number(d.maxtempC),
+    precipitation: d.hourly.reduce((s, h) => s + Number(h.precipMM), 0),
+    windMax: Math.max(...d.hourly.map((h) => Number(h.windspeedKmph))),
+    gustMax: Math.max(...d.hourly.map((h) => Number(h.WindGustKmph ?? h.windspeedKmph))),
+    waveMax: null,
+  }));
+
+  const current: WeatherHour = cc
+    ? {
+        time: nowIso,
+        temperature: Number(cc.temp_C),
+        precipitation: Number(cc.precipMM),
+        windSpeed: Number(cc.windspeedKmph),
+        windGust: Number(cc.windspeedKmph),
+        windDirection: Number(cc.winddirDegree),
+        waveHeight: null,
+        wavePeriod: null,
+        waveDirection: null,
+      }
+    : hourly[0];
+
+  return {
+    spot,
+    current,
+    hourly,
+    daily,
+    provider: "wttr.in",
+    fetchedAt: nowIso,
+  };
+}
+
+type WttrHour = {
+  time: string;
+  tempC: string;
+  precipMM: string;
+  windspeedKmph: string;
+  WindGustKmph?: string;
+  winddirDegree: string;
+};
+type WttrResponse = {
+  current_condition?: Array<{
+    temp_C: string;
+    precipMM: string;
+    windspeedKmph: string;
+    winddirDegree: string;
+  }>;
+  weather: Array<{
+    date: string;
+    maxtempC: string;
+    mintempC: string;
+    hourly: WttrHour[];
+  }>;
+};

@@ -80,16 +80,28 @@ export const Route = createFileRoute("/api/weather")({
           }
 
           try {
-            const data = await fetchOpenMeteo(spot, days);
+            const data = await fetchWithRetry(() => fetchOpenMeteo(spot, days), 3);
             MEMO.set(cacheKey, { at: now, data });
             return json(data, 200, { "Cache-Control": "public, max-age=600" });
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
-            // Si Open-Meteo rate-limitea, servimos cache vieja si la hay.
-            if (msg.includes("429") && cached && now - cached.at < 60 * 60_000) {
-              return json(cached.data, 200, { "Cache-Control": "public, max-age=60" });
+            const rateLimited = msg.includes("429");
+            // Si tenemos cache (aunque sea vieja), la servimos antes de fallar.
+            if (cached) {
+              return json(cached.data, 200, {
+                "Cache-Control": "public, max-age=60",
+                "X-Weather-Stale": "true",
+              });
             }
-            if (msg.includes("429")) {
+            // Fallback: wttr.in (gratis, sin key) para no quedarnos sin nada.
+            try {
+              const fallback = await fetchWttr(spot, days);
+              MEMO.set(cacheKey, { at: now, data: fallback });
+              return json(fallback, 200, { "Cache-Control": "public, max-age=300" });
+            } catch (fallbackErr) {
+              console.error("weather fallback failed", fallbackErr);
+            }
+            if (rateLimited) {
               return json(
                 { error: "El servicio del clima está saturado. Probá de nuevo en unos segundos." },
                 503,

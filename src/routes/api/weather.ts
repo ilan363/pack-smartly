@@ -79,35 +79,31 @@ export const Route = createFileRoute("/api/weather")({
             return json({ error: "Indicá un destino o coordenadas" }, 400);
           }
 
+          // Intentamos Open-Meteo primero (con timeout corto); si falla o tarda,
+          // caemos a wttr.in. Sin retry loops para no exceder el CPU budget del worker.
           try {
-            const data = await fetchWithRetry(() => fetchOpenMeteo(spot, days), 3);
+            const data = await fetchOpenMeteo(spot, days);
             MEMO.set(cacheKey, { at: now, data });
             return json(data, 200, { "Cache-Control": "public, max-age=600" });
           } catch (err) {
-            const msg = err instanceof Error ? err.message : String(err);
-            const rateLimited = msg.includes("429");
-            // Si tenemos cache (aunque sea vieja), la servimos antes de fallar.
+            console.warn("open-meteo failed, trying wttr", err);
             if (cached) {
               return json(cached.data, 200, {
                 "Cache-Control": "public, max-age=60",
                 "X-Weather-Stale": "true",
               });
             }
-            // Fallback: wttr.in (gratis, sin key) para no quedarnos sin nada.
             try {
               const fallback = await fetchWttr(spot, days);
               MEMO.set(cacheKey, { at: now, data: fallback });
               return json(fallback, 200, { "Cache-Control": "public, max-age=300" });
             } catch (fallbackErr) {
-              console.error("weather fallback failed", fallbackErr);
-            }
-            if (rateLimited) {
+              console.error("wttr fallback failed", fallbackErr);
               return json(
-                { error: "El servicio del clima está saturado. Probá de nuevo en unos segundos." },
+                { error: "No pude obtener el clima ahora. Probá de nuevo en unos segundos." },
                 503,
               );
             }
-            throw err;
           }
         } catch (err) {
           console.error("weather route error", err);

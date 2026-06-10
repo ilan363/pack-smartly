@@ -124,6 +124,17 @@ function json(body: unknown, status = 200, extra: Record<string, string> = {}) {
   });
 }
 
+// ── fetch con timeout (CF Workers a veces cuelgan en upstreams lentos) ──
+async function fetchWithTimeout(url: string, ms = 6000, init?: RequestInit): Promise<Response> {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  try {
+    return await fetch(url, { ...init, signal: ctrl.signal });
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 // ── Geocoding (Open-Meteo, gratis) ────────────────────────────────
 async function geocode(name: string): Promise<WeatherSpot | null> {
   const url = new URL("https://geocoding-api.open-meteo.com/v1/search");
@@ -131,7 +142,7 @@ async function geocode(name: string): Promise<WeatherSpot | null> {
   url.searchParams.set("count", "1");
   url.searchParams.set("language", "es");
   url.searchParams.set("format", "json");
-  const res = await fetch(url.toString());
+  const res = await fetchWithTimeout(url.toString(), 6000);
   if (!res.ok) return null;
   const data = (await res.json()) as {
     results?: Array<{
@@ -179,8 +190,8 @@ async function fetchOpenMeteo(spot: WeatherSpot, days: number): Promise<WeatherF
   mr.searchParams.set("hourly", "wave_height,wave_period,wave_direction");
 
   const [fr, mrRes] = await Promise.all([
-    fetch(fc.toString()),
-    fetch(mr.toString()).catch(() => null), // olas pueden no existir tierra adentro
+    fetchWithTimeout(fc.toString(), 7000),
+    fetchWithTimeout(mr.toString(), 5000).catch(() => null), // olas pueden no existir tierra adentro
   ]);
   if (!fr.ok) throw new Error(`open-meteo ${fr.status}`);
   const fJson = (await fr.json()) as OpenMeteoForecast;

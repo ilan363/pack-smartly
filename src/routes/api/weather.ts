@@ -79,35 +79,31 @@ export const Route = createFileRoute("/api/weather")({
             return json({ error: "Indicá un destino o coordenadas" }, 400);
           }
 
+          // Intentamos Open-Meteo primero (con timeout corto); si falla o tarda,
+          // caemos a wttr.in. Sin retry loops para no exceder el CPU budget del worker.
           try {
-            const data = await fetchWithRetry(() => fetchOpenMeteo(spot, days), 3);
+            const data = await fetchOpenMeteo(spot, days);
             MEMO.set(cacheKey, { at: now, data });
             return json(data, 200, { "Cache-Control": "public, max-age=600" });
           } catch (err) {
-            const msg = err instanceof Error ? err.message : String(err);
-            const rateLimited = msg.includes("429");
-            // Si tenemos cache (aunque sea vieja), la servimos antes de fallar.
+            console.warn("open-meteo failed, trying wttr", err);
             if (cached) {
               return json(cached.data, 200, {
                 "Cache-Control": "public, max-age=60",
                 "X-Weather-Stale": "true",
               });
             }
-            // Fallback: wttr.in (gratis, sin key) para no quedarnos sin nada.
             try {
               const fallback = await fetchWttr(spot, days);
               MEMO.set(cacheKey, { at: now, data: fallback });
               return json(fallback, 200, { "Cache-Control": "public, max-age=300" });
             } catch (fallbackErr) {
-              console.error("weather fallback failed", fallbackErr);
-            }
-            if (rateLimited) {
+              console.error("wttr fallback failed", fallbackErr);
               return json(
-                { error: "El servicio del clima está saturado. Probá de nuevo en unos segundos." },
+                { error: "No pude obtener el clima ahora. Probá de nuevo en unos segundos." },
                 503,
               );
             }
-            throw err;
           }
         } catch (err) {
           console.error("weather route error", err);
@@ -128,6 +124,17 @@ function json(body: unknown, status = 200, extra: Record<string, string> = {}) {
   });
 }
 
+// ── fetch con timeout (CF Workers a veces cuelgan en upstreams lentos) ──
+async function fetchWithTimeout(url: string, ms = 6000, init?: RequestInit): Promise<Response> {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  try {
+    return await fetch(url, { ...init, signal: ctrl.signal });
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 // ── Geocoding (Open-Meteo, gratis) ────────────────────────────────
 async function geocode(name: string): Promise<WeatherSpot | null> {
   const url = new URL("https://geocoding-api.open-meteo.com/v1/search");
@@ -135,7 +142,7 @@ async function geocode(name: string): Promise<WeatherSpot | null> {
   url.searchParams.set("count", "1");
   url.searchParams.set("language", "es");
   url.searchParams.set("format", "json");
-  const res = await fetch(url.toString());
+  const res = await fetchWithTimeout(url.toString(), 6000);
   if (!res.ok) return null;
   const data = (await res.json()) as {
     results?: Array<{
@@ -183,8 +190,8 @@ async function fetchOpenMeteo(spot: WeatherSpot, days: number): Promise<WeatherF
   mr.searchParams.set("hourly", "wave_height,wave_period,wave_direction");
 
   const [fr, mrRes] = await Promise.all([
-    fetch(fc.toString()),
-    fetch(mr.toString()).catch(() => null), // olas pueden no existir tierra adentro
+    fetchWithTimeout(fc.toString(), 7000),
+    fetchWithTimeout(mr.toString(), 5000).catch(() => null), // olas pueden no existir tierra adentro
   ]);
   if (!fr.ok) throw new Error(`open-meteo ${fr.status}`);
   const fJson = (await fr.json()) as OpenMeteoForecast;
@@ -293,27 +300,10 @@ type OpenMeteoMarine = {
   };
 };
 
-// ── Retry con backoff para mitigar 429 ─────────────────────────────
-async function fetchWithRetry<T>(fn: () => Promise<T>, tries = 3): Promise<T> {
-  let lastErr: unknown;
-  for (let i = 0; i < tries; i++) {
-    try {
-      return await fn();
-    } catch (err) {
-      lastErr = err;
-      const msg = err instanceof Error ? err.message : String(err);
-      if (!msg.includes("429") || i === tries - 1) throw err;
-      const delay = 400 * Math.pow(2, i) + Math.random() * 200;
-      await new Promise((r) => setTimeout(r, delay));
-    }
-  }
-  throw lastErr;
-}
-
 // ── Fallback provider: wttr.in (gratis, sin API key) ──────────────
 async function fetchWttr(spot: WeatherSpot, days: number): Promise<WeatherForecastResponse> {
   const loc = `${spot.latitude},${spot.longitude}`;
-  const res = await fetch(`https://wttr.in/${loc}?format=j1`, {
+  const res = await fetchWithTimeout(`https://wttr.in/${loc}?format=j1`, 8000, {
     headers: { "User-Agent": "curl/8" },
   });
   if (!res.ok) throw new Error(`wttr ${res.status}`);

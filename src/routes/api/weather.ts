@@ -300,27 +300,10 @@ type OpenMeteoMarine = {
   };
 };
 
-// ── Retry con backoff para mitigar 429 ─────────────────────────────
-async function fetchWithRetry<T>(fn: () => Promise<T>, tries = 3): Promise<T> {
-  let lastErr: unknown;
-  for (let i = 0; i < tries; i++) {
-    try {
-      return await fn();
-    } catch (err) {
-      lastErr = err;
-      const msg = err instanceof Error ? err.message : String(err);
-      if (!msg.includes("429") || i === tries - 1) throw err;
-      const delay = 400 * Math.pow(2, i) + Math.random() * 200;
-      await new Promise((r) => setTimeout(r, delay));
-    }
-  }
-  throw lastErr;
-}
-
 // ── Fallback provider: wttr.in (gratis, sin API key) ──────────────
 async function fetchWttr(spot: WeatherSpot, days: number): Promise<WeatherForecastResponse> {
   const loc = `${spot.latitude},${spot.longitude}`;
-  const res = await fetch(`https://wttr.in/${loc}?format=j1`, {
+  const res = await fetchWithTimeout(`https://wttr.in/${loc}?format=j1`, 8000, {
     headers: { "User-Agent": "curl/8" },
   });
   if (!res.ok) throw new Error(`wttr ${res.status}`);

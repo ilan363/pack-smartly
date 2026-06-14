@@ -123,7 +123,7 @@ const RawSuggestionSchema = z.object({
       z.object({
         category: z.string().optional(),
         name: z.string().optional(),
-        quantity: z.coerce.number().int().min(1).max(10).optional(),
+        quantity: z.coerce.number().int().min(1).max(50).optional(),
         weight: z.coerce.number().min(0.01).max(8).optional(),
       }),
     )

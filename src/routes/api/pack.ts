@@ -443,7 +443,7 @@ function normalizeWeight(category: Category, quantity: number, rawWeight: number
 function normalizeItem(item: RawPackItem): PackItem | null {
   const name = item.name?.trim();
   if (!name) return null;
-  const quantity = Math.max(1, Math.min(Number(item.quantity ?? 1), 20));
+  const quantity = Math.max(1, Math.min(Number(item.quantity ?? 1), 10));
   const category = normalizeCategory(item.category, name);
   const weight = normalizeWeight(category, quantity, Number(item.weight ?? 0.2));
   return {

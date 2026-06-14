@@ -157,23 +157,61 @@ const normalizeText = (value: string) =>
     .replace(/\s+/g, " ")
     .trim();
 
+type ExtraSpec = { match: RegExp; item: PackItem };
+const NOTE_EXTRAS: ExtraSpec[] = [
+  { match: /anteojos?\s*de\s*sol|gafas\s*de\s*sol|lentes\s*de\s*sol/, item: { category: "Accesorios", name: "Anteojos de sol", quantity: 1, weight: 0.08 } },
+  { match: /anteojos?\s*(?:de\s*lectura|recetados?|graduados?)|lentes\s*recetad/, item: { category: "Accesorios", name: "Anteojos recetados", quantity: 1, weight: 0.08 } },
+  { match: /\bmate\b|bombilla|yerba/, item: { category: "Otros", name: "Mate y yerba", quantity: 1, weight: 0.5 } },
+  { match: /libro|lectura/, item: { category: "Otros", name: "Libro", quantity: 1, weight: 0.3 } },
+  { match: /laptop|notebook/, item: { category: "Electrónica", name: "Laptop", quantity: 1, weight: 1.4 } },
+  { match: /auricular|headphone|airpods/, item: { category: "Electrónica", name: "Auriculares", quantity: 1, weight: 0.15 } },
+  { match: /camara|cámara/, item: { category: "Electrónica", name: "Cámara", quantity: 1, weight: 0.55 } },
+  { match: /paraguas/, item: { category: "Accesorios", name: "Paraguas plegable", quantity: 1, weight: 0.35 } },
+  { match: /medicac|remedio|pastilla/, item: { category: "Higiene", name: "Medicación personal", quantity: 1, weight: 0.15 } },
+  { match: /toalla/, item: { category: "Otros", name: "Toalla", quantity: 1, weight: 0.4 } },
+  { match: /gorra|sombrero/, item: { category: "Accesorios", name: "Gorra o sombrero", quantity: 1, weight: 0.12 } },
+  { match: /zapatill/, item: { category: "Zapatillas", name: "Zapatillas extra", quantity: 1, weight: 1.0 } },
+];
+
+function extractExtras(text: string): PackItem[] {
+  if (!text) return [];
+  const n = normalizeText(text);
+  const out: PackItem[] = [];
+  for (const e of NOTE_EXTRAS) {
+    if (e.match.test(n) && !out.some((o) => o.name === e.item.name)) out.push(e.item);
+  }
+  return out;
+}
+
 function extractTripContext(prompt: string) {
   const normalized = normalizeText(prompt);
+
+  // Datos estructurados que envía la UI: "Destino: X", "Días: 8", "Notas: ..."
+  const structDestination = prompt.match(/destino\s*:\s*([^\n]+)/i)?.[1]?.trim();
+  const structDays = prompt.match(/d[ií]as?\s*:\s*(\d{1,2})/i)?.[1];
+  const structOccasion = prompt.match(/ocasi[oó]n\s*:\s*([^\n]+)/i)?.[1]?.trim();
+  const structNotes = prompt.match(/notas?\s*:\s*([^\n]+)/i)?.[1]?.trim() ?? "";
+
   const numericDays = normalized.match(/(\d{1,2})\s*(?:dias|dia|noches|noche)\b/);
   const wordDays = normalized.match(
     /\b(un|una|uno|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce|quince)\s*(?:dias|dia|noches|noche)\b/,
   );
-  const days = numericDays
-    ? Number(numericDays[1])
-    : wordDays
-      ? NUMBER_WORDS[wordDays[1]]
-      : 3;
+  const days = structDays
+    ? Number(structDays)
+    : numericDays
+      ? Number(numericDays[1])
+      : wordDays
+        ? NUMBER_WORDS[wordDays[1]]
+        : 3;
 
   const destinationMatch = normalized.match(
     /(?:viaje a|viajo a|voy a|me voy a|destino a|para|hacia|en)\s+([a-zñ ]+?)(?=\s+(?:por|durante|a un|a una|para un|para una|con|del|de|y|,|\.|$)|$)/,
   );
-  const rawDestination = destinationMatch?.[1]
-    ?.replace(/\b(?:un|una|el|la|los|las)\b/g, "")
+  const rawDestination = (structDestination ?? destinationMatch?.[1] ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\b(?:un|una|el|la|los|las)\b/g, "")
     .replace(/\s+/g, " ")
     .trim();
   const destination = rawDestination && /\b(boda|casamiento|matrimonio)\b/.test(rawDestination)
@@ -182,25 +220,31 @@ function extractTripContext(prompt: string) {
       : undefined
     : rawDestination;
 
-  const occasion = /casamiento|boda|matrimonio/.test(normalized)
-    ? "Casamiento"
-    : /playa|mar|costa/.test(normalized)
-      ? "Playa"
-      : /trabajo|negocio|reunion|conferencia/.test(normalized)
-        ? "Trabajo"
-        : /trekking|senderismo|montana|montaña|acampar/.test(prompt.toLowerCase())
-          ? "Trekking"
-          : /nieve|ski|esqui|ushuaia|bariloche/.test(normalized)
-            ? "Frío / nieve"
-            : "Viaje urbano";
+  const occasion = structOccasion
+    ? titleCase(structOccasion.toLowerCase())
+    : /casamiento|boda|matrimonio/.test(normalized)
+      ? "Casamiento"
+      : /playa|mar|costa/.test(normalized)
+        ? "Playa"
+        : /trabajo|negocio|reunion|conferencia/.test(normalized)
+          ? "Trabajo"
+          : /trekking|senderismo|montana|montaña|acampar/.test(prompt.toLowerCase())
+            ? "Trekking"
+            : /nieve|ski|esqui|ushuaia|bariloche/.test(normalized)
+              ? "Frío / nieve"
+              : "Viaje urbano";
+
+  const extras = extractExtras(`${structNotes} ${prompt}`);
 
   return {
-    destination: destination ? titleCase(destination) : "Destino indicado",
+    destination: destination ? titleCase(destination) : (structDestination ? titleCase(structDestination) : "Destino indicado"),
     days: Math.max(1, Math.min(days, 90)),
     occasion,
     warm: /brasil|rio|salvador|playa|caribe|cancun|punta cana|cartagena|costa/.test(normalized),
     cold: /ushuaia|nieve|ski|esqui|patagonia|bariloche|calafate|islandia/.test(normalized),
     formal: /casamiento|boda|matrimonio|gala|evento formal/.test(normalized),
+    notes: structNotes,
+    extras,
   };
 }
 

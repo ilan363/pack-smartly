@@ -1,26 +1,39 @@
 import "@tanstack/react-start";
 import { createFileRoute } from "@tanstack/react-router";
-import { generateText, type LanguageModel } from "ai";
 import { z } from "zod";
-import {
-  createGroqProvider,
-  createLovableAiGatewayProvider,
-  createOpenRouterProvider,
-} from "@/lib/ai-gateway";
 
 declare const process: { env: Record<string, string | undefined> };
 
-type ProviderAttempt = { provider: string; model: LanguageModel };
+type AiModel = unknown;
+type GenerateTextFn = (options: {
+  model: AiModel;
+  system: string;
+  prompt: string;
+}) => Promise<{ text: string }>;
+type ProviderAttempt = { provider: string; model: AiModel };
 
 // Cadena de proveedores: si Lovable se queda sin créditos, cae a OpenRouter
 // (modelos :free) y luego a Groq (Llama gratis). Si ninguno está disponible,
 // se usa el fallback determinista local.
-function buildProviderChain(): ProviderAttempt[] {
+async function buildProviderChain(): Promise<ProviderAttempt[]> {
   const chain: ProviderAttempt[] = [];
+
+  const hasAnyKey = Boolean(
+    process.env.LOVABLE_API_KEY || process.env.OPENROUTER_API_KEY || process.env.GROQ_API_KEY,
+  );
+  if (!hasAnyKey) return chain;
+
+  let providers: typeof import("@/lib/ai-gateway");
+  try {
+    providers = await import("@/lib/ai-gateway");
+  } catch (error) {
+    console.warn("[pack] No se pudieron cargar los proveedores IA; usando fallback local", error);
+    return chain;
+  }
 
   const lovableKey = process.env.LOVABLE_API_KEY;
   if (lovableKey) {
-    const gw = createLovableAiGatewayProvider(lovableKey);
+    const gw = providers.createLovableAiGatewayProvider(lovableKey);
     for (const m of [
       "google/gemini-3-flash-preview",
       "google/gemini-2.5-flash",
@@ -32,7 +45,7 @@ function buildProviderChain(): ProviderAttempt[] {
 
   const openrouterKey = process.env.OPENROUTER_API_KEY;
   if (openrouterKey) {
-    const or = createOpenRouterProvider(openrouterKey);
+    const or = providers.createOpenRouterProvider(openrouterKey);
     for (const m of [
       "meta-llama/llama-3.3-70b-instruct:free",
       "google/gemini-2.0-flash-exp:free",
@@ -44,7 +57,7 @@ function buildProviderChain(): ProviderAttempt[] {
 
   const groqKey = process.env.GROQ_API_KEY;
   if (groqKey) {
-    const gq = createGroqProvider(groqKey);
+    const gq = providers.createGroqProvider(groqKey);
     for (const m of ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]) {
       chain.push({ provider: `groq:${m}`, model: gq(m) });
     }
@@ -630,27 +643,41 @@ async function generatePackSuggestion(input: {
 }): Promise<{ suggestion: PackSuggestion; providerUsed: string }> {
   const context = extractTripContext(input.prompt);
   const capacity = clampCapacityKg(input.suitcaseCapacityKg);
-  const chain = buildProviderChain();
+  const chain = await buildProviderChain();
   let lastError: unknown;
 
-  for (const attempt of chain) {
+  let generateText: GenerateTextFn | undefined;
+  if (chain.length > 0) {
     try {
-      const { text } = await generateText({
-        model: attempt.model,
-        system: `Sos un asistente experto en equipaje. Respondé SOLO JSON válido, sin markdown.
+      const ai = (await import("ai")) as unknown as { generateText: GenerateTextFn };
+      generateText = ai.generateText;
+    } catch (error) {
+      console.warn("[pack] Falta el paquete de IA en esta instalación; usando fallback local", error);
+      lastError = error;
+    }
+  }
+  const runGenerateText = generateText;
+
+  if (runGenerateText) {
+    for (const attempt of chain) {
+      try {
+        const { text } = await runGenerateText({
+          model: attempt.model,
+          system: `Sos un asistente experto en equipaje. Respondé SOLO JSON válido, sin markdown.
 Formato exacto: {"destination":"Ciudad o país","days":3,"weather":"resumen breve","occasion":"motivo","items":[{"category":"Remeras|Pantalones|Abrigos|Zapatillas|Accesorios|Higiene|Electrónica|Otros","name":"item","quantity":1,"weight":0.2}]}.
 Reglas críticas: respetá destino y días del usuario; no cambies España por Ushuaia; si hay casamiento/boda incluí conjunto y zapatos formales; si es playa incluí traje de baño/protector; si no hay nieve no sugieras ropa de nieve; cantidades realistas para la duración; si el usuario indicó capacidad de valija en kg, mantené la lista compacta y priorizá lo esencial.`,
-        prompt: `Solicitud del usuario: ${input.prompt}\nContexto detectado: destino=${context.destination}, días=${context.days}, ocasión=${context.occasion}${capacity ? `, capacidad=${capacity}kg` : ""}.`,
-      });
-      return {
-        suggestion: normalizeSuggestion(JSON.parse(stripJson(text)), input.prompt, capacity),
-        providerUsed: attempt.provider,
-      };
-    } catch (error) {
-      lastError = error;
-      // En 429 (rate limit) o 402 (sin créditos) seguimos con el próximo
-      // proveedor en lugar de fallar — esa es la razón de ser de la cadena.
-      console.warn(`[pack] ${attempt.provider} falló, probando siguiente`, error);
+          prompt: `Solicitud del usuario: ${input.prompt}\nContexto detectado: destino=${context.destination}, días=${context.days}, ocasión=${context.occasion}${capacity ? `, capacidad=${capacity}kg` : ""}.`,
+        });
+        return {
+          suggestion: normalizeSuggestion(JSON.parse(stripJson(text)), input.prompt, capacity),
+          providerUsed: attempt.provider,
+        };
+      } catch (error) {
+        lastError = error;
+        // En 429 (rate limit) o 402 (sin créditos) seguimos con el próximo
+        // proveedor en lugar de fallar — esa es la razón de ser de la cadena.
+        console.warn(`[pack] ${attempt.provider} falló, probando siguiente`, error);
+      }
     }
   }
 

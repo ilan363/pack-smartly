@@ -420,12 +420,21 @@ function stripJson(text: string) {
 }
 
 function requiredItems(context: ReturnType<typeof extractTripContext>, destination: string): PackItem[] {
-  const shirts = Math.min(context.days, 7);
+  const days = context.days;
+  // Cantidades realistas — una persona repite prendas, no lleva una por día.
+  // Remeras ≈ 60% de los días + 1 base, tope 7.  Ej: 8 días → 6 remeras.
+  const shirts = Math.max(2, Math.min(7, Math.ceil(days * 0.6) + 1));
+  // Pantalones: uno cada 4 días aprox, mín 1, máx 4. Ej: 8 días → 2.
+  const pants = Math.max(1, Math.min(4, Math.ceil(days / 4)));
+  // Ropa interior / medias: 1 por día, tope 10 (después se lava o se repite).
+  const underwear = Math.max(2, Math.min(10, days));
+  const socks = Math.max(2, Math.min(10, days));
+
   const items: PackItem[] = [
     { category: "Remeras", name: "Remeras o tops cómodos", quantity: shirts, weight: 0.18 },
-    { category: "Pantalones", name: "Pantalón o jean versátil", quantity: Math.max(1, Math.ceil(context.days / 3)), weight: 0.55 },
-    { category: "Otros", name: "Ropa interior", quantity: context.days, weight: 0.05 },
-    { category: "Otros", name: "Medias", quantity: context.days, weight: 0.04 },
+    { category: "Pantalones", name: "Pantalón o jean versátil", quantity: pants, weight: 0.55 },
+    { category: "Otros", name: "Ropa interior", quantity: underwear, weight: 0.05 },
+    { category: "Otros", name: "Medias", quantity: socks, weight: 0.04 },
     { category: "Higiene", name: "Neceser de higiene personal", quantity: 1, weight: 0.45 },
     { category: "Electrónica", name: "Cargador de celular", quantity: 1, weight: 0.12 },
     { category: "Accesorios", name: "Documento, pasaporte y reservas", quantity: 1, weight: 0.08 },
@@ -453,6 +462,12 @@ function requiredItems(context: ReturnType<typeof extractTripContext>, destinati
     );
   } else {
     items.push({ category: "Abrigos", name: "Campera liviana", quantity: 1, weight: 0.45 });
+  }
+
+  // Extras pedidos en las notas del usuario (anteojos, libro, mate, etc.)
+  for (const extra of context.extras) {
+    const exists = items.some((i) => normalizeText(i.name) === normalizeText(extra.name));
+    if (!exists) items.push(extra);
   }
 
   return items;

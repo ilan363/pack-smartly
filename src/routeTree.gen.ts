@@ -13,8 +13,10 @@ import { Route as LayoutRouteImport } from './routes/_layout'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiWeatherRouteImport } from './routes/api/weather'
 import { Route as ApiPackRouteImport } from './routes/api/pack'
+import { Route as ApiForecastRouteImport } from './routes/api.forecast'
 import { Route as LayoutWeatherRouteImport } from './routes/_layout.weather'
 import { Route as LayoutSuitcasesRouteImport } from './routes/_layout.suitcases'
+import { Route as LayoutSavedSuitcasesRouteImport } from './routes/_layout.saved-suitcases'
 import { Route as LayoutDashboardRouteImport } from './routes/_layout.dashboard'
 import { Route as LayoutChecklistsRouteImport } from './routes/_layout.checklists'
 import { Route as LayoutAssistantRouteImport } from './routes/_layout.assistant'
@@ -38,6 +40,11 @@ const ApiPackRoute = ApiPackRouteImport.update({
   path: '/api/pack',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiForecastRoute = ApiForecastRouteImport.update({
+  id: '/api/forecast',
+  path: '/api/forecast',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LayoutWeatherRoute = LayoutWeatherRouteImport.update({
   id: '/weather',
   path: '/weather',
@@ -46,6 +53,11 @@ const LayoutWeatherRoute = LayoutWeatherRouteImport.update({
 const LayoutSuitcasesRoute = LayoutSuitcasesRouteImport.update({
   id: '/suitcases',
   path: '/suitcases',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutSavedSuitcasesRoute = LayoutSavedSuitcasesRouteImport.update({
+  id: '/saved-suitcases',
+  path: '/saved-suitcases',
   getParentRoute: () => LayoutRoute,
 } as any)
 const LayoutDashboardRoute = LayoutDashboardRouteImport.update({
@@ -69,8 +81,10 @@ export interface FileRoutesByFullPath {
   '/assistant': typeof LayoutAssistantRoute
   '/checklists': typeof LayoutChecklistsRoute
   '/dashboard': typeof LayoutDashboardRoute
+  '/saved-suitcases': typeof LayoutSavedSuitcasesRoute
   '/suitcases': typeof LayoutSuitcasesRoute
   '/weather': typeof LayoutWeatherRoute
+  '/api/forecast': typeof ApiForecastRoute
   '/api/pack': typeof ApiPackRoute
   '/api/weather': typeof ApiWeatherRoute
 }
@@ -79,8 +93,10 @@ export interface FileRoutesByTo {
   '/assistant': typeof LayoutAssistantRoute
   '/checklists': typeof LayoutChecklistsRoute
   '/dashboard': typeof LayoutDashboardRoute
+  '/saved-suitcases': typeof LayoutSavedSuitcasesRoute
   '/suitcases': typeof LayoutSuitcasesRoute
   '/weather': typeof LayoutWeatherRoute
+  '/api/forecast': typeof ApiForecastRoute
   '/api/pack': typeof ApiPackRoute
   '/api/weather': typeof ApiWeatherRoute
 }
@@ -91,8 +107,10 @@ export interface FileRoutesById {
   '/_layout/assistant': typeof LayoutAssistantRoute
   '/_layout/checklists': typeof LayoutChecklistsRoute
   '/_layout/dashboard': typeof LayoutDashboardRoute
+  '/_layout/saved-suitcases': typeof LayoutSavedSuitcasesRoute
   '/_layout/suitcases': typeof LayoutSuitcasesRoute
   '/_layout/weather': typeof LayoutWeatherRoute
+  '/api/forecast': typeof ApiForecastRoute
   '/api/pack': typeof ApiPackRoute
   '/api/weather': typeof ApiWeatherRoute
 }
@@ -103,8 +121,10 @@ export interface FileRouteTypes {
     | '/assistant'
     | '/checklists'
     | '/dashboard'
+    | '/saved-suitcases'
     | '/suitcases'
     | '/weather'
+    | '/api/forecast'
     | '/api/pack'
     | '/api/weather'
   fileRoutesByTo: FileRoutesByTo
@@ -113,8 +133,10 @@ export interface FileRouteTypes {
     | '/assistant'
     | '/checklists'
     | '/dashboard'
+    | '/saved-suitcases'
     | '/suitcases'
     | '/weather'
+    | '/api/forecast'
     | '/api/pack'
     | '/api/weather'
   id:
@@ -124,8 +146,10 @@ export interface FileRouteTypes {
     | '/_layout/assistant'
     | '/_layout/checklists'
     | '/_layout/dashboard'
+    | '/_layout/saved-suitcases'
     | '/_layout/suitcases'
     | '/_layout/weather'
+    | '/api/forecast'
     | '/api/pack'
     | '/api/weather'
   fileRoutesById: FileRoutesById
@@ -133,6 +157,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LayoutRoute: typeof LayoutRouteWithChildren
+  ApiForecastRoute: typeof ApiForecastRoute
   ApiPackRoute: typeof ApiPackRoute
   ApiWeatherRoute: typeof ApiWeatherRoute
 }
@@ -167,6 +192,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/forecast': {
+      id: '/api/forecast'
+      path: '/api/forecast'
+      fullPath: '/api/forecast'
+      preLoaderRoute: typeof ApiForecastRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_layout/weather': {
       id: '/_layout/weather'
       path: '/weather'
@@ -179,6 +211,13 @@ declare module '@tanstack/react-router' {
       path: '/suitcases'
       fullPath: '/suitcases'
       preLoaderRoute: typeof LayoutSuitcasesRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/saved-suitcases': {
+      id: '/_layout/saved-suitcases'
+      path: '/saved-suitcases'
+      fullPath: '/saved-suitcases'
+      preLoaderRoute: typeof LayoutSavedSuitcasesRouteImport
       parentRoute: typeof LayoutRoute
     }
     '/_layout/dashboard': {
@@ -209,6 +248,7 @@ interface LayoutRouteChildren {
   LayoutAssistantRoute: typeof LayoutAssistantRoute
   LayoutChecklistsRoute: typeof LayoutChecklistsRoute
   LayoutDashboardRoute: typeof LayoutDashboardRoute
+  LayoutSavedSuitcasesRoute: typeof LayoutSavedSuitcasesRoute
   LayoutSuitcasesRoute: typeof LayoutSuitcasesRoute
   LayoutWeatherRoute: typeof LayoutWeatherRoute
 }
@@ -217,6 +257,7 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutAssistantRoute: LayoutAssistantRoute,
   LayoutChecklistsRoute: LayoutChecklistsRoute,
   LayoutDashboardRoute: LayoutDashboardRoute,
+  LayoutSavedSuitcasesRoute: LayoutSavedSuitcasesRoute,
   LayoutSuitcasesRoute: LayoutSuitcasesRoute,
   LayoutWeatherRoute: LayoutWeatherRoute,
 }
@@ -227,9 +268,20 @@ const LayoutRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LayoutRoute: LayoutRouteWithChildren,
+  ApiForecastRoute: ApiForecastRoute,
   ApiPackRoute: ApiPackRoute,
   ApiWeatherRoute: ApiWeatherRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

@@ -135,6 +135,7 @@ function AssistantPage() {
           days,
           suitcaseCapacityKg: Math.round(form.suitcaseCapacityKg),
           occasion: occasion || undefined,
+          notes: notes || undefined,
           from: form.from,
           to: form.to,
         }),

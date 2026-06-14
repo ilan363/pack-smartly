@@ -643,10 +643,21 @@ async function generatePackSuggestion(input: {
 }): Promise<{ suggestion: PackSuggestion; providerUsed: string }> {
   const context = extractTripContext(input.prompt);
   const capacity = clampCapacityKg(input.suitcaseCapacityKg);
-  const chain = buildProviderChain();
+  const chain = await buildProviderChain();
   let lastError: unknown;
 
-  for (const attempt of chain) {
+  let generateText: GenerateTextFn | undefined;
+  if (chain.length > 0) {
+    try {
+      const ai = (await import("ai")) as unknown as { generateText: GenerateTextFn };
+      generateText = ai.generateText;
+    } catch (error) {
+      console.warn("[pack] Falta el paquete de IA en esta instalación; usando fallback local", error);
+      lastError = error;
+    }
+  }
+
+  for (const attempt of generateText ? chain : []) {
     try {
       const { text } = await generateText({
         model: attempt.model,

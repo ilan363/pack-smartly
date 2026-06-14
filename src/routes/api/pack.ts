@@ -656,10 +656,11 @@ async function generatePackSuggestion(input: {
       lastError = error;
     }
   }
+  const runGenerateText = generateText;
 
-  for (const attempt of generateText ? chain : []) {
+  for (const attempt of runGenerateText ? chain : []) {
     try {
-      const { text } = await generateText({
+      const { text } = await runGenerateText({
         model: attempt.model,
         system: `Sos un asistente experto en equipaje. Respondé SOLO JSON válido, sin markdown.
 Formato exacto: {"destination":"Ciudad o país","days":3,"weather":"resumen breve","occasion":"motivo","items":[{"category":"Remeras|Pantalones|Abrigos|Zapatillas|Accesorios|Higiene|Electrónica|Otros","name":"item","quantity":1,"weight":0.2}]}.

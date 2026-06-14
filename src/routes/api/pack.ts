@@ -724,8 +724,13 @@ async function generatePackSuggestion(input: {
           model: attempt.model,
           system: `Sos un asistente experto en equipaje. Respondé SOLO JSON válido, sin markdown.
 Formato exacto: {"destination":"Ciudad o país","days":3,"weather":"resumen breve","occasion":"motivo","items":[{"category":"Remeras|Pantalones|Abrigos|Zapatillas|Accesorios|Higiene|Electrónica|Otros","name":"item","quantity":1,"weight":0.2}]}.
-Reglas críticas: respetá destino y días del usuario; no cambies España por Ushuaia; si hay casamiento/boda incluí conjunto y zapatos formales; si es playa incluí traje de baño/protector; si no hay nieve no sugieras ropa de nieve; cantidades realistas para la duración; si el usuario indicó capacidad de valija en kg, mantené la lista compacta y priorizá lo esencial.`,
-          prompt: `Solicitud del usuario: ${input.prompt}\nContexto detectado: destino=${context.destination}, días=${context.days}, ocasión=${context.occasion}${capacity ? `, capacidad=${capacity}kg` : ""}.`,
+Reglas críticas:
+- USÁ EXACTAMENTE los días, destino y ocasión que indica el usuario (no inventes ni cambies).
+- Cantidades realistas: una persona repite prendas. Para N días: remeras ≈ ceil(N*0.6)+1 (máx 7), pantalones ≈ ceil(N/4) (máx 4), ropa interior y medias = N (máx 10). Nunca pongas quantity > 10.
+- Si el usuario menciona algo en las notas (ej: anteojos de sol, mate, libro, cámara, paraguas, medicación), INCLUILO en items con la categoría correcta.
+- Si hay casamiento/boda incluí conjunto y zapatos formales; si es playa incluí traje de baño/protector; si no hay nieve no sugieras ropa de nieve.
+- Si el usuario indicó capacidad de valija en kg, mantené la lista compacta y priorizá lo esencial.`,
+          prompt: `Solicitud del usuario: ${input.prompt}\nContexto detectado: destino=${context.destination}, días=${context.days}, ocasión=${context.occasion}${capacity ? `, capacidad=${capacity}kg` : ""}${context.notes ? `, notas="${context.notes}"` : ""}.`,
         });
         return {
           suggestion: normalizeSuggestion(JSON.parse(stripJson(text)), input.prompt, capacity),

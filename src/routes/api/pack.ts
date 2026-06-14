@@ -1,26 +1,39 @@
 import "@tanstack/react-start";
 import { createFileRoute } from "@tanstack/react-router";
-import { generateText, type LanguageModel } from "ai";
 import { z } from "zod";
-import {
-  createGroqProvider,
-  createLovableAiGatewayProvider,
-  createOpenRouterProvider,
-} from "@/lib/ai-gateway";
 
 declare const process: { env: Record<string, string | undefined> };
 
-type ProviderAttempt = { provider: string; model: LanguageModel };
+type AiModel = unknown;
+type GenerateTextFn = (options: {
+  model: AiModel;
+  system: string;
+  prompt: string;
+}) => Promise<{ text: string }>;
+type ProviderAttempt = { provider: string; model: AiModel };
 
 // Cadena de proveedores: si Lovable se queda sin créditos, cae a OpenRouter
 // (modelos :free) y luego a Groq (Llama gratis). Si ninguno está disponible,
 // se usa el fallback determinista local.
-function buildProviderChain(): ProviderAttempt[] {
+async function buildProviderChain(): Promise<ProviderAttempt[]> {
   const chain: ProviderAttempt[] = [];
+
+  const hasAnyKey = Boolean(
+    process.env.LOVABLE_API_KEY || process.env.OPENROUTER_API_KEY || process.env.GROQ_API_KEY,
+  );
+  if (!hasAnyKey) return chain;
+
+  let providers: typeof import("@/lib/ai-gateway");
+  try {
+    providers = await import("@/lib/ai-gateway");
+  } catch (error) {
+    console.warn("[pack] No se pudieron cargar los proveedores IA; usando fallback local", error);
+    return chain;
+  }
 
   const lovableKey = process.env.LOVABLE_API_KEY;
   if (lovableKey) {
-    const gw = createLovableAiGatewayProvider(lovableKey);
+    const gw = providers.createLovableAiGatewayProvider(lovableKey);
     for (const m of [
       "google/gemini-3-flash-preview",
       "google/gemini-2.5-flash",
@@ -32,7 +45,7 @@ function buildProviderChain(): ProviderAttempt[] {
 
   const openrouterKey = process.env.OPENROUTER_API_KEY;
   if (openrouterKey) {
-    const or = createOpenRouterProvider(openrouterKey);
+    const or = providers.createOpenRouterProvider(openrouterKey);
     for (const m of [
       "meta-llama/llama-3.3-70b-instruct:free",
       "google/gemini-2.0-flash-exp:free",
@@ -44,7 +57,7 @@ function buildProviderChain(): ProviderAttempt[] {
 
   const groqKey = process.env.GROQ_API_KEY;
   if (groqKey) {
-    const gq = createGroqProvider(groqKey);
+    const gq = providers.createGroqProvider(groqKey);
     for (const m of ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]) {
       chain.push({ provider: `groq:${m}`, model: gq(m) });
     }
@@ -110,7 +123,7 @@ const RawSuggestionSchema = z.object({
       z.object({
         category: z.string().optional(),
         name: z.string().optional(),
-        quantity: z.coerce.number().int().min(1).max(20).optional(),
+        quantity: z.coerce.number().int().min(1).max(50).optional(),
         weight: z.coerce.number().min(0.01).max(8).optional(),
       }),
     )
@@ -144,6 +157,7 @@ const normalizeText = (value: string) =>
     .replace(/\s+/g, " ")
     .trim();
 
+<<<<<<< HEAD
 type StructuredPrompt = {
   destination?: string;
   days?: number;
@@ -268,16 +282,52 @@ function itemsFromNotes(notes: string): PackItem[] {
   }
 
   return items;
+=======
+type ExtraSpec = { match: RegExp; item: PackItem };
+const NOTE_EXTRAS: ExtraSpec[] = [
+  { match: /anteojos?\s*de\s*sol|gafas\s*de\s*sol|lentes\s*de\s*sol/, item: { category: "Accesorios", name: "Anteojos de sol", quantity: 1, weight: 0.08 } },
+  { match: /anteojos?\s*(?:de\s*lectura|recetados?|graduados?)|lentes\s*recetad/, item: { category: "Accesorios", name: "Anteojos recetados", quantity: 1, weight: 0.08 } },
+  { match: /\bmate\b|bombilla|yerba/, item: { category: "Otros", name: "Mate y yerba", quantity: 1, weight: 0.5 } },
+  { match: /libro|lectura/, item: { category: "Otros", name: "Libro", quantity: 1, weight: 0.3 } },
+  { match: /laptop|notebook/, item: { category: "Electrónica", name: "Laptop", quantity: 1, weight: 1.4 } },
+  { match: /auricular|headphone|airpods/, item: { category: "Electrónica", name: "Auriculares", quantity: 1, weight: 0.15 } },
+  { match: /camara|cámara/, item: { category: "Electrónica", name: "Cámara", quantity: 1, weight: 0.55 } },
+  { match: /paraguas/, item: { category: "Accesorios", name: "Paraguas plegable", quantity: 1, weight: 0.35 } },
+  { match: /medicac|remedio|pastilla/, item: { category: "Higiene", name: "Medicación personal", quantity: 1, weight: 0.15 } },
+  { match: /toalla/, item: { category: "Otros", name: "Toalla", quantity: 1, weight: 0.4 } },
+  { match: /gorra|sombrero/, item: { category: "Accesorios", name: "Gorra o sombrero", quantity: 1, weight: 0.12 } },
+  { match: /zapatill/, item: { category: "Zapatillas", name: "Zapatillas extra", quantity: 1, weight: 1.0 } },
+];
+
+function extractExtras(text: string): PackItem[] {
+  if (!text) return [];
+  const n = normalizeText(text);
+  const out: PackItem[] = [];
+  for (const e of NOTE_EXTRAS) {
+    if (e.match.test(n) && !out.some((o) => o.name === e.item.name)) out.push(e.item);
+  }
+  return out;
+>>>>>>> 472d2102fdcd75302d0b64ce0d3daa641d7e7b89
 }
 
 function extractTripContext(prompt: string) {
   const normalized = normalizeText(prompt);
+<<<<<<< HEAD
   const structured = parseStructuredPrompt(prompt);
+=======
+
+  // Datos estructurados que envía la UI: "Destino: X", "Días: 8", "Notas: ..."
+  const structDestination = prompt.match(/destino\s*:\s*([^\n]+)/i)?.[1]?.trim();
+  const structDays = prompt.match(/d[ií]as?\s*:\s*(\d{1,2})/i)?.[1];
+  const structOccasion = prompt.match(/ocasi[oó]n\s*:\s*([^\n]+)/i)?.[1]?.trim();
+  const structNotes = prompt.match(/notas?\s*:\s*([^\n]+)/i)?.[1]?.trim() ?? "";
+>>>>>>> 472d2102fdcd75302d0b64ce0d3daa641d7e7b89
 
   const numericDays = normalized.match(/(\d{1,2})\s*(?:dias|dia|noches|noche)\b/);
   const wordDays = normalized.match(
     /\b(un|una|uno|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce|quince)\s*(?:dias|dia|noches|noche)\b/,
   );
+<<<<<<< HEAD
   const freeTextDays = numericDays
     ? Number(numericDays[1])
     : wordDays
@@ -289,23 +339,47 @@ function extractTripContext(prompt: string) {
     computeDaysFromDateRange(structured.from, structured.to) ??
     freeTextDays ??
     3;
+=======
+  const days = structDays
+    ? Number(structDays)
+    : numericDays
+      ? Number(numericDays[1])
+      : wordDays
+        ? NUMBER_WORDS[wordDays[1]]
+        : 3;
+>>>>>>> 472d2102fdcd75302d0b64ce0d3daa641d7e7b89
 
   const destinationMatch = normalized.match(
     /(?:viaje a|viajo a|voy a|me voy a|destino a|para|hacia|en)\s+([a-zñ ]+?)(?=\s+(?:por|durante|a un|a una|para un|para una|con|del|de|y|,|\.|$)|$)/,
   );
+<<<<<<< HEAD
   const rawDestination = structured.destination
     ?? destinationMatch?.[1]
       ?.replace(/\b(?:un|una|el|la|los|las)\b/g, "")
       .replace(/\s+/g, " ")
       .trim();
+=======
+  const rawDestination = (structDestination ?? destinationMatch?.[1] ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\b(?:un|una|el|la|los|las)\b/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+>>>>>>> 472d2102fdcd75302d0b64ce0d3daa641d7e7b89
   const destination = rawDestination && /\b(boda|casamiento|matrimonio)\b/.test(rawDestination)
     ? rawDestination.includes("playa")
       ? "playa"
       : undefined
     : rawDestination;
 
+<<<<<<< HEAD
   const occasion = structured.occasion
     ? structured.occasion
+=======
+  const occasion = structOccasion
+    ? titleCase(structOccasion.toLowerCase())
+>>>>>>> 472d2102fdcd75302d0b64ce0d3daa641d7e7b89
     : /casamiento|boda|matrimonio/.test(normalized)
       ? "Casamiento"
       : /playa|mar|costa/.test(normalized)
@@ -317,15 +391,22 @@ function extractTripContext(prompt: string) {
             : /nieve|ski|esqui|ushuaia|bariloche/.test(normalized)
               ? "Frío / nieve"
               : "Viaje urbano";
+<<<<<<< HEAD
+=======
+
+  const extras = extractExtras(`${structNotes} ${prompt}`);
+>>>>>>> 472d2102fdcd75302d0b64ce0d3daa641d7e7b89
 
   return {
-    destination: destination ? titleCase(destination) : "Destino indicado",
+    destination: destination ? titleCase(destination) : (structDestination ? titleCase(structDestination) : "Destino indicado"),
     days: Math.max(1, Math.min(days, 90)),
     occasion,
     notes: structured.notes ?? "",
     warm: /brasil|rio|salvador|playa|caribe|cancun|punta cana|cartagena|costa/.test(normalized),
     cold: /ushuaia|nieve|ski|esqui|patagonia|bariloche|calafate|islandia/.test(normalized),
     formal: /casamiento|boda|matrimonio|gala|evento formal/.test(normalized),
+    notes: structNotes,
+    extras,
   };
 }
 
@@ -559,6 +640,10 @@ function applyRealisticQuantities(items: PackItem[], days: number): PackItem[] {
 function normalizeItem(item: RawPackItem, days = 3): PackItem | null {
   const name = item.name?.trim();
   if (!name) return null;
+HEAD
+
+  const quantity = Math.max(1, Math.min(Number(item.quantity ?? 1), 10));
+472d2102fdcd75302d0b64ce0d3daa641d7e7b89
   const category = normalizeCategory(item.category, name);
   const rawQty = Math.max(1, Math.min(Number(item.quantity ?? 1), 20));
   const cap = maxRealisticQuantity({ category, name }, days);
@@ -582,12 +667,30 @@ function stripJson(text: string) {
 }
 
 function requiredItems(context: ReturnType<typeof extractTripContext>, destination: string): PackItem[] {
+<<<<<<< HEAD
   const qty = realisticClothingQuantities(context.days);
   const items: PackItem[] = [
     { category: "Remeras", name: "Remeras o tops cómodos", quantity: qty.shirts, weight: 0.18 },
     { category: "Pantalones", name: "Pantalón o jean versátil", quantity: qty.pants, weight: 0.55 },
     { category: "Otros", name: "Ropa interior", quantity: qty.underwear, weight: 0.05 },
     { category: "Otros", name: "Medias", quantity: qty.socks, weight: 0.04 },
+=======
+  const days = context.days;
+  // Cantidades realistas — una persona repite prendas, no lleva una por día.
+  // Remeras ≈ 60% de los días + 1 base, tope 7.  Ej: 8 días → 6 remeras.
+  const shirts = Math.max(2, Math.min(7, Math.ceil(days * 0.6) + 1));
+  // Pantalones: uno cada 4 días aprox, mín 1, máx 4. Ej: 8 días → 2.
+  const pants = Math.max(1, Math.min(4, Math.ceil(days / 4)));
+  // Ropa interior / medias: 1 por día, tope 10 (después se lava o se repite).
+  const underwear = Math.max(2, Math.min(10, days));
+  const socks = Math.max(2, Math.min(10, days));
+
+  const items: PackItem[] = [
+    { category: "Remeras", name: "Remeras o tops cómodos", quantity: shirts, weight: 0.18 },
+    { category: "Pantalones", name: "Pantalón o jean versátil", quantity: pants, weight: 0.55 },
+    { category: "Otros", name: "Ropa interior", quantity: underwear, weight: 0.05 },
+    { category: "Otros", name: "Medias", quantity: socks, weight: 0.04 },
+>>>>>>> 472d2102fdcd75302d0b64ce0d3daa641d7e7b89
     { category: "Higiene", name: "Neceser de higiene personal", quantity: 1, weight: 0.45 },
     { category: "Electrónica", name: "Cargador de celular", quantity: 1, weight: 0.12 },
     { category: "Accesorios", name: "Documento, pasaporte y reservas", quantity: 1, weight: 0.08 },
@@ -615,6 +718,12 @@ function requiredItems(context: ReturnType<typeof extractTripContext>, destinati
     );
   } else {
     items.push({ category: "Abrigos", name: "Campera liviana", quantity: 1, weight: 0.45 });
+  }
+
+  // Extras pedidos en las notas del usuario (anteojos, libro, mate, etc.)
+  for (const extra of context.extras) {
+    const exists = items.some((i) => normalizeText(i.name) === normalizeText(extra.name));
+    if (!exists) items.push(extra);
   }
 
   return items;
@@ -762,6 +871,7 @@ function normalizeSuggestion(
   const trip = resolveTripMetadata(prompt, overrides);
   const parsed = RawSuggestionSchema.safeParse(raw);
   const data = parsed.success ? parsed.data : {};
+<<<<<<< HEAD
   const destination = trip.destination !== "Destino indicado" ? trip.destination : data.destination?.trim() || trip.destination;
   const days = trip.days;
   const occasion = trip.occasion !== "Viaje urbano" ? trip.occasion : data.occasion?.trim() || trip.occasion;
@@ -770,6 +880,24 @@ function normalizeSuggestion(
     .map((item) => normalizeItem(item, days))
     .filter((item): item is PackItem => Boolean(item));
   const blockedSnow = !trip.cold && !/nieve|ski|esqui|ushuaia|patagonia/i.test(prompt);
+=======
+  const destination = context.destination !== "Destino indicado" ? context.destination : data.destination?.trim() || context.destination;
+  const days = context.days || data.days || 3;
+  const occasion = context.occasion !== "Viaje urbano" ? context.occasion : data.occasion?.trim() || context.occasion;
+  const weather = data.weather?.trim() || inferWeather(prompt, destination, context.warm, context.cold, days);
+  const realisticShirts = Math.max(2, Math.min(7, Math.ceil(context.days * 0.6) + 1));
+  const realisticPants = Math.max(1, Math.min(4, Math.ceil(context.days / 4)));
+  const clampClothing = (it: PackItem): PackItem => {
+    if (it.category === "Remeras" && it.quantity > realisticShirts) return { ...it, quantity: realisticShirts };
+    if (it.category === "Pantalones" && it.quantity > realisticPants) return { ...it, quantity: realisticPants };
+    return it;
+  };
+  const aiItems = (data.items ?? [])
+    .map(normalizeItem)
+    .filter((item): item is PackItem => Boolean(item))
+    .map(clampClothing);
+  const blockedSnow = !context.cold && !/nieve|ski|esqui|ushuaia|patagonia/i.test(prompt);
+>>>>>>> 472d2102fdcd75302d0b64ce0d3daa641d7e7b89
   const filteredItems = blockedSnow
     ? aiItems.filter((item) => !/nieve|ski|esqui|termic|guantes|gorro polar|botas de nieve/i.test(item.name))
     : aiItems;
@@ -835,9 +963,10 @@ async function generatePackSuggestion(input: {
   };
   const trip = resolveTripMetadata(input.prompt, overrides);
   const capacity = clampCapacityKg(input.suitcaseCapacityKg);
-  const chain = buildProviderChain();
+  const chain = await buildProviderChain();
   let lastError: unknown;
 
+<<<<<<< HEAD
   const notesLine = trip.notes ? `\nNotas del usuario (incluí cada ítem mencionado en la lista): ${trip.notes}` : "";
 
   for (const attempt of chain) {
@@ -864,11 +993,45 @@ Contexto OBLIGATORIO (copiá estos valores tal cual en el JSON): destino=${trip.
         suggestion: normalizeSuggestion(JSON.parse(stripJson(text)), input.prompt, capacity, overrides),
         providerUsed: attempt.provider,
       };
+=======
+  let generateText: GenerateTextFn | undefined;
+  if (chain.length > 0) {
+    try {
+      const ai = (await import("ai")) as unknown as { generateText: GenerateTextFn };
+      generateText = ai.generateText;
+>>>>>>> 472d2102fdcd75302d0b64ce0d3daa641d7e7b89
     } catch (error) {
+      console.warn("[pack] Falta el paquete de IA en esta instalación; usando fallback local", error);
       lastError = error;
-      // En 429 (rate limit) o 402 (sin créditos) seguimos con el próximo
-      // proveedor en lugar de fallar — esa es la razón de ser de la cadena.
-      console.warn(`[pack] ${attempt.provider} falló, probando siguiente`, error);
+    }
+  }
+  const runGenerateText = generateText;
+
+  if (runGenerateText) {
+    for (const attempt of chain) {
+      try {
+        const { text } = await runGenerateText({
+          model: attempt.model,
+          system: `Sos un asistente experto en equipaje. Respondé SOLO JSON válido, sin markdown.
+Formato exacto: {"destination":"Ciudad o país","days":3,"weather":"resumen breve","occasion":"motivo","items":[{"category":"Remeras|Pantalones|Abrigos|Zapatillas|Accesorios|Higiene|Electrónica|Otros","name":"item","quantity":1,"weight":0.2}]}.
+Reglas críticas:
+- USÁ EXACTAMENTE los días, destino y ocasión que indica el usuario (no inventes ni cambies).
+- Cantidades realistas: una persona repite prendas. Para N días: remeras ≈ ceil(N*0.6)+1 (máx 7), pantalones ≈ ceil(N/4) (máx 4), ropa interior y medias = N (máx 10). Nunca pongas quantity > 10.
+- Si el usuario menciona algo en las notas (ej: anteojos de sol, mate, libro, cámara, paraguas, medicación), INCLUILO en items con la categoría correcta.
+- Si hay casamiento/boda incluí conjunto y zapatos formales; si es playa incluí traje de baño/protector; si no hay nieve no sugieras ropa de nieve.
+- Si el usuario indicó capacidad de valija en kg, mantené la lista compacta y priorizá lo esencial.`,
+          prompt: `Solicitud del usuario: ${input.prompt}\nContexto detectado: destino=${context.destination}, días=${context.days}, ocasión=${context.occasion}${capacity ? `, capacidad=${capacity}kg` : ""}${context.notes ? `, notas="${context.notes}"` : ""}.`,
+        });
+        return {
+          suggestion: normalizeSuggestion(JSON.parse(stripJson(text)), input.prompt, capacity),
+          providerUsed: attempt.provider,
+        };
+      } catch (error) {
+        lastError = error;
+        // En 429 (rate limit) o 402 (sin créditos) seguimos con el próximo
+        // proveedor en lugar de fallar — esa es la razón de ser de la cadena.
+        console.warn(`[pack] ${attempt.provider} falló, probando siguiente`, error);
+      }
     }
   }
 

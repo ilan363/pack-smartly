@@ -12,4 +12,17 @@ export default defineConfig({
   tanstackStart: {
     server: { entry: "server" },
   },
+  vite: {
+    server: {
+      host: true, // escucha en 0.0.0.0 → accesible desde cualquier IP/host de la red
+      strictPort: false,
+      cors: true,
+      allowedHosts: true, // permite cualquier hostname (Cursor, ngrok, túneles, etc.)
+    },
+    preview: {
+      host: true,
+      allowedHosts: true,
+      cors: true,
+    },
+  },
 });

@@ -1,26 +1,39 @@
 import "@tanstack/react-start";
 import { createFileRoute } from "@tanstack/react-router";
-import { generateText, type LanguageModel } from "ai";
 import { z } from "zod";
-import {
-  createGroqProvider,
-  createLovableAiGatewayProvider,
-  createOpenRouterProvider,
-} from "@/lib/ai-gateway";
 
 declare const process: { env: Record<string, string | undefined> };
 
-type ProviderAttempt = { provider: string; model: LanguageModel };
+type AiModel = unknown;
+type GenerateTextFn = (options: {
+  model: AiModel;
+  system: string;
+  prompt: string;
+}) => Promise<{ text: string }>;
+type ProviderAttempt = { provider: string; model: AiModel };
 
 // Cadena de proveedores: si Lovable se queda sin créditos, cae a OpenRouter
 // (modelos :free) y luego a Groq (Llama gratis). Si ninguno está disponible,
 // se usa el fallback determinista local.
-function buildProviderChain(): ProviderAttempt[] {
+async function buildProviderChain(): Promise<ProviderAttempt[]> {
   const chain: ProviderAttempt[] = [];
+
+  const hasAnyKey = Boolean(
+    process.env.LOVABLE_API_KEY || process.env.OPENROUTER_API_KEY || process.env.GROQ_API_KEY,
+  );
+  if (!hasAnyKey) return chain;
+
+  let providers: typeof import("@/lib/ai-gateway");
+  try {
+    providers = await import("@/lib/ai-gateway");
+  } catch (error) {
+    console.warn("[pack] No se pudieron cargar los proveedores IA; usando fallback local", error);
+    return chain;
+  }
 
   const lovableKey = process.env.LOVABLE_API_KEY;
   if (lovableKey) {
-    const gw = createLovableAiGatewayProvider(lovableKey);
+    const gw = providers.createLovableAiGatewayProvider(lovableKey);
     for (const m of [
       "google/gemini-3-flash-preview",
       "google/gemini-2.5-flash",
@@ -32,7 +45,7 @@ function buildProviderChain(): ProviderAttempt[] {
 
   const openrouterKey = process.env.OPENROUTER_API_KEY;
   if (openrouterKey) {
-    const or = createOpenRouterProvider(openrouterKey);
+    const or = providers.createOpenRouterProvider(openrouterKey);
     for (const m of [
       "meta-llama/llama-3.3-70b-instruct:free",
       "google/gemini-2.0-flash-exp:free",
@@ -44,7 +57,7 @@ function buildProviderChain(): ProviderAttempt[] {
 
   const groqKey = process.env.GROQ_API_KEY;
   if (groqKey) {
-    const gq = createGroqProvider(groqKey);
+    const gq = providers.createGroqProvider(groqKey);
     for (const m of ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]) {
       chain.push({ provider: `groq:${m}`, model: gq(m) });
     }

@@ -658,24 +658,26 @@ async function generatePackSuggestion(input: {
   }
   const runGenerateText = generateText;
 
-  for (const attempt of runGenerateText ? chain : []) {
-    try {
-      const { text } = await runGenerateText({
-        model: attempt.model,
-        system: `Sos un asistente experto en equipaje. Respondé SOLO JSON válido, sin markdown.
+  if (runGenerateText) {
+    for (const attempt of chain) {
+      try {
+        const { text } = await runGenerateText({
+          model: attempt.model,
+          system: `Sos un asistente experto en equipaje. Respondé SOLO JSON válido, sin markdown.
 Formato exacto: {"destination":"Ciudad o país","days":3,"weather":"resumen breve","occasion":"motivo","items":[{"category":"Remeras|Pantalones|Abrigos|Zapatillas|Accesorios|Higiene|Electrónica|Otros","name":"item","quantity":1,"weight":0.2}]}.
 Reglas críticas: respetá destino y días del usuario; no cambies España por Ushuaia; si hay casamiento/boda incluí conjunto y zapatos formales; si es playa incluí traje de baño/protector; si no hay nieve no sugieras ropa de nieve; cantidades realistas para la duración; si el usuario indicó capacidad de valija en kg, mantené la lista compacta y priorizá lo esencial.`,
-        prompt: `Solicitud del usuario: ${input.prompt}\nContexto detectado: destino=${context.destination}, días=${context.days}, ocasión=${context.occasion}${capacity ? `, capacidad=${capacity}kg` : ""}.`,
-      });
-      return {
-        suggestion: normalizeSuggestion(JSON.parse(stripJson(text)), input.prompt, capacity),
-        providerUsed: attempt.provider,
-      };
-    } catch (error) {
-      lastError = error;
-      // En 429 (rate limit) o 402 (sin créditos) seguimos con el próximo
-      // proveedor en lugar de fallar — esa es la razón de ser de la cadena.
-      console.warn(`[pack] ${attempt.provider} falló, probando siguiente`, error);
+          prompt: `Solicitud del usuario: ${input.prompt}\nContexto detectado: destino=${context.destination}, días=${context.days}, ocasión=${context.occasion}${capacity ? `, capacidad=${capacity}kg` : ""}.`,
+        });
+        return {
+          suggestion: normalizeSuggestion(JSON.parse(stripJson(text)), input.prompt, capacity),
+          providerUsed: attempt.provider,
+        };
+      } catch (error) {
+        lastError = error;
+        // En 429 (rate limit) o 402 (sin créditos) seguimos con el próximo
+        // proveedor en lugar de fallar — esa es la razón de ser de la cadena.
+        console.warn(`[pack] ${attempt.provider} falló, probando siguiente`, error);
+      }
     }
   }
 

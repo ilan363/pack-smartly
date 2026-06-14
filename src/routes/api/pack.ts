@@ -658,7 +658,17 @@ function normalizeSuggestion(raw: unknown, prompt: string, suitcaseCapacityKg?: 
   const days = context.days || data.days || 3;
   const occasion = context.occasion !== "Viaje urbano" ? context.occasion : data.occasion?.trim() || context.occasion;
   const weather = data.weather?.trim() || inferWeather(prompt, destination, context.warm, context.cold, days);
-  const aiItems = (data.items ?? []).map(normalizeItem).filter((item): item is PackItem => Boolean(item));
+  const realisticShirts = Math.max(2, Math.min(7, Math.ceil(context.days * 0.6) + 1));
+  const realisticPants = Math.max(1, Math.min(4, Math.ceil(context.days / 4)));
+  const clampClothing = (it: PackItem): PackItem => {
+    if (it.category === "Remeras" && it.quantity > realisticShirts) return { ...it, quantity: realisticShirts };
+    if (it.category === "Pantalones" && it.quantity > realisticPants) return { ...it, quantity: realisticPants };
+    return it;
+  };
+  const aiItems = (data.items ?? [])
+    .map(normalizeItem)
+    .filter((item): item is PackItem => Boolean(item))
+    .map(clampClothing);
   const blockedSnow = !context.cold && !/nieve|ski|esqui|ushuaia|patagonia/i.test(prompt);
   const filteredItems = blockedSnow
     ? aiItems.filter((item) => !/nieve|ski|esqui|termic|guantes|gorro polar|botas de nieve/i.test(item.name))

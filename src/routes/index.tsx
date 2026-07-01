@@ -1,6 +1,8 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { ArrowRight, BaggageClaim, Bot, CheckCircle2, CloudLightning } from "lucide-react";
+import { useState } from "react";
+import { AuthDialog } from "@/components/AuthDialog";
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/")({
@@ -8,27 +10,48 @@ export const Route = createFileRoute("/")({
 });
 
 function Navbar() {
+  const navigate = useNavigate();
+  const [authOpen, setAuthOpen] = useState(false);
+  const [authTab, setAuthTab] = useState<"login" | "register" | "admin">("login");
+
+  const openAuth = (tab: "login" | "register" | "admin") => {
+    setAuthTab(tab);
+    setAuthOpen(true);
+  };
+
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/40 bg-background/80 backdrop-blur-md">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
-        <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <BaggageClaim size={18} />
+    <>
+      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/40 bg-background/80 backdrop-blur-md">
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+              <BaggageClaim size={18} />
+            </div>
+            <span className="text-lg font-bold tracking-tight">Travel Wolf</span>
           </div>
-          <span className="text-lg font-bold tracking-tight">Travel Wolf</span>
-        </div>
-        <div className="flex items-center gap-4">
-          <Link to="/dashboard">
-            <Button variant="ghost" className="hidden sm:inline-flex">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              className="hidden sm:inline-flex"
+              onClick={() => openAuth("login")}
+            >
               Ingresar
             </Button>
-          </Link>
-          <Link to="/dashboard">
-            <Button className="rounded-full">Comenzar gratis</Button>
-          </Link>
+            <Button className="rounded-full" onClick={() => openAuth("register")}>
+              Comenzar gratis
+            </Button>
+          </div>
         </div>
-      </div>
-    </nav>
+      </nav>
+
+      <AuthDialog
+        open={authOpen}
+        onOpenChange={setAuthOpen}
+        defaultTab={authTab}
+        onSuccess={() => navigate({ to: "/dashboard" })}
+        onAdminSuccess={() => navigate({ to: "/admin" })}
+      />
+    </>
   );
 }
 

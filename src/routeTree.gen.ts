@@ -20,6 +20,7 @@ import { Route as LayoutSavedSuitcasesRouteImport } from './routes/_layout.saved
 import { Route as LayoutDashboardRouteImport } from './routes/_layout.dashboard'
 import { Route as LayoutChecklistsRouteImport } from './routes/_layout.checklists'
 import { Route as LayoutAssistantRouteImport } from './routes/_layout.assistant'
+import { Route as LayoutAdminRouteImport } from './routes/_layout.admin'
 
 const LayoutRoute = LayoutRouteImport.update({
   id: '/_layout',
@@ -75,9 +76,15 @@ const LayoutAssistantRoute = LayoutAssistantRouteImport.update({
   path: '/assistant',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LayoutAdminRoute = LayoutAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => LayoutRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof LayoutAdminRoute
   '/assistant': typeof LayoutAssistantRoute
   '/checklists': typeof LayoutChecklistsRoute
   '/dashboard': typeof LayoutDashboardRoute
@@ -90,6 +97,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin': typeof LayoutAdminRoute
   '/assistant': typeof LayoutAssistantRoute
   '/checklists': typeof LayoutChecklistsRoute
   '/dashboard': typeof LayoutDashboardRoute
@@ -104,6 +112,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_layout': typeof LayoutRouteWithChildren
+  '/_layout/admin': typeof LayoutAdminRoute
   '/_layout/assistant': typeof LayoutAssistantRoute
   '/_layout/checklists': typeof LayoutChecklistsRoute
   '/_layout/dashboard': typeof LayoutDashboardRoute
@@ -118,6 +127,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin'
     | '/assistant'
     | '/checklists'
     | '/dashboard'
@@ -130,6 +140,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/admin'
     | '/assistant'
     | '/checklists'
     | '/dashboard'
@@ -143,6 +154,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/_layout'
+    | '/_layout/admin'
     | '/_layout/assistant'
     | '/_layout/checklists'
     | '/_layout/dashboard'
@@ -241,10 +253,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutAssistantRouteImport
       parentRoute: typeof LayoutRoute
     }
+    '/_layout/admin': {
+      id: '/_layout/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof LayoutAdminRouteImport
+      parentRoute: typeof LayoutRoute
+    }
   }
 }
 
 interface LayoutRouteChildren {
+  LayoutAdminRoute: typeof LayoutAdminRoute
   LayoutAssistantRoute: typeof LayoutAssistantRoute
   LayoutChecklistsRoute: typeof LayoutChecklistsRoute
   LayoutDashboardRoute: typeof LayoutDashboardRoute
@@ -254,6 +274,7 @@ interface LayoutRouteChildren {
 }
 
 const LayoutRouteChildren: LayoutRouteChildren = {
+  LayoutAdminRoute: LayoutAdminRoute,
   LayoutAssistantRoute: LayoutAssistantRoute,
   LayoutChecklistsRoute: LayoutChecklistsRoute,
   LayoutDashboardRoute: LayoutDashboardRoute,

@@ -1,24 +1,32 @@
-import { Link, useLocation } from "@tanstack/react-router";
+import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import {
   BaggageClaim,
   Home,
   Bot,
-  Settings,
   LogOut,
   ListChecks,
   CloudSun,
+  ShieldCheck,
   type LucideIcon,
 } from "lucide-react";
-
-const navigation: { name: string; href: string; icon: LucideIcon }[] = [
-  { name: "Dashboard", href: "/dashboard", icon: Home },
-  { name: "Asistente IA", href: "/assistant", icon: Bot },
-  { name: "Clima", href: "/weather", icon: CloudSun },
-  { name: "Listas", href: "/checklists", icon: ListChecks },
-];
+import { useAuthStore } from "@/lib/auth-store";
+import { toast } from "sonner";
 
 export function AppSidebar() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const logout = useAuthStore((s) => s.logout);
+  const isAdmin = useAuthStore((s) => s.isAdmin);
+
+  const navigation: { name: string; href: string; icon: LucideIcon }[] = [
+    { name: "Dashboard", href: "/dashboard", icon: Home },
+    { name: "Asistente IA", href: "/assistant", icon: Bot },
+    { name: "Clima", href: "/weather", icon: CloudSun },
+    { name: "Listas", href: "/checklists", icon: ListChecks },
+    ...(isAdmin
+      ? [{ name: "Administración", href: "/admin", icon: ShieldCheck }]
+      : []),
+  ];
 
   return (
     <aside className="hidden h-svh w-64 shrink-0 flex-col border-r border-border bg-card md:flex">
@@ -50,16 +58,19 @@ export function AppSidebar() {
       </nav>
 
       <div className="shrink-0 border-t border-border p-4">
-        <div className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
-          <Settings className="h-4 w-4" />
-          Configuración
-        </div>
-        <Link to="/">
-          <div className="mt-1 flex cursor-pointer items-center gap-3 rounded-md px-3 py-2 text-sm text-red-500 transition-colors hover:bg-red-500/10">
-            <LogOut className="h-4 w-4" />
-            Salir
-          </div>
-        </Link>
+        
+        <button
+          type="button"
+          onClick={() => {
+            logout();
+            toast.success("Sesión cerrada");
+            navigate({ to: "/" });
+          }}
+          className="mt-1 flex w-full cursor-pointer items-center gap-3 rounded-md px-3 py-2 text-sm text-red-500 transition-colors hover:bg-red-500/10"
+        >
+          <LogOut className="h-4 w-4" />
+          Salir
+        </button>
       </div>
     </aside>
   );

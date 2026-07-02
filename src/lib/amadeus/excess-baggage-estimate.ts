@@ -32,7 +32,10 @@ type AmadeusFlightOffer = {
   }>;
 };
 
-const DEFAULT_ORIGIN = "EZE";
+const AR_IATA = new Set([
+  "EZE", "AEP", "COR", "MDZ", "BRC", "SLA", "IGR", "NQN", "TUC", "USH",
+  "FTE", "REL", "PSS", "CRD", "RSA", "SFN", "JUJ", "IRJ", "CNQ", "RCU",
+]);
 
 function defaultDepartureDate() {
   const d = new Date();
@@ -40,10 +43,29 @@ function defaultDepartureDate() {
   return d.toISOString().slice(0, 10);
 }
 
+function isArgentinaIata(code: string) {
+  return AR_IATA.has(code.toUpperCase());
+}
+
+function isLikelyArgentinaDestination(destination: string): boolean {
+  const d = destination.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  if (/^[a-z]{3}$/i.test(destination.trim()) && isArgentinaIata(destination.trim())) {
+    return true;
+  }
+  return /argentina|buenos aires|cordoba|mendoza|bariloche|ushuaia|calafate|mar del plata|salta|iguazu|el calafate/.test(
+    d,
+  );
+}
+
+function isDomesticRoute(origin: string, destination: string): boolean {
+  return isArgentinaIata(origin) && isLikelyArgentinaDestination(destination);
+}
+
 function fallbackEstimate(
   excessKg: number,
   suitcaseType: SuitcaseType,
   domestic: boolean,
+  note?: string,
 ): ExcessBaggageEstimate {
   const pricePerKg = domestic
     ? suitcaseType === "cabina"
@@ -60,7 +82,9 @@ function fallbackEstimate(
     estimatedCost: Math.round(excessKg * pricePerKg * 100) / 100,
     currency,
     source: "fallback",
-    note: "Estimación regional aproximada. Configurá credenciales Amadeus para cotizar con ofertas reales del mercado.",
+    note:
+      note ??
+      "Estimación regional aproximada. Configurá credenciales Amadeus para cotizar con ofertas reales del mercado.",
   };
 }
 
@@ -137,11 +161,29 @@ export async function estimateExcessBaggageCost(input: {
     };
   }
 
-  const origin = (input.originAirport ?? DEFAULT_ORIGIN).toUpperCase();
-  const domestic = origin.startsWith("A") && origin.length === 3;
+  const originRaw = input.originAirport?.trim().toUpperCase();
+  const hasOrigin = Boolean(originRaw && /^[A-Z0-9]{3}$/.test(originRaw));
+
+  if (!hasOrigin) {
+    const domestic = isLikelyArgentinaDestination(input.destination);
+    return fallbackEstimate(
+      excessKg,
+      input.suitcaseType,
+      domestic,
+      "No indicaste aeropuerto de origen (IATA). Mostramos una estimación aproximada del exceso; completá el origen en la valija para afinar la cotización.",
+    );
+  }
+
+  const origin = originRaw!;
+  const domestic = isDomesticRoute(origin, input.destination);
 
   if (!hasAmadeusCredentials()) {
-    return fallbackEstimate(excessKg, input.suitcaseType, domestic);
+    return fallbackEstimate(
+      excessKg,
+      input.suitcaseType,
+      domestic,
+      "Estimación regional aproximada (sin credenciales Amadeus).",
+    );
   }
 
   try {

@@ -29,7 +29,6 @@ import {
 } from "@/lib/suitcases-store";
 import { ExcessBaggageEstimateCard } from "@/components/suitcases/ExcessBaggageEstimate";
 import { IataAirportCombobox } from "@/components/suitcases/IataAirportCombobox";
-import { isValidIataCode } from "@/lib/airports/iata";
 
 export const Route = createFileRoute("/_layout/suitcases")({
   component: SuitcasesPage,
@@ -575,12 +574,17 @@ function SuitcaseDialog({
       toast.error("Completá nombre, destino y peso máximo.");
       return;
     }
-    if (!form.originAirport.trim() || !isValidIataCode(form.originAirport)) {
-      toast.error("Elegí un aeropuerto de origen válido (código IATA de 3 letras).");
-      return;
+    if (dialog?.mode === "edit") {
+      onUpdate(dialog.id, {
+        ...form,
+        originAirport: form.originAirport.trim().toUpperCase(),
+      });
+    } else {
+      onCreate({
+        ...form,
+        originAirport: form.originAirport.trim().toUpperCase(),
+      });
     }
-    if (dialog?.mode === "edit") onUpdate(dialog.id, form);
-    else onCreate(form);
     onClose();
   };
 
@@ -617,7 +621,7 @@ function SuitcaseDialog({
               <label className="text-sm font-medium" htmlFor="origin-iata">
                 Origen{" "}
                 <span className="font-normal text-muted-foreground">
-                  (código IATA del aeropuerto de salida, ej: EZE, MIA, MAD)
+                  (opcional — código IATA de 3 letras del aeropuerto de salida, ej: EZE, MIA, MAD)
                 </span>
               </label>
               <IataAirportCombobox

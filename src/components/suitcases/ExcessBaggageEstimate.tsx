@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { AlertCircle, Loader2, Plane, Wallet } from "lucide-react";
+import { AlertCircle, Info, Loader2, Plane, Wallet } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import type { Suitcase } from "@/lib/suitcases-store";
@@ -16,6 +16,7 @@ type Props = {
 export function ExcessBaggageEstimateCard({ suitcase, currentWeight }: Props) {
   const excessKg = Math.max(0, currentWeight - suitcase.maxWeight);
   const enabled = excessKg > 0;
+  const missingOrigin = !suitcase.originAirport?.trim();
 
   const { data, isFetching, error, refetch } = useQuery({
     queryKey: [
@@ -58,6 +59,12 @@ export function ExcessBaggageEstimateCard({ suitcase, currentWeight }: Props) {
               <span className="font-medium text-foreground">{excessKg.toFixed(2)} kg</span>.
               Estimación de lo que podrías pagar en el aeropuerto:
             </p>
+            {missingOrigin && (
+              <p className="text-xs text-muted-foreground mt-2 flex items-start gap-1.5">
+                <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                Sin aeropuerto de origen cargado — usamos tarifas de referencia generales.
+              </p>
+            )}
           </div>
 
           {isFetching && (

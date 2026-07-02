@@ -1,37 +1,87 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Search, Loader2, CloudSun, AlertCircle, MapPin } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { WeatherDashboard } from "@/components/weather/WeatherDashboard";
-import { fetchWeather } from "@/lib/weather/client";
+import { fetchWeather, searchWeatherPlaces } from "@/lib/weather/client";
+import type { GeocodePlace } from "@/lib/weather/geocode";
 
 export const Route = createFileRoute("/_layout/weather")({
   component: WeatherPage,
 });
 
-const PRESETS = [
-  "Mar del Plata",
-  "Punta del Este",
+const SUGGESTIONS = [
+  "Miami",
+  "Buenos Aires",
   "Barcelona",
-  "Tarifa, España",
-  "Florianópolis",
-  "Bariloche",
+  "Madrid",
+  "Ciudad de México",
+  "Río de Janeiro",
 ];
 
 function WeatherPage() {
-  const [query, setQuery] = useState("Mar del Plata");
-  const [active, setActive] = useState("Mar del Plata");
+  const [query, setQuery] = useState("");
+  const [active, setActive] = useState("");
+  const [candidates, setCandidates] = useState<GeocodePlace[]>([]);
+  const [pickedPlace, setPickedPlace] = useState<GeocodePlace | null>(null);
+  const [isResolving, setIsResolving] = useState(false);
+
+  const applyPlace = (place: GeocodePlace) => {
+    setPickedPlace(place);
+    setActive(place.name);
+    setQuery(place.name);
+    setCandidates([]);
+  };
+
+  const runPlaceSearch = async (raw: string) => {
+    const q = raw.trim();
+    if (!q) return;
+    setQuery(q);
+    setIsResolving(true);
+    setCandidates([]);
+    try {
+      const places = await searchWeatherPlaces(q, 5);
+      if (places.length === 1) {
+        applyPlace(places[0]);
+        return;
+      }
+      if (places.length > 1) {
+        setCandidates(places);
+        setActive("");
+        setPickedPlace(null);
+        return;
+      }
+      setPickedPlace(null);
+      setActive(q);
+    } finally {
+      setIsResolving(false);
+    }
+  };
 
   const { data, isFetching, error, refetch } = useQuery({
-    queryKey: ["weather", active],
-    queryFn: ({ signal }) => fetchWeather({ query: active, days: 7, signal }),
+    queryKey: ["weather", active, pickedPlace?.id ?? null],
+    queryFn: ({ signal }) =>
+      pickedPlace
+        ? fetchWeather({
+            query: pickedPlace.name,
+            lat: pickedPlace.latitude,
+            lon: pickedPlace.longitude,
+            days: 7,
+            signal,
+          })
+        : fetchWeather({ query: active, days: 7, signal }),
     enabled: !!active,
     staleTime: 1000 * 60 * 10,
-    retry: 1,
+    retry: 0,
   });
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    await runPlaceSearch(query);
+  };
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -42,54 +92,78 @@ function WeatherPage() {
             Clima del viaje
           </h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            Pronóstico actualizado por destino: temperatura, lluvia, viento y olas.
+            Buscá por ciudad o barrio. Cada lugar tiene su propio clima (Miami, Buenos Aires, Bariloche…).
           </p>
         </div>
       </div>
 
       <Card className="p-4">
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            const q = query.trim();
-            if (q) setActive(q);
-          }}
-          className="flex gap-2"
-        >
+        <form onSubmit={handleSubmit} className="flex gap-2">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               className="pl-9"
-              placeholder="Buscá un destino: Mar del Plata, Tarifa, Maui..."
+              placeholder="Ciudad o lugar: Miami, Buenos Aires, Barcelona, Mar del Plata…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               maxLength={120}
             />
           </div>
-          <Button type="submit" disabled={isFetching}>
-            {isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Buscar"}
+          <Button type="submit" disabled={isFetching || isResolving || !query.trim()}>
+            {isFetching || isResolving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Buscar"}
           </Button>
         </form>
+
+        {candidates.length > 0 && (
+          <div className="mt-3 space-y-2">
+            <p className="text-xs text-muted-foreground">Elegí la ciudad correcta:</p>
+            <div className="flex flex-wrap gap-2">
+              {candidates.map((place) => (
+                <Button
+                  key={place.id}
+                  variant="secondary"
+                  size="sm"
+                  className="h-auto py-1.5 text-xs text-left"
+                  onClick={() => applyPlace(place)}
+                >
+                  <MapPin className="h-3 w-3 mr-1 shrink-0" />
+                  {place.name}
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="flex flex-wrap gap-2 mt-3">
-          {PRESETS.map((p) => (
+          <span className="text-[11px] text-muted-foreground self-center mr-1">Ejemplos:</span>
+          {SUGGESTIONS.map((p) => (
             <Button
               key={p}
-              variant={p === active ? "default" : "outline"}
+              variant="outline"
               size="sm"
-              onClick={() => {
-                setQuery(p);
-                setActive(p);
-              }}
+              onClick={() => void runPlaceSearch(p)}
               className="h-7 text-xs"
             >
-              <MapPin className="h-3 w-3 mr-1" />
               {p}
             </Button>
           ))}
         </div>
       </Card>
 
-      {isFetching && !data && (
+      {!active && !isFetching && !isResolving && !data && candidates.length === 0 && (
+        <Card className="p-10 flex flex-col items-center gap-3 text-center text-muted-foreground border-dashed">
+          <CloudSun className="h-10 w-10 text-primary/40" />
+          <div>
+            <p className="font-medium text-foreground">Buscá una ciudad</p>
+            <p className="text-sm mt-1 max-w-md">
+              Escribí el nombre de la ciudad donde vas a estar. Podés agregar el país para afinar,
+              por ejemplo <span className="text-foreground">Barcelona, España</span>.
+            </p>
+          </div>
+        </Card>
+      )}
+
+      {(isFetching || isResolving) && !data && active && (
         <Card className="p-12 flex flex-col items-center gap-3 text-muted-foreground">
           <Loader2 className="h-8 w-8 animate-spin" />
           <span className="text-sm">Buscando pronóstico para "{active}"...</span>

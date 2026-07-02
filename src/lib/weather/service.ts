@@ -5,6 +5,10 @@ import type {
   WeatherSpot,
 } from "./types";
 import { wmoToWeather } from "./codes";
+import { resolvePlace, searchPlaces } from "./geocode";
+
+export { resolvePlace, searchPlaces } from "./geocode";
+export type { GeocodePlace } from "./geocode";
 
 const MEMO = new Map<string, { at: number; data: WeatherForecastResponse }>();
 
@@ -19,31 +23,7 @@ async function fetchWithTimeout(url: string, ms = 6000, init?: RequestInit): Pro
 }
 
 async function geocode(name: string): Promise<WeatherSpot | null> {
-  const url = new URL("https://geocoding-api.open-meteo.com/v1/search");
-  url.searchParams.set("name", name);
-  url.searchParams.set("count", "1");
-  url.searchParams.set("language", "es");
-  url.searchParams.set("format", "json");
-  const res = await fetchWithTimeout(url.toString(), 6000);
-  if (!res.ok) return null;
-  const data = (await res.json()) as {
-    results?: Array<{
-      name: string;
-      latitude: number;
-      longitude: number;
-      country?: string;
-      timezone?: string;
-    }>;
-  };
-  const r = data.results?.[0];
-  if (!r) return null;
-  return {
-    name: r.name,
-    latitude: r.latitude,
-    longitude: r.longitude,
-    country: r.country,
-    timezone: r.timezone,
-  };
+  return resolvePlace(name);
 }
 
 async function fetchOpenMeteo(
@@ -317,7 +297,18 @@ export async function getWeatherForecast(params: {
     };
   } else if (params.query) {
     const geo = await geocode(params.query);
-    if (!geo) throw new Error(`No encontré "${params.query}"`);
+    if (!geo) {
+      const suggestions = await searchPlaces(params.query, 4);
+      if (suggestions.length) {
+        const names = suggestions.map((s) => s.name).join(" · ");
+        throw new Error(
+          `No encontré "${params.query}". Probá con el nombre de una ciudad, por ejemplo: ${names}`,
+        );
+      }
+      throw new Error(
+        `No encontré "${params.query}". Escribí una ciudad (ej: Miami, Buenos Aires, Barcelona).`,
+      );
+    }
     spot = geo;
   } else {
     throw new Error("Indicá un destino o coordenadas");

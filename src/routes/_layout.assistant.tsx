@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useRef, useEffect } from "react";
-import { Bot, Send, User, Sparkles, Plus, Trash2, BookmarkPlus, Loader2, Sun, Cloud, CloudRain, CloudSnow, CloudLightning, CloudSun, ChevronDown } from "lucide-react";
+import { Bot, Send, User, Sparkles, Plus, Trash2, BookmarkPlus, Loader2, CloudSun, ChevronDown } from "lucide-react";
+import { DailyForecastCards } from "@/components/weather/DailyForecastCards";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -83,8 +84,8 @@ function AssistantPage() {
 
   const computeDays = () => {
     if (!form.from || !form.to) return 0;
-    const a = new Date(form.from).getTime();
-    const b = new Date(form.to).getTime();
+    const a = new Date(`${form.from}T12:00:00`).getTime();
+    const b = new Date(`${form.to}T12:00:00`).getTime();
     if (isNaN(a) || isNaN(b) || b < a) return 0;
     return Math.max(1, Math.round((b - a) / 86400000) + 1);
   };
@@ -130,6 +131,13 @@ function AssistantPage() {
       const { suggestion: data } = await generatePackSuggestion({
         prompt: userText,
         suitcaseCapacityKg: Math.round(form.suitcaseCapacityKg),
+        trip: {
+          destination,
+          days,
+          dateFrom: form.from,
+          dateTo: form.to,
+          occasion: occasion || undefined,
+        },
       });
       const totalWeight = data.items.reduce(
         (acc, it) => acc + it.weight * (it.quantity ?? 1),
@@ -225,9 +233,6 @@ function AssistantPage() {
     toast.success(`Valija "${createForm.name}" creada con ${createMsg.suggestion.items.length} items`);
     navigate({ to: "/suitcases" });
   };
-
-  const iconFor = (i: string) => i === "sun" ? Sun : i === "cloud" ? Cloud : i === "rain" ? CloudRain : i === "snow" ? CloudSnow : i === "storm" ? CloudLightning : CloudSun;
-  const toneFor = (i: string) => i === "snow" ? "text-sky-500" : i === "rain" || i === "storm" ? "text-blue-500" : i === "cloud" ? "text-muted-foreground" : "text-amber-500";
 
   return (
     <div className="max-w-7xl mx-auto pb-10">
@@ -383,26 +388,30 @@ function AssistantPage() {
                               <CloudSun className="h-5 w-5" />
                             </div>
                             <div className="text-left">
-                              <div className="font-bold">Cronograma del clima</div>
-                              <div className="text-xs text-muted-foreground">{msg.suggestion.forecast.length} día{msg.suggestion.forecast.length === 1 ? "" : "s"} de pronóstico</div>
+                              <div className="font-bold">Clima del viaje</div>
+                              <div className="text-xs text-muted-foreground">
+                                Pronóstico por fecha · {msg.suggestion.forecast.length} día
+                                {msg.suggestion.forecast.length === 1 ? "" : "s"}
+                              </div>
                             </div>
                           </div>
                           <ChevronDown className="h-5 w-5 text-muted-foreground transition-transform group-data-[state=closed]:rotate-[-90deg]" />
                         </CollapsibleTrigger>
                         <CollapsibleContent>
-                          <div className="p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3">
-                            {msg.suggestion.forecast.map((f) => {
-                              const Icon = iconFor(f.icon);
-                              return (
-                                <div key={f.day} className="border border-border rounded-xl p-3 bg-card hover:shadow-md transition-shadow flex flex-col items-center text-center">
-                                  <div className="text-[11px] font-bold uppercase tracking-wider text-primary">Día {f.day}</div>
-                                  <div className="text-xs text-muted-foreground">{f.label}</div>
-                                  <Icon className={`h-10 w-10 my-2 ${toneFor(f.icon)}`} />
-                                  <div className="text-lg font-bold">{f.tempMax}°<span className="text-muted-foreground font-medium text-sm"> / {f.tempMin}°</span></div>
-                                  <div className="text-xs text-muted-foreground leading-tight mt-1">{f.conditions}</div>
-                                </div>
-                              );
-                            })}
+                          <div className="p-4 pt-2">
+                            <DailyForecastCards
+                              compact
+                              days={msg.suggestion.forecast.map((f) => ({
+                                date: f.date ?? f.label,
+                                dayNumber: f.day,
+                                tempMin: f.tempMin,
+                                tempMax: f.tempMax,
+                                conditions: f.conditions,
+                                icon: f.icon,
+                                precipitation: f.precipitation,
+                                windMax: f.windMax,
+                              }))}
+                            />
                           </div>
                         </CollapsibleContent>
                       </Collapsible>

@@ -4,6 +4,7 @@ import type {
   WeatherHour,
   WeatherSpot,
 } from "./types";
+import { wmoToWeather } from "./codes";
 
 const MEMO = new Map<string, { at: number; data: WeatherForecastResponse }>();
 
@@ -45,21 +46,35 @@ async function geocode(name: string): Promise<WeatherSpot | null> {
   };
 }
 
-async function fetchOpenMeteo(spot: WeatherSpot, days: number): Promise<WeatherForecastResponse> {
+async function fetchOpenMeteo(
+  spot: WeatherSpot,
+  days: number,
+  range?: { startDate?: string; endDate?: string },
+): Promise<WeatherForecastResponse> {
   const fc = new URL("https://api.open-meteo.com/v1/forecast");
   fc.searchParams.set("latitude", String(spot.latitude));
   fc.searchParams.set("longitude", String(spot.longitude));
-  fc.searchParams.set("timezone", "auto");
-  fc.searchParams.set("forecast_days", String(days));
+  fc.searchParams.set("timezone", spot.timezone ?? "auto");
+
+  if (range?.startDate && range?.endDate) {
+    fc.searchParams.set("start_date", range.startDate);
+    fc.searchParams.set("end_date", range.endDate);
+  } else {
+    fc.searchParams.set("forecast_days", String(days));
+  }
+
   fc.searchParams.set(
     "hourly",
-    "temperature_2m,precipitation,wind_speed_10m,wind_gusts_10m,wind_direction_10m",
+    "temperature_2m,precipitation,wind_speed_10m,wind_gusts_10m,wind_direction_10m,weather_code",
   );
   fc.searchParams.set(
     "daily",
-    "temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,wind_gusts_10m_max",
+    "weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,wind_gusts_10m_max",
   );
-  fc.searchParams.set("current", "temperature_2m,precipitation,wind_speed_10m,wind_gusts_10m,wind_direction_10m");
+  fc.searchParams.set(
+    "current",
+    "temperature_2m,precipitation,wind_speed_10m,wind_gusts_10m,wind_direction_10m,weather_code",
+  );
 
   const mr = new URL("https://marine-api.open-meteo.com/v1/marine");
   mr.searchParams.set("latitude", String(spot.latitude));
@@ -88,15 +103,21 @@ async function fetchOpenMeteo(spot: WeatherSpot, days: number): Promise<WeatherF
     waveDirection: mJson ? pickByTime(mJson.hourly.time, mJson.hourly.wave_direction, t) : null,
   }));
 
-  const daily: WeatherDaySummary[] = fJson.daily.time.map((d, i) => ({
-    date: d,
-    tempMin: round(fJson.daily.temperature_2m_min[i]),
-    tempMax: round(fJson.daily.temperature_2m_max[i]),
-    precipitation: round(fJson.daily.precipitation_sum[i] ?? 0),
-    windMax: round(fJson.daily.wind_speed_10m_max[i]),
-    gustMax: round(fJson.daily.wind_gusts_10m_max[i]),
-    waveMax: mJson ? maxWaveForDay(mJson, d) : null,
-  }));
+  const daily: WeatherDaySummary[] = fJson.daily.time.map((d, i) => {
+    const code = fJson.daily.weather_code?.[i];
+    const parsed = code != null ? wmoToWeather(code) : null;
+    return {
+      date: d,
+      tempMin: round(fJson.daily.temperature_2m_min[i]),
+      tempMax: round(fJson.daily.temperature_2m_max[i]),
+      precipitation: round(fJson.daily.precipitation_sum[i] ?? 0),
+      windMax: round(fJson.daily.wind_speed_10m_max[i]),
+      gustMax: round(fJson.daily.wind_gusts_10m_max[i]),
+      waveMax: mJson ? maxWaveForDay(mJson, d) : null,
+      weatherCode: code,
+      conditions: parsed?.label,
+    };
+  });
 
   const current: WeatherHour = {
     time: fJson.current.time,
@@ -105,6 +126,7 @@ async function fetchOpenMeteo(spot: WeatherSpot, days: number): Promise<WeatherF
     windSpeed: round(fJson.current.wind_speed_10m),
     windGust: round(fJson.current.wind_gusts_10m),
     windDirection: Math.round(fJson.current.wind_direction_10m),
+    weatherCode: fJson.current.weather_code,
     waveHeight: hourly[0]?.waveHeight ?? null,
     wavePeriod: hourly[0]?.wavePeriod ?? null,
     waveDirection: hourly[0]?.waveDirection ?? null,
@@ -150,6 +172,7 @@ type OpenMeteoForecast = {
     wind_speed_10m: number;
     wind_gusts_10m: number;
     wind_direction_10m: number;
+    weather_code?: number;
   };
   hourly: {
     time: string[];
@@ -158,9 +181,11 @@ type OpenMeteoForecast = {
     wind_speed_10m: number[];
     wind_gusts_10m: number[];
     wind_direction_10m: number[];
+    weather_code?: number[];
   };
   daily: {
     time: string[];
+    weather_code?: number[];
     temperature_2m_max: number[];
     temperature_2m_min: number[];
     precipitation_sum: number[];
@@ -271,10 +296,12 @@ export async function getWeatherForecast(params: {
   lat?: number;
   lon?: number;
   days?: number;
+  startDate?: string;
+  endDate?: string;
   signal?: AbortSignal;
 }): Promise<WeatherForecastResponse> {
   const days = Math.min(14, Math.max(1, params.days ?? 5));
-  const cacheKey = `${params.query ?? ""}|${params.lat ?? ""}|${params.lon ?? ""}|${days}`;
+  const cacheKey = `${params.query ?? ""}|${params.lat ?? ""}|${params.lon ?? ""}|${days}|${params.startDate ?? ""}|${params.endDate ?? ""}`;
   const cached = MEMO.get(cacheKey);
   const now = Date.now();
   if (cached && now - cached.at < 10 * 60_000) {
@@ -297,7 +324,10 @@ export async function getWeatherForecast(params: {
   }
 
   try {
-    const data = await fetchOpenMeteo(spot, days);
+    const data = await fetchOpenMeteo(spot, days, {
+      startDate: params.startDate,
+      endDate: params.endDate,
+    });
     MEMO.set(cacheKey, { at: now, data });
     return data;
   } catch (err) {

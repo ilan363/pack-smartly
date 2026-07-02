@@ -7,9 +7,11 @@ import {
   ListChecks,
   CloudSun,
   ShieldCheck,
+  RotateCcw,
   type LucideIcon,
 } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
+import { resetAppState } from "@/lib/reset-app";
 import { toast } from "sonner";
 
 export function AppSidebar() {
@@ -58,7 +60,20 @@ export function AppSidebar() {
       </nav>
 
       <div className="shrink-0 border-t border-border p-4">
-        
+        <button
+          type="button"
+          onClick={() => {
+            resetAppState();
+            toast.success("Todo reiniciado", {
+              description: "Valijas, listas y conversación volvieron al estado inicial.",
+            });
+            navigate({ to: "/dashboard" });
+          }}
+          className="flex w-full cursor-pointer items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        >
+          <RotateCcw className="h-4 w-4" />
+          Reiniciar todo
+        </button>
         <button
           type="button"
           onClick={() => {

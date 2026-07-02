@@ -21,6 +21,7 @@ export type WeatherHour = {
   waveHeight: number | null; // metros
   wavePeriod: number | null; // segundos
   waveDirection: number | null; // grados
+  weatherCode?: number;
 };
 
 export type WeatherDaySummary = {
@@ -31,6 +32,8 @@ export type WeatherDaySummary = {
   windMax: number;
   gustMax: number;
   waveMax: number | null;
+  weatherCode?: number;
+  conditions?: string;
 };
 
 export type WeatherForecastResponse = {

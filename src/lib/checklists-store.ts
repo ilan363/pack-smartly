@@ -1,5 +1,4 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
 
 export type ChecklistItem = {
   id: string;
@@ -34,52 +33,49 @@ type Actions = {
   removeChecklist: (id: string) => void;
   toggleItem: (checklistId: string, itemId: string) => void;
   pendingCount: (id: string) => number;
+  reset: () => void;
 };
 
-export const useChecklistsStore = create<State & Actions>()(
-  persist(
-    (set, get) => ({
-      checklists: [],
-      addChecklist: (data) => {
-        const id = uid();
-        set((s) => ({
-          checklists: [
-            ...s.checklists,
-            {
-              id,
-              title: data.title,
-              destination: data.destination,
-              days: data.days,
-              weather: data.weather,
-              occasion: data.occasion,
-              createdAt: Date.now(),
-              items: data.items.map((i) => ({ ...i, id: uid(), checked: false })),
-            },
-          ],
-        }));
-        return id;
-      },
-      removeChecklist: (id) =>
-        set((s) => ({ checklists: s.checklists.filter((c) => c.id !== id) })),
-      toggleItem: (checklistId, itemId) =>
-        set((s) => ({
-          checklists: s.checklists.map((c) =>
-            c.id === checklistId
-              ? {
-                  ...c,
-                  items: c.items.map((it) =>
-                    it.id === itemId ? { ...it, checked: !it.checked } : it,
-                  ),
-                }
-              : c,
-          ),
-        })),
-      pendingCount: (id) => {
-        const c = get().checklists.find((cl) => cl.id === id);
-        if (!c) return 0;
-        return c.items.filter((i) => !i.checked).length;
-      },
-    }),
-    { name: "travel-wolf-checklists" },
-  ),
-);
+export const useChecklistsStore = create<State & Actions>()((set, get) => ({
+  checklists: [],
+  addChecklist: (data) => {
+    const id = uid();
+    set((s) => ({
+      checklists: [
+        ...s.checklists,
+        {
+          id,
+          title: data.title,
+          destination: data.destination,
+          days: data.days,
+          weather: data.weather,
+          occasion: data.occasion,
+          createdAt: Date.now(),
+          items: data.items.map((i) => ({ ...i, id: uid(), checked: false })),
+        },
+      ],
+    }));
+    return id;
+  },
+  removeChecklist: (id) =>
+    set((s) => ({ checklists: s.checklists.filter((c) => c.id !== id) })),
+  toggleItem: (checklistId, itemId) =>
+    set((s) => ({
+      checklists: s.checklists.map((c) =>
+        c.id === checklistId
+          ? {
+              ...c,
+              items: c.items.map((it) =>
+                it.id === itemId ? { ...it, checked: !it.checked } : it,
+              ),
+            }
+          : c,
+      ),
+    })),
+  pendingCount: (id) => {
+    const c = get().checklists.find((cl) => cl.id === id);
+    if (!c) return 0;
+    return c.items.filter((i) => !i.checked).length;
+  },
+  reset: () => set({ checklists: [] }),
+}));

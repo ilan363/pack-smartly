@@ -7,7 +7,9 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
+import { useEffect } from "react";
 
+import { clearLegacyAppStorage } from "@/lib/clear-legacy-storage";
 import appCss from "../styles.css?url";
 
 function NotFoundComponent() {
@@ -110,6 +112,10 @@ function RootShell({ children }: { children: React.ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+
+  useEffect(() => {
+    clearLegacyAppStorage();
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>

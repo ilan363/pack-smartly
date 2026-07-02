@@ -27,6 +27,7 @@ import {
   type Item,
   type SuitcaseType,
 } from "@/lib/suitcases-store";
+import { ExcessBaggageEstimateCard } from "@/components/suitcases/ExcessBaggageEstimate";
 
 export const Route = createFileRoute("/_layout/suitcases")({
   component: SuitcasesPage,
@@ -63,7 +64,7 @@ function SuitcasesPage() {
     name: "",
     category: "",
     quantity: 1,
-    weight: 0,
+    totalWeight: 0,
   });
 
   const [editingItem, setEditingItem] = useState<Item | null>(null);
@@ -97,12 +98,20 @@ function SuitcasesPage() {
   }
 
   const handleAddItem = () => {
-    if (!newItem.name || !newItem.category || newItem.weight <= 0) {
-      toast.error("Completá nombre, categoría y peso.");
+    if (!newItem.name || !newItem.category || newItem.totalWeight <= 0) {
+      toast.error("Completá nombre, categoría y peso total.");
       return;
     }
-    addItem(active.id, newItem);
-    setNewItem({ name: "", category: "", quantity: 1, weight: 0 });
+    const quantity = Math.max(1, newItem.quantity);
+    const weightPerUnit =
+      Math.round((newItem.totalWeight / quantity) * 100) / 100;
+    addItem(active.id, {
+      name: newItem.name,
+      category: newItem.category,
+      quantity,
+      weight: weightPerUnit,
+    });
+    setNewItem({ name: "", category: "", quantity: 1, totalWeight: 0 });
     toast.success(`"${newItem.name}" agregado a ${active.name}`);
   };
 
@@ -170,13 +179,22 @@ function SuitcasesPage() {
             style={{ width: `${Math.min(percentage, 100)}%` }}
           />
         </div>
-        {percentage > 90 && (
+        {percentage > 100 ? (
+          <div className="flex items-center gap-2 text-red-600 text-sm mt-3 bg-red-500/10 p-2 rounded-md">
+            <AlertCircle className="h-4 w-4" />
+            Superaste el peso permitido. Revisá el costo estimado de exceso abajo.
+          </div>
+        ) : percentage > 90 ? (
           <div className="flex items-center gap-2 text-red-500 text-sm mt-3 bg-red-500/10 p-2 rounded-md">
             <AlertCircle className="h-4 w-4" />
             Atención: Estás muy cerca del límite de peso permitido.
           </div>
-        )}
+        ) : null}
       </Card>
+
+      {percentage > 100 && (
+        <ExcessBaggageEstimateCard suitcase={active} currentWeight={currentWeight} />
+      )}
 
       <div className="grid md:grid-cols-3 gap-8">
         <div className="md:col-span-2 space-y-4">
@@ -190,7 +208,7 @@ function SuitcasesPage() {
                     <th className="text-left font-medium p-4">Item</th>
                     <th className="text-left font-medium p-4">Categoría</th>
                     <th className="text-right font-medium p-4">Cant.</th>
-                    <th className="text-right font-medium p-4">Peso (c/u)</th>
+                    <th className="text-right font-medium p-4">Peso total</th>
                     <th className="text-right font-medium p-4">Acciones</th>
                   </tr>
                 </thead>
@@ -208,7 +226,12 @@ function SuitcasesPage() {
                       </td>
                       <td className="p-4 text-right">{item.quantity}</td>
                       <td className="p-4 text-right text-muted-foreground">
-                        {item.weight} kg
+                        {(item.weight * item.quantity).toFixed(2)} kg
+                        {item.quantity > 1 && (
+                          <span className="block text-[11px] text-muted-foreground/80">
+                            ({item.weight.toFixed(2)} kg c/u)
+                          </span>
+                        )}
                       </td>
                       <td className="p-4 text-right">
                         <Button
@@ -288,15 +311,25 @@ function SuitcasesPage() {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Peso (kg)</label>
+                <label className="text-sm font-medium">Peso total (kg)</label>
                 <Input
                   type="number"
-                  step="0.1"
-                  value={newItem.weight || ""}
+                  step="0.01"
+                  min="0.01"
+                  placeholder="Ej: 0.90"
+                  value={newItem.totalWeight || ""}
                   onChange={(e) =>
-                    setNewItem({ ...newItem, weight: parseFloat(e.target.value) || 0 })
+                    setNewItem({
+                      ...newItem,
+                      totalWeight: parseFloat(e.target.value) || 0,
+                    })
                   }
                 />
+                {newItem.quantity > 1 && newItem.totalWeight > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    ≈ {(newItem.totalWeight / newItem.quantity).toFixed(2)} kg por unidad
+                  </p>
+                )}
               </div>
             </div>
             <Button className="w-full mt-2" onClick={handleAddItem}>
@@ -356,18 +389,32 @@ function SuitcasesPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Peso (kg)</label>
+                  <label className="text-sm font-medium">Peso total (kg)</label>
                   <Input
                     type="number"
-                    step="0.1"
-                    value={editingItem.weight}
-                    onChange={(e) =>
+                    step="0.01"
+                    min="0.01"
+                    value={
+                      editingItem
+                        ? (editingItem.weight * editingItem.quantity).toFixed(2)
+                        : ""
+                    }
+                    onChange={(e) => {
+                      if (!editingItem) return;
+                      const total = parseFloat(e.target.value) || 0;
+                      const qty = Math.max(1, editingItem.quantity);
                       setEditingItem({
                         ...editingItem,
-                        weight: parseFloat(e.target.value) || 0,
-                      })
-                    }
+                        weight: Math.round((total / qty) * 100) / 100,
+                      });
+                    }}
                   />
+                  {editingItem && editingItem.quantity > 1 && (
+                    <p className="text-xs text-muted-foreground">
+                      {editingItem.quantity} unidades ·{" "}
+                      {editingItem.weight.toFixed(2)} kg c/u
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -408,7 +455,10 @@ function SuitcasesPage() {
           updateSuitcase(id, data);
           toast.success("Valija actualizada");
         }}
-        getInitial={(id) => suitcases.find((s) => s.id === id)}
+        getInitial={(id) => {
+          const s = suitcases.find((sc) => sc.id === id);
+          return s ? suitcaseToForm(s) : undefined;
+        }}
       />
     </div>
   );
@@ -453,7 +503,26 @@ type SuitcaseFormData = {
   destination: string;
   type: SuitcaseType;
   maxWeight: number;
+  originAirport: string;
+  departureDate: string;
 };
+
+function defaultDepartureDate() {
+  const d = new Date();
+  d.setDate(d.getDate() + 14);
+  return d.toISOString().slice(0, 10);
+}
+
+function suitcaseToForm(s: import("@/lib/suitcases-store").Suitcase): SuitcaseFormData {
+  return {
+    name: s.name,
+    destination: s.destination,
+    type: s.type,
+    maxWeight: s.maxWeight,
+    originAirport: s.originAirport ?? "EZE",
+    departureDate: s.departureDate ?? defaultDepartureDate(),
+  };
+}
 
 function SuitcaseDialog({
   dialog,
@@ -476,6 +545,8 @@ function SuitcaseDialog({
     destination: "",
     type: "cabina",
     maxWeight: 10,
+    originAirport: "EZE",
+    departureDate: defaultDepartureDate(),
   });
 
   // Re-seed form when dialog opens
@@ -486,7 +557,14 @@ function SuitcaseDialog({
     if (dialog?.mode === "edit" && initial) {
       setForm(initial);
     } else if (dialog?.mode === "create") {
-      setForm({ name: "", destination: "", type: "cabina", maxWeight: 10 });
+      setForm({
+        name: "",
+        destination: "",
+        type: "cabina",
+        maxWeight: 10,
+        originAirport: "EZE",
+        departureDate: defaultDepartureDate(),
+      });
     }
   }
 
@@ -508,7 +586,7 @@ function SuitcaseDialog({
             {dialog?.mode === "edit" ? "Editar valija" : "Nueva valija"}
           </DialogTitle>
           <DialogDescription>
-            Configurá el nombre, destino, tipo y límite de peso.
+            Configurá el viaje y el límite de peso. Origen y fecha se usan para estimar exceso de equipaje.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
@@ -523,10 +601,34 @@ function SuitcaseDialog({
           <div className="space-y-2">
             <label className="text-sm font-medium">Destino</label>
             <Input
-              placeholder="Bariloche"
+              placeholder="Bariloche o código BRC"
               value={form.destination}
               onChange={(e) => setForm({ ...form, destination: e.target.value })}
             />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Origen (IATA)</label>
+              <Input
+                placeholder="EZE"
+                maxLength={3}
+                value={form.originAirport}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    originAirport: e.target.value.toUpperCase().slice(0, 3),
+                  })
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Fecha de ida</label>
+              <Input
+                type="date"
+                value={form.departureDate}
+                onChange={(e) => setForm({ ...form, departureDate: e.target.value })}
+              />
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">

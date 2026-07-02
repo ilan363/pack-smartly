@@ -42,7 +42,7 @@ function WeatherPage() {
             Clima del viaje
           </h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            Pronóstico estilo Windguru: viento, ráfagas, olas y temperatura por hora.
+            Pronóstico actualizado por destino: temperatura, lluvia, viento y olas.
           </p>
         </div>
       </div>

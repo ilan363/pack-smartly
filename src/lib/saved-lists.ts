@@ -1,5 +1,3 @@
-const STORAGE_KEY = "pack-smartly-saved-lists";
-
 export type SavedListItem = {
   id: string;
   name: string;
@@ -23,20 +21,14 @@ export type SavedList = {
   lastReminderAt?: string;
 };
 
+let savedLists: SavedList[] = [];
+
 function readAll(): SavedList[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as SavedList[];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
+  return savedLists;
 }
 
 function writeAll(lists: SavedList[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(lists));
+  savedLists = lists;
 }
 
 export function getSavedLists(): SavedList[] {
@@ -59,6 +51,10 @@ export function saveList(list: SavedList) {
 
 export function deleteSavedList(id: string) {
   writeAll(readAll().filter((l) => l.id !== id));
+}
+
+export function clearAllSavedLists() {
+  writeAll([]);
 }
 
 export function createId() {

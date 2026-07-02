@@ -1,5 +1,4 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
 
 export type ChatSuggestionItem = {
   category: string;
@@ -10,11 +9,14 @@ export type ChatSuggestionItem = {
 
 export type ForecastDay = {
   day: number;
+  date?: string;
   label: string;
   tempMin: number;
   tempMax: number;
   conditions: string;
   icon: "sun" | "cloud" | "rain" | "snow" | "storm" | "partly";
+  precipitation?: number;
+  windMax?: number;
 };
 
 export type ChatSuggestion = {
@@ -51,20 +53,15 @@ export const INITIAL_CHAT: ChatMessage = {
   createdAt: 0,
 };
 
-export const useChatStore = create<ChatState>()(
-  persist(
-    (set) => ({
-      messages: [INITIAL_CHAT],
-      addMessage: (m) =>
-        set((s) => ({ messages: [...s.messages, { ...m, createdAt: Date.now() }] })),
-      updateSuggestion: (id, suggestion) =>
-        set((s) => ({
-          messages: s.messages.map((msg) =>
-            msg.id === id ? { ...msg, suggestion } : msg,
-          ),
-        })),
-      reset: () => set({ messages: [INITIAL_CHAT] }),
-    }),
-    { name: "travel-wolf-chat" },
-  ),
-);
+export const useChatStore = create<ChatState>()((set) => ({
+  messages: [INITIAL_CHAT],
+  addMessage: (m) =>
+    set((s) => ({ messages: [...s.messages, { ...m, createdAt: Date.now() }] })),
+  updateSuggestion: (id, suggestion) =>
+    set((s) => ({
+      messages: s.messages.map((msg) =>
+        msg.id === id ? { ...msg, suggestion } : msg,
+      ),
+    })),
+  reset: () => set({ messages: [INITIAL_CHAT] }),
+}));

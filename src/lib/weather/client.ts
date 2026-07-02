@@ -6,6 +6,8 @@ export async function fetchWeather(params: {
   lat?: number;
   lon?: number;
   days?: number;
+  startDate?: string;
+  endDate?: string;
   signal?: AbortSignal;
 }): Promise<WeatherForecastResponse> {
   return getWeatherForecast(params);

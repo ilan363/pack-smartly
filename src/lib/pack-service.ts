@@ -1,6 +1,8 @@
 ﻿import { z } from "zod";
 
 import type { ForecastDay } from "@/lib/chat-store";
+import { formatWeatherDate } from "@/lib/weather/codes";
+import { fetchTripForecast, summarizeForecast } from "@/lib/weather/trip-forecast";
 
 const env = import.meta.env;
 
@@ -162,6 +164,10 @@ const NOTE_EXTRAS: ExtraSpec[] = [
   { match: /toalla/, item: { category: "Otros", name: "Toalla", quantity: 1, weight: 0.4 } },
   { match: /gorra|sombrero/, item: { category: "Accesorios", name: "Gorra o sombrero", quantity: 1, weight: 0.12 } },
   { match: /zapatill/, item: { category: "Zapatillas", name: "Zapatillas extra", quantity: 1, weight: 1.0 } },
+  { match: /vestido|falda\s+larga/, item: { category: "Otros", name: "Vestido o falda", quantity: 1, weight: 0.35 } },
+  { match: /remera\s+deportiva|musculosa|remera\s+running/, item: { category: "Remeras", name: "Remera deportiva", quantity: 1, weight: 0.15 } },
+  { match: /pijama/, item: { category: "Otros", name: "Pijama", quantity: 1, weight: 0.3 } },
+  { match: /buzo|hoodie|sweater|sueter/, item: { category: "Abrigos", name: "Buzo o sweater", quantity: 1, weight: 0.55 } },
 ];
 
 function extractExtras(text: string): PackItem[] {
@@ -174,26 +180,62 @@ function extractExtras(text: string): PackItem[] {
   return out;
 }
 
-function extractTripContext(prompt: string) {
+export type TripInput = {
+  destination: string;
+  days: number;
+  dateFrom?: string;
+  dateTo?: string;
+  occasion?: string;
+};
+
+function computeDaysFromDates(dateFrom?: string, dateTo?: string): number | null {
+  if (!dateFrom || !dateTo) return null;
+  const start = new Date(`${dateFrom}T12:00:00`);
+  const end = new Date(`${dateTo}T12:00:00`);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) {
+    return null;
+  }
+  return Math.max(1, Math.round((end.getTime() - start.getTime()) / 86400000) + 1);
+}
+
+function extractTripContext(prompt: string, trip?: TripInput) {
   const normalized = normalizeText(prompt);
 
   // Datos estructurados que envía la UI: "Destino: X", "Días: 8", "Notas: ..."
   const structDestination = prompt.match(/destino\s*:\s*([^\n]+)/i)?.[1]?.trim();
-  const structDays = prompt.match(/d[ií]as?\s*:\s*(\d{1,2})/i)?.[1];
+  const structDaysRaw = prompt.match(/d[ií]as?\s*:\s*(\d+)/i)?.[1];
+  const structDateFrom = prompt.match(/desde\s*:\s*(\d{4}-\d{2}-\d{2})/i)?.[1];
+  const structDateTo = prompt.match(/hasta\s*:\s*(\d{4}-\d{2}-\d{2})/i)?.[1];
   const structOccasion = prompt.match(/ocasi[oó]n\s*:\s*([^\n]+)/i)?.[1]?.trim();
-  const structNotes = prompt.match(/notas?\s*:\s*([^\n]+)/i)?.[1]?.trim() ?? "";
+  const structNotes = prompt.match(/notas?\s*:\s*([\s\S]+)$/i)?.[1]?.trim() ?? "";
 
-  const numericDays = normalized.match(/(\d{1,2})\s*(?:dias|dia|noches|noche)\b/);
+  const daysFromDates = computeDaysFromDates(
+    trip?.dateFrom ?? structDateFrom,
+    trip?.dateTo ?? structDateTo,
+  );
+
+  const numericDays = normalized.match(
+    /\bdias\s*:\s*(\d+)\b|\b(\d{1,2})\s*(?:dias|dia|noches|noche)\b/,
+  );
   const wordDays = normalized.match(
     /\b(un|una|uno|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce|quince)\s*(?:dias|dia|noches|noche)\b/,
   );
-  const days = structDays
-    ? Number(structDays)
-    : numericDays
-      ? Number(numericDays[1])
-      : wordDays
-        ? NUMBER_WORDS[wordDays[1]]
-        : 3;
+
+  let parsedDays = 3;
+  if (structDaysRaw) {
+    parsedDays = Number(structDaysRaw);
+  } else if (numericDays) {
+    parsedDays = Number(numericDays[1] ?? numericDays[2]);
+  } else if (wordDays) {
+    parsedDays = NUMBER_WORDS[wordDays[1]];
+  } else if (daysFromDates) {
+    parsedDays = daysFromDates;
+  }
+
+  const days =
+    trip?.days != null && trip.days > 0
+      ? trip.days
+      : Math.max(1, Math.min(parsedDays, 90));
 
   const destinationMatch = normalized.match(
     /(?:viaje a|viajo a|voy a|me voy a|destino a|para|hacia|en)\s+([a-zñ ]+?)(?=\s+(?:por|durante|a un|a una|para un|para una|con|del|de|y|,|\.|$)|$)/,
@@ -205,31 +247,38 @@ function extractTripContext(prompt: string) {
     .replace(/\b(?:un|una|el|la|los|las)\b/g, "")
     .replace(/\s+/g, " ")
     .trim();
-  const destination = rawDestination && /\b(boda|casamiento|matrimonio)\b/.test(rawDestination)
-    ? rawDestination.includes("playa")
-      ? "playa"
-      : undefined
-    : rawDestination;
+  const destinationFromPrompt = rawDestination
+    ? titleCase(rawDestination)
+    : structDestination
+      ? titleCase(structDestination)
+      : "Destino indicado";
 
-  const occasion = structOccasion
-    ? titleCase(structOccasion.toLowerCase())
-    : /casamiento|boda|matrimonio/.test(normalized)
-      ? "Casamiento"
-      : /playa|mar|costa/.test(normalized)
-        ? "Playa"
-        : /trabajo|negocio|reunion|conferencia/.test(normalized)
-          ? "Trabajo"
-          : /trekking|senderismo|montana|montaña|acampar/.test(prompt.toLowerCase())
-            ? "Trekking"
-            : /nieve|ski|esqui|ushuaia|bariloche/.test(normalized)
-              ? "Frío / nieve"
-              : "Viaje urbano";
+  const destination =
+    trip?.destination?.trim() ? titleCase(trip.destination.trim()) : destinationFromPrompt;
+
+  const occasion = trip?.occasion?.trim()
+    ? titleCase(trip.occasion.trim())
+    : structOccasion
+      ? titleCase(structOccasion.toLowerCase())
+      : /casamiento|boda|matrimonio/.test(normalized)
+        ? "Casamiento"
+        : /playa|mar|costa/.test(normalized)
+          ? "Playa"
+          : /trabajo|negocio|reunion|conferencia/.test(normalized)
+            ? "Trabajo"
+            : /trekking|senderismo|montana|montaña|acampar/.test(prompt.toLowerCase())
+              ? "Trekking"
+              : /nieve|ski|esqui|ushuaia|bariloche/.test(normalized)
+                ? "Frío / nieve"
+                : "Viaje urbano";
 
   const extras = extractExtras(`${structNotes} ${prompt}`);
 
   return {
-    destination: destination ? titleCase(destination) : (structDestination ? titleCase(structDestination) : "Destino indicado"),
-    days: Math.max(1, Math.min(days, 90)),
+    destination,
+    days,
+    dateFrom: trip?.dateFrom ?? structDateFrom,
+    dateTo: trip?.dateTo ?? structDateTo,
     occasion,
     warm: /brasil|rio|salvador|playa|caribe|cancun|punta cana|cartagena|costa/.test(normalized),
     cold: /ushuaia|nieve|ski|esqui|patagonia|bariloche|calafate|islandia/.test(normalized),
@@ -323,7 +372,13 @@ function inferWeather(prompt: string, destination: string, warm: boolean, cold: 
   return `${RANGES[zone][season]} — pronóstico aproximado para tu estadía de ${days} día${days === 1 ? "" : "s"} (${season}).`;
 }
 
-function buildForecast(destination: string, days: number, warm: boolean, cold: boolean): ForecastDay[] {
+function buildForecast(
+  destination: string,
+  days: number,
+  warm: boolean,
+  cold: boolean,
+  dateFrom?: string,
+): ForecastDay[] {
   const promptCold = cold;
   const { zone, hemisphere } = detectClimate(destination);
   const month = new Date().getUTCMonth();
@@ -377,8 +432,10 @@ function buildForecast(destination: string, days: number, warm: boolean, cold: b
     const x = Math.sin(seedBase * 9301 + i * 49297) * 233280;
     return x - Math.floor(x);
   };
-  const today = new Date();
-  const dayNames = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+  const tripStart = dateFrom ? new Date(`${dateFrom}T12:00:00`) : new Date();
+  if (Number.isNaN(tripStart.getTime())) {
+    tripStart.setTime(Date.now());
+  }
 
   const out: ForecastDay[] = [];
   for (let i = 0; i < Math.min(days, 14); i++) {
@@ -393,12 +450,45 @@ function buildForecast(destination: string, days: number, warm: boolean, cold: b
       acc -= c.w;
       if (acc <= 0) { picked = c; break; }
     }
-    const date = new Date(today);
-    date.setDate(today.getDate() + i);
-    const label = `${dayNames[date.getDay()]} ${date.getDate()}/${date.getMonth() + 1}`;
-    out.push({ day: i + 1, label, tempMin, tempMax: Math.max(tempMax, tempMin + 2), conditions: picked.c, icon: picked.i });
+    const date = new Date(tripStart);
+    date.setDate(tripStart.getDate() + i);
+    const iso = date.toISOString().slice(0, 10);
+    out.push({
+      day: i + 1,
+      date: iso,
+      label: formatWeatherDate(iso),
+      tempMin,
+      tempMax: Math.max(tempMax, tempMin + 2),
+      conditions: picked.c,
+      icon: picked.i,
+    });
   }
   return out;
+}
+
+async function enrichWithForecast(
+  suggestion: PackSuggestion,
+  context: ReturnType<typeof extractTripContext>,
+): Promise<PackSuggestion> {
+  const real = await fetchTripForecast({
+    destination: suggestion.destination,
+    days: suggestion.days,
+    dateFrom: context.dateFrom,
+    dateTo: context.dateTo,
+  });
+  const forecast =
+    real ??
+    buildForecast(
+      suggestion.destination,
+      suggestion.days,
+      context.warm,
+      context.cold,
+      context.dateFrom,
+    );
+  const weather = real?.length
+    ? summarizeForecast(forecast, suggestion.days)
+    : suggestion.weather;
+  return { ...suggestion, forecast, weather };
 }
 
 function normalizeCategory(category: string | undefined, name: string): Category {
@@ -454,26 +544,232 @@ function stripJson(text: string) {
   return candidate.slice(start, end + 1);
 }
 
-function requiredItems(context: ReturnType<typeof extractTripContext>, destination: string): PackItem[] {
+type ClothingBudget = {
+  shirts: number;
+  pants: number;
+  shorts: number;
+  underwear: number;
+  socks: number;
+  outerwear: number;
+};
+
+type ClothingSlot =
+  | "shirts"
+  | "pants"
+  | "shorts"
+  | "underwear"
+  | "socks"
+  | "outerwear"
+  | "swimwear"
+  | "formal"
+  | "footwear"
+  | "other_clothing";
+
+function computeClothingBudget(
+  context: ReturnType<typeof extractTripContext>,
+  destination: string,
+): ClothingBudget {
   const days = context.days;
-  // Cantidades realistas — una persona repite prendas, no lleva una por día.
-  // Remeras ≈ 60% de los días + 1 base, tope 7.  Ej: 8 días → 6 remeras.
-  const shirts = Math.max(2, Math.min(7, Math.ceil(days * 0.6) + 1));
-  // Pantalones: uno cada 4 días aprox, mín 1, máx 4. Ej: 8 días → 2.
-  const pants = Math.max(1, Math.min(4, Math.ceil(days / 4)));
-  // Ropa interior / medias: 1 por día, tope 10 (después se lava o se repite).
-  const underwear = Math.max(2, Math.min(10, days));
-  const socks = Math.max(2, Math.min(10, days));
+  const destNorm = normalizeText(destination);
+  const notesNorm = normalizeText(`${context.notes ?? ""} ${context.occasion ?? ""}`);
+  const occasionNorm = normalizeText(context.occasion);
+
+  // Una persona repite prendas; no lleva una remera por día.
+  let shirts = Math.max(2, Math.min(7, Math.ceil(days * 0.6) + 1));
+  let pants = Math.max(1, Math.min(4, Math.ceil(days / 4)));
+  let shorts = 0;
+  let underwear = Math.max(2, Math.min(10, Math.ceil(days * 0.85)));
+  let socks = Math.max(2, Math.min(10, Math.ceil(days * 0.75)));
+  const outerwear = context.cold ? 2 : 1;
+
+  if (
+    context.warm ||
+    /playa|mar|costa|brasil|caribe|cancun|punta cana/.test(destNorm) ||
+    occasionNorm.includes("playa")
+  ) {
+    shorts = Math.max(1, Math.min(3, Math.ceil(days / 5)));
+    pants = Math.max(1, Math.min(2, Math.ceil(days / 6)));
+  }
+
+  if (context.formal || /casamiento|boda|matrimonio|gala|formal/.test(occasionNorm)) {
+    shirts = Math.min(7, shirts + 1);
+  }
+
+  if (/trabajo|negocio|conferencia|reunion|oficina/.test(occasionNorm)) {
+    pants = Math.min(4, pants + 1);
+    shirts = Math.min(7, shirts + 1);
+  }
+
+  if (/trekking|senderismo|montana|acampar|campamento/.test(occasionNorm)) {
+    socks = Math.min(10, socks + 1);
+    shirts = Math.min(7, shirts + 1);
+  }
+
+  if (/lavander|lavarrop|laundry|wash and wear/.test(notesNorm)) {
+    shirts = Math.max(2, Math.min(shirts, Math.ceil(days / 3) + 1));
+    pants = Math.max(1, Math.min(pants, Math.ceil(days / 5)));
+    underwear = Math.max(2, Math.min(underwear, Math.ceil(days / 3)));
+    socks = Math.max(2, Math.min(socks, Math.ceil(days / 3)));
+  }
+
+  if (/equipaje de mano|carry on|carry-on|valija chica|valija peque|poco espacio|minimal|liviano|solo mochila/.test(notesNorm)) {
+    shirts = Math.max(2, shirts - 1);
+    pants = Math.max(1, pants - 1);
+    underwear = Math.max(2, Math.min(underwear, Math.ceil(days / 2)));
+    socks = Math.max(2, Math.min(socks, Math.ceil(days / 2)));
+  }
+
+  return { shirts, pants, shorts, underwear, socks, outerwear };
+}
+
+function clothingSlot(item: PackItem): ClothingSlot | null {
+  const t = normalizeText(`${item.category} ${item.name}`);
+
+  if (
+    /documento|pasaporte|reserva|cargador|adaptador|cepillo|shampoo|neceser|medic|mate|libro|laptop|auricular|camara|paraguas|protector solar|desodorante|perfume/.test(
+      t,
+    )
+  ) {
+    return null;
+  }
+
+  if (/traje de bano|traje de baño|malla|bikini/.test(t)) return "swimwear";
+  if (/conjunto formal|smoking|corbata|moño|traje sastre/.test(t)) return "formal";
+  if (/vestido|falda larga/.test(t)) return "formal";
+  if (/zapat|sandalia|ojota|bota/.test(t)) return "footwear";
+  if (/short|bermuda/.test(t)) return "shorts";
+  if (/ropa interior|calzon|bombacha|boxer|braga/.test(t)) return "underwear";
+  if (/^medias$|^media$|calcetin|calcetines/.test(t)) return "socks";
+  if (/remera deportiva|musculosa|remera running/.test(t)) return "other_clothing";
+  if (/pijama/.test(t)) return "other_clothing";
+  if (item.category === "Abrigos" || /campera|abrigo|tapado|piloto|impermeable|buzo|sweater|sueter|chaqueta/.test(t)) {
+    return "outerwear";
+  }
+  if (item.category === "Remeras" || /remera|camisa|blusa|top|chomba|polo/.test(t)) return "shirts";
+  if (item.category === "Pantalones" || /pantalon|jean|jogger|legging|falda|pollera/.test(t)) return "pants";
+  if (item.category === "Otros" && /ropa|prenda|conjunto/.test(t)) return "other_clothing";
+
+  return null;
+}
+
+const CANONICAL_CLOTHING: Record<
+  "shirts" | "pants" | "shorts" | "underwear" | "socks",
+  Pick<PackItem, "category" | "name" | "weight">
+> = {
+  shirts: { category: "Remeras", name: "Remeras o tops cómodos", weight: 0.18 },
+  pants: { category: "Pantalones", name: "Pantalón o jean versátil", weight: 0.55 },
+  shorts: { category: "Pantalones", name: "Short o bermuda", weight: 0.25 },
+  underwear: { category: "Otros", name: "Ropa interior", weight: 0.05 },
+  socks: { category: "Otros", name: "Medias", weight: 0.04 },
+};
+
+function mergeClothingGroup(
+  group: PackItem[],
+  slot: keyof typeof CANONICAL_CLOTHING,
+  limit: number,
+): PackItem | null {
+  if (limit <= 0) return null;
+
+  const totalQty = group.reduce((sum, it) => sum + it.quantity, 0);
+  if (totalQty <= 0) return null;
+  const finalQty = Math.min(totalQty, limit);
+
+  const canonical = CANONICAL_CLOTHING[slot];
+  const primary = group.find((it) => normalizeText(it.name).includes(normalizeText(canonical.name).slice(0, 8))) ?? group[0];
+  const weight = primary?.weight ?? canonical.weight;
+
+  return {
+    category: canonical.category,
+    name: canonical.name,
+    quantity: finalQty,
+    weight: Number(weight.toFixed(2)),
+  };
+}
+
+function enforceClothingBudget(
+  items: PackItem[],
+  context: ReturnType<typeof extractTripContext>,
+  destination: string,
+): PackItem[] {
+  const budget = computeClothingBudget(context, destination);
+  const slotLimits: Record<ClothingSlot, number> = {
+    shirts: budget.shirts,
+    pants: budget.pants,
+    shorts: budget.shorts,
+    underwear: budget.underwear,
+    socks: budget.socks,
+    outerwear: budget.outerwear,
+    swimwear: 2,
+    formal: context.formal ? 3 : 2,
+    footwear: 3,
+    other_clothing: 4,
+  };
+
+  const nonClothing: PackItem[] = [];
+  const bySlot = new Map<ClothingSlot, PackItem[]>();
+
+  for (const item of items) {
+    const slot = clothingSlot(item);
+    if (!slot) {
+      nonClothing.push(item);
+      continue;
+    }
+    const list = bySlot.get(slot) ?? [];
+    list.push(item);
+    bySlot.set(slot, list);
+  }
+
+  const result = [...nonClothing];
+  const managedSlots: Array<keyof typeof CANONICAL_CLOTHING> = [
+    "shirts",
+    "pants",
+    "shorts",
+    "underwear",
+    "socks",
+  ];
+
+  for (const slot of managedSlots) {
+    const merged = mergeClothingGroup(bySlot.get(slot) ?? [], slot, slotLimits[slot]);
+    if (merged) result.push(merged);
+    bySlot.delete(slot);
+  }
+
+  for (const [slot, group] of bySlot) {
+    const limit = slotLimits[slot];
+    let remaining = limit;
+    for (const item of group) {
+      if (remaining <= 0) break;
+      const qty = Math.min(item.quantity, remaining);
+      if (qty <= 0) continue;
+      result.push({ ...item, quantity: qty });
+      remaining -= qty;
+    }
+  }
+
+  return result;
+}
+
+function requiredItems(context: ReturnType<typeof extractTripContext>, destination: string): PackItem[] {
+  const budget = computeClothingBudget(context, destination);
 
   const items: PackItem[] = [
-    { category: "Remeras", name: "Remeras o tops cómodos", quantity: shirts, weight: 0.18 },
-    { category: "Pantalones", name: "Pantalón o jean versátil", quantity: pants, weight: 0.55 },
-    { category: "Otros", name: "Ropa interior", quantity: underwear, weight: 0.05 },
-    { category: "Otros", name: "Medias", quantity: socks, weight: 0.04 },
+    { category: "Remeras", name: "Remeras o tops cómodos", quantity: budget.shirts, weight: 0.18 },
+    { category: "Pantalones", name: "Pantalón o jean versátil", quantity: budget.pants, weight: 0.55 },
+    { category: "Otros", name: "Ropa interior", quantity: budget.underwear, weight: 0.05 },
+    { category: "Otros", name: "Medias", quantity: budget.socks, weight: 0.04 },
     { category: "Higiene", name: "Neceser de higiene personal", quantity: 1, weight: 0.45 },
     { category: "Electrónica", name: "Cargador de celular", quantity: 1, weight: 0.12 },
     { category: "Accesorios", name: "Documento, pasaporte y reservas", quantity: 1, weight: 0.08 },
   ];
+
+  if (budget.shorts > 0) {
+    items.push({
+      category: "Pantalones",
+      name: "Short o bermuda",
+      quantity: budget.shorts,
+      weight: 0.25,
+    });
+  }
 
   if (context.formal) {
     items.push(
@@ -641,36 +937,30 @@ function applyCapacityBudget(input: {
   return picked.slice(0, Math.max(maxItems, requiredAdjusted.length));
 }
 
-function normalizeSuggestion(raw: unknown, prompt: string, suitcaseCapacityKg?: number): PackSuggestion {
-  const context = extractTripContext(prompt);
+function normalizeSuggestion(
+  raw: unknown,
+  prompt: string,
+  suitcaseCapacityKg?: number,
+  trip?: TripInput,
+): PackSuggestion {
+  const context = extractTripContext(prompt, trip);
   const parsed = RawSuggestionSchema.safeParse(raw);
   const data = parsed.success ? parsed.data : {};
-  const destination = context.destination !== "Destino indicado" ? context.destination : data.destination?.trim() || context.destination;
-  const days = context.days || data.days || 3;
-  const occasion = context.occasion !== "Viaje urbano" ? context.occasion : data.occasion?.trim() || context.occasion;
-  const weather = data.weather?.trim() || inferWeather(prompt, destination, context.warm, context.cold, days);
-  const realisticShirts = Math.max(2, Math.min(7, Math.ceil(context.days * 0.6) + 1));
-  const realisticPants = Math.max(1, Math.min(4, Math.ceil(context.days / 4)));
-  const clampClothing = (it: PackItem): PackItem => {
-    if (it.category === "Remeras" && it.quantity > realisticShirts) return { ...it, quantity: realisticShirts };
-    if (it.category === "Pantalones" && it.quantity > realisticPants) return { ...it, quantity: realisticPants };
-    return it;
-  };
+  const destination = context.destination;
+  const days = context.days;
+  const occasion = context.occasion;
+  const weather =
+    data.weather?.trim() || inferWeather(prompt, destination, context.warm, context.cold, days);
   const aiItems = (data.items ?? [])
     .map(normalizeItem)
-    .filter((item): item is PackItem => Boolean(item))
-    .map(clampClothing);
+    .filter((item): item is PackItem => Boolean(item));
   const blockedSnow = !context.cold && !/nieve|ski|esqui|ushuaia|patagonia/i.test(prompt);
   const filteredItems = blockedSnow
     ? aiItems.filter((item) => !/nieve|ski|esqui|termic|guantes|gorro polar|botas de nieve/i.test(item.name))
     : aiItems;
-  const merged = [...filteredItems];
 
   const required = requiredItems(context, destination);
-  for (const req of required) {
-    const exists = merged.some((item) => normalizeText(item.name).includes(normalizeText(req.name).slice(0, 10)));
-    if (!exists) merged.push(req);
-  }
+  const merged = enforceClothingBudget([...filteredItems, ...required], context, destination);
 
   const capacity =
     clampCapacityKg(suitcaseCapacityKg) ??
@@ -693,15 +983,16 @@ function normalizeSuggestion(raw: unknown, prompt: string, suitcaseCapacityKg?: 
     occasion,
     suitcaseCapacityKg: capacity,
     items,
-    forecast: buildForecast(destination, days, context.warm, context.cold),
+    forecast: [],
   };
 }
 
 export async function generatePackSuggestion(input: {
   prompt: string;
   suitcaseCapacityKg?: number;
+  trip?: TripInput;
 }): Promise<{ suggestion: PackSuggestion; providerUsed: string }> {
-  const context = extractTripContext(input.prompt);
+  const context = extractTripContext(input.prompt, input.trip);
   const capacity = clampCapacityKg(input.suitcaseCapacityKg);
   const chain = await buildProviderChain();
   let lastError: unknown;
@@ -727,14 +1018,22 @@ export async function generatePackSuggestion(input: {
 Formato exacto: {"destination":"Ciudad o país","days":3,"weather":"resumen breve","occasion":"motivo","items":[{"category":"Remeras|Pantalones|Abrigos|Zapatillas|Accesorios|Higiene|Electrónica|Otros","name":"item","quantity":1,"weight":0.2}]}.
 Reglas críticas:
 - USÁ EXACTAMENTE los días, destino y ocasión que indica el usuario (no inventes ni cambies).
-- Cantidades realistas: una persona repite prendas. Para N días: remeras ≈ ceil(N*0.6)+1 (máx 7), pantalones ≈ ceil(N/4) (máx 4), ropa interior y medias = N (máx 10). Nunca pongas quantity > 10.
-- Si el usuario menciona algo en las notas (ej: anteojos de sol, mate, libro, cámara, paraguas, medicación), INCLUILO en items con la categoría correcta.
+- Cantidades realistas OBLIGATORIAS (no una prenda por día): remeras = min(7, ceil(N*0.6)+1), pantalones = min(4, ceil(N/4)), ropa interior/medias ≈ 75-85% de N (máx 10). Ejemplo: 8 días → 6 remeras, 2 pantalones, ~7 medias — NUNCA 8 remeras.
+- Si el usuario puso notas (anteojos, mate, pijama, remera deportiva, etc.), incluilas como ítems aparte con quantity 1.
 - Si hay casamiento/boda incluí conjunto y zapatos formales; si es playa incluí traje de baño/protector; si no hay nieve no sugieras ropa de nieve.
 - Si el usuario indicó capacidad de valija en kg, mantené la lista compacta y priorizá lo esencial.`,
           prompt: `Solicitud del usuario: ${input.prompt}\nContexto detectado: destino=${context.destination}, días=${context.days}, ocasión=${context.occasion}${capacity ? `, capacidad=${capacity}kg` : ""}${context.notes ? `, notas="${context.notes}"` : ""}.`,
         });
         return {
-          suggestion: normalizeSuggestion(JSON.parse(stripJson(text)), input.prompt, capacity),
+          suggestion: await enrichWithForecast(
+            normalizeSuggestion(
+              JSON.parse(stripJson(text)),
+              input.prompt,
+              capacity,
+              input.trip,
+            ),
+            context,
+          ),
           providerUsed: attempt.provider,
         };
       } catch (error) {
@@ -748,7 +1047,10 @@ Reglas críticas:
 
   console.warn("[pack] Sin proveedores IA disponibles, usando fallback determinista", lastError);
   return {
-    suggestion: normalizeSuggestion({}, input.prompt, capacity),
+    suggestion: await enrichWithForecast(
+      normalizeSuggestion({}, input.prompt, capacity, input.trip),
+      context,
+    ),
     providerUsed: "fallback-local",
   };
 }

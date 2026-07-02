@@ -140,7 +140,56 @@ const NUMBER_WORDS: Record<string, number> = {
   once: 11,
   doce: 12,
   quince: 15,
+  veinte: 20,
+  treinta: 30,
+  cuarenta: 40,
+  sesenta: 60,
+  noventa: 90,
 };
+
+function clampInt(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, Math.round(value)));
+}
+
+function parseWordOrNumber(token: string): number | null {
+  if (NUMBER_WORDS[token] != null) return NUMBER_WORDS[token];
+  const n = Number(token);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function parseDurationFromText(text: string): number | null {
+  const n = normalizeText(text);
+
+  const months = n.match(
+    /\b(\d+|un|una|dos|tres|cuatro|cinco|seis|doce|veinte|treinta|cuarenta|sesenta|noventa)\s*mes(?:es)?\b/,
+  );
+  if (months) {
+    const v = parseWordOrNumber(months[1]);
+    if (v) return Math.min(120, v * 30);
+  }
+
+  const weeks = n.match(
+    /\b(\d+|un|una|dos|tres|cuatro|cinco|seis|ocho|doce|quince|veinte)\s*semana(?:s)?\b/,
+  );
+  if (weeks) {
+    const v = parseWordOrNumber(weeks[1]);
+    if (v) return Math.min(120, v * 7);
+  }
+
+  return null;
+}
+
+function monthFromDate(date?: string): number | null {
+  if (!date) return null;
+  const d = new Date(`${date}T12:00:00`);
+  return Number.isNaN(d.getTime()) ? null : d.getMonth();
+}
+
+function isColdSeasonMonth(month: number | null, hemisphere: "N" | "S") {
+  if (month == null) return false;
+  const coldNorth = month === 11 || month === 0 || month === 1 || month === 2;
+  return hemisphere === "N" ? coldNorth : !coldNorth;
+}
 
 const normalizeText = (value: string) =>
   value
@@ -221,21 +270,27 @@ function extractTripContext(prompt: string, trip?: TripInput) {
     /\b(un|una|uno|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce|quince)\s*(?:dias|dia|noches|noche)\b/,
   );
 
+  const durationFromText = parseDurationFromText(
+    `${structNotes} ${structOccasion ?? ""} ${prompt}`,
+  );
+
   let parsedDays = 3;
   if (structDaysRaw) {
     parsedDays = Number(structDaysRaw);
+  } else if (daysFromDates) {
+    parsedDays = daysFromDates;
+  } else if (durationFromText) {
+    parsedDays = durationFromText;
   } else if (numericDays) {
     parsedDays = Number(numericDays[1] ?? numericDays[2]);
   } else if (wordDays) {
     parsedDays = NUMBER_WORDS[wordDays[1]];
-  } else if (daysFromDates) {
-    parsedDays = daysFromDates;
   }
 
   const days =
     trip?.days != null && trip.days > 0
       ? trip.days
-      : Math.max(1, Math.min(parsedDays, 90));
+      : Math.max(1, Math.min(parsedDays, 120));
 
   const destinationMatch = normalized.match(
     /(?:viaje a|viajo a|voy a|me voy a|destino a|para|hacia|en)\s+([a-zñ ]+?)(?=\s+(?:por|durante|a un|a una|para un|para una|con|del|de|y|,|\.|$)|$)/,
@@ -274,14 +329,36 @@ function extractTripContext(prompt: string, trip?: TripInput) {
 
   const extras = extractExtras(`${structNotes} ${prompt}`);
 
+  const destBlob = normalizeText(`${destination} ${structDestination ?? ""} ${prompt}`);
+  const usaWarm =
+    /miami|orlando|florida|hawaii|honolulu|los angeles|san diego|phoenix|las vegas|houston|dallas|san antonio|san juan pr/.test(
+      destBlob,
+    );
+  const usaCold =
+    /new york|nyc|boston|chicago|seattle|denver|minneapolis|alaska|washington dc|philadelphia|detroit|filadelfia/.test(
+      destBlob,
+    );
+  const isUsa =
+    /estados unidos|estados unidos|usa\b|united states|eeuu|ee uu|u s a|america del norte/.test(destBlob) ||
+    usaWarm ||
+    usaCold;
+  const tripMonth = monthFromDate(trip?.dateFrom ?? structDateFrom);
+  const usaSeasonCold = isUsa && !usaWarm && isColdSeasonMonth(tripMonth, "N");
+
   return {
     destination,
     days,
     dateFrom: trip?.dateFrom ?? structDateFrom,
     dateTo: trip?.dateTo ?? structDateTo,
     occasion,
-    warm: /brasil|rio|salvador|playa|caribe|cancun|punta cana|cartagena|costa/.test(normalized),
-    cold: /ushuaia|nieve|ski|esqui|patagonia|bariloche|calafate|islandia/.test(normalized),
+    warm:
+      /brasil|rio|salvador|playa|caribe|cancun|punta cana|cartagena|costa|miami|hawaii|florida|tailandia|bali/.test(
+        destBlob,
+      ) || usaWarm,
+    cold:
+      /ushuaia|nieve|ski|esqui|patagonia|bariloche|calafate|islandia|alaska|montana|colorado ski/.test(destBlob) ||
+      usaCold ||
+      usaSeasonCold,
     formal: /casamiento|boda|matrimonio|gala|evento formal/.test(normalized),
     notes: structNotes,
     extras,
@@ -570,53 +647,110 @@ function computeClothingBudget(
   destination: string,
 ): ClothingBudget {
   const days = context.days;
-  const destNorm = normalizeText(destination);
+  const destNorm = normalizeText(`${destination} ${context.notes ?? ""}`);
   const notesNorm = normalizeText(`${context.notes ?? ""} ${context.occasion ?? ""}`);
   const occasionNorm = normalizeText(context.occasion);
 
-  // Una persona repite prendas; no lleva una remera por día.
-  let shirts = Math.max(2, Math.min(7, Math.ceil(days * 0.6) + 1));
-  let pants = Math.max(1, Math.min(4, Math.ceil(days / 4)));
-  let shorts = 0;
-  let underwear = Math.max(2, Math.min(10, Math.ceil(days * 0.85)));
-  let socks = Math.max(2, Math.min(10, Math.ceil(days * 0.75)));
-  const outerwear = context.cold ? 2 : 1;
+  const longStay = days > 21;
+  const extendedStay = days > 45;
+  const assumesLaundry =
+    longStay && !/sin lavander|no lavar|no laundry|sin lavarrop/.test(notesNorm);
 
-  if (
+  // Cantidades según duración (viajes largos = menos prendas por día, se asume lavandería).
+  let shirts: number;
+  if (days <= 5) {
+    shirts = Math.max(2, Math.ceil(days * 0.65) + 1);
+  } else if (days <= 14) {
+    shirts = Math.max(3, Math.ceil(days / 2));
+  } else if (days <= 30) {
+    shirts = assumesLaundry ? 4 + Math.ceil(days / 9) : Math.ceil(days / 3);
+  } else {
+    shirts = assumesLaundry ? 5 + Math.floor(days / 10) : Math.ceil(days / 4);
+  }
+
+  let pants: number;
+  if (days <= 7) {
+    pants = Math.max(1, Math.ceil(days / 5));
+  } else if (days <= 21) {
+    pants = Math.max(2, Math.ceil(days / 6));
+  } else {
+    pants = assumesLaundry ? 2 + Math.floor(days / 16) : Math.ceil(days / 8);
+  }
+
+  let underwear: number;
+  let socks: number;
+  if (assumesLaundry) {
+    underwear = 4 + Math.ceil(days / 8);
+    socks = 4 + Math.ceil(days / 7);
+  } else {
+    underwear = Math.ceil(days * 0.85);
+    socks = Math.ceil(days * 0.75);
+  }
+
+  const shirtCap = extendedStay ? 14 : longStay ? 11 : days <= 7 ? 6 : 9;
+  const pantsCap = extendedStay ? 7 : longStay ? 5 : 4;
+  shirts = clampInt(shirts, 2, shirtCap);
+  pants = clampInt(pants, 1, pantsCap);
+  underwear = clampInt(underwear, 3, extendedStay ? 14 : longStay ? 12 : 10);
+  socks = clampInt(socks, 3, extendedStay ? 14 : longStay ? 12 : 10);
+
+  let shorts = 0;
+  let outerwear = context.cold ? 2 : 1;
+
+  const beach =
     context.warm ||
-    /playa|mar|costa|brasil|caribe|cancun|punta cana/.test(destNorm) ||
-    occasionNorm.includes("playa")
-  ) {
-    shorts = Math.max(1, Math.min(3, Math.ceil(days / 5)));
-    pants = Math.max(1, Math.min(2, Math.ceil(days / 6)));
+    /playa|mar|costa|caribe|cancun|punta cana|miami|hawaii|florida|bali|phuket/.test(destNorm) ||
+    occasionNorm.includes("playa");
+
+  if (beach) {
+    shorts = clampInt(days <= 10 ? 1 + Math.floor(days / 6) : 2 + Math.floor(days / 12), 1, extendedStay ? 5 : 3);
+    pants = clampInt(pants - (days <= 14 ? 1 : 0), 1, pantsCap);
+    shirts = clampInt(shirts - (days <= 10 ? 1 : 0), 2, shirtCap);
+  }
+
+  if (context.cold) {
+    outerwear = longStay ? 3 : 2;
+    shirts = clampInt(shirts + 1, 2, shirtCap + 1);
+    socks = clampInt(socks + 1, 3, extendedStay ? 15 : 12);
+  }
+
+  if (/estados unidos|usa\b|united states|eeuu|ee uu|new york|los angeles|miami|chicago|boston/.test(destNorm)) {
+    if (context.cold) {
+      pants = clampInt(pants + 1, 1, pantsCap + 1);
+    }
+    if (beach && !context.cold) {
+      shorts = clampInt(shorts + 1, 1, extendedStay ? 6 : 4);
+    }
   }
 
   if (context.formal || /casamiento|boda|matrimonio|gala|formal/.test(occasionNorm)) {
-    shirts = Math.min(7, shirts + 1);
+    shirts = clampInt(shirts + (longStay ? 2 : 1), 2, shirtCap + 2);
+    pants = clampInt(pants + 1, 1, pantsCap + 1);
   }
 
-  if (/trabajo|negocio|conferencia|reunion|oficina/.test(occasionNorm)) {
-    pants = Math.min(4, pants + 1);
-    shirts = Math.min(7, shirts + 1);
+  if (/trabajo|negocio|conferencia|reunion|oficina|work|business/.test(occasionNorm)) {
+    shirts = clampInt(shirts + 1, 2, shirtCap + 1);
+    pants = clampInt(pants + (longStay ? 2 : 1), 1, pantsCap + 2);
   }
 
-  if (/trekking|senderismo|montana|acampar|campamento/.test(occasionNorm)) {
-    socks = Math.min(10, socks + 1);
-    shirts = Math.min(7, shirts + 1);
+  if (/trekking|senderismo|montana|acampar|campamento|hiking/.test(occasionNorm)) {
+    socks = clampInt(socks + 2, 3, extendedStay ? 16 : 13);
+    shirts = clampInt(shirts + 1, 2, shirtCap + 1);
   }
 
   if (/lavander|lavarrop|laundry|wash and wear/.test(notesNorm)) {
-    shirts = Math.max(2, Math.min(shirts, Math.ceil(days / 3) + 1));
-    pants = Math.max(1, Math.min(pants, Math.ceil(days / 5)));
-    underwear = Math.max(2, Math.min(underwear, Math.ceil(days / 3)));
-    socks = Math.max(2, Math.min(socks, Math.ceil(days / 3)));
+    shirts = clampInt(3 + Math.ceil(days / 10), 2, shirtCap);
+    pants = clampInt(1 + Math.ceil(days / 14), 1, pantsCap);
+    underwear = clampInt(3 + Math.ceil(days / 9), 3, extendedStay ? 12 : 10);
+    socks = clampInt(3 + Math.ceil(days / 8), 3, extendedStay ? 12 : 10);
   }
 
   if (/equipaje de mano|carry on|carry-on|valija chica|valija peque|poco espacio|minimal|liviano|solo mochila/.test(notesNorm)) {
-    shirts = Math.max(2, shirts - 1);
-    pants = Math.max(1, pants - 1);
-    underwear = Math.max(2, Math.min(underwear, Math.ceil(days / 2)));
-    socks = Math.max(2, Math.min(socks, Math.ceil(days / 2)));
+    shirts = clampInt(shirts - 2, 2, shirtCap);
+    pants = clampInt(pants - 1, 1, pantsCap);
+    underwear = clampInt(underwear - 2, 2, extendedStay ? 10 : 8);
+    socks = clampInt(socks - 2, 2, extendedStay ? 10 : 8);
+    shorts = Math.max(0, shorts - 1);
   }
 
   return { shirts, pants, shorts, underwear, socks, outerwear };
@@ -1018,7 +1152,7 @@ export async function generatePackSuggestion(input: {
 Formato exacto: {"destination":"Ciudad o país","days":3,"weather":"resumen breve","occasion":"motivo","items":[{"category":"Remeras|Pantalones|Abrigos|Zapatillas|Accesorios|Higiene|Electrónica|Otros","name":"item","quantity":1,"weight":0.2}]}.
 Reglas críticas:
 - USÁ EXACTAMENTE los días, destino y ocasión que indica el usuario (no inventes ni cambies).
-- Cantidades realistas OBLIGATORIAS (no una prenda por día): remeras = min(7, ceil(N*0.6)+1), pantalones = min(4, ceil(N/4)), ropa interior/medias ≈ 75-85% de N (máx 10). Ejemplo: 8 días → 6 remeras, 2 pantalones, ~7 medias — NUNCA 8 remeras.
+- Cantidades de ropa según días y destino (no fijas): viajes cortos ≈ ceil(N/2) remeras; largos (>21 días) asumí lavandería y menos prendas por día (ej. 60 días ≈ 11 remeras, 5 pantalones; 8 días ≈ 4 remeras, 2 pantalones). Ajustá por clima (playa/calor → más shorts; frío → más abrigos) y ocasión.
 - Si el usuario puso notas (anteojos, mate, pijama, remera deportiva, etc.), incluilas como ítems aparte con quantity 1.
 - Si hay casamiento/boda incluí conjunto y zapatos formales; si es playa incluí traje de baño/protector; si no hay nieve no sugieras ropa de nieve.
 - Si el usuario indicó capacidad de valija en kg, mantené la lista compacta y priorizá lo esencial.`,

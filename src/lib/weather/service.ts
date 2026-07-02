@@ -1,130 +1,12 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { z } from "zod";
 import type {
+  WeatherDaySummary,
   WeatherForecastResponse,
   WeatherHour,
-  WeatherDaySummary,
   WeatherSpot,
-} from "@/lib/weather/types";
+} from "./types";
 
-/**
- * Server route: /api/weather
- *
- * Devuelve un pronóstico normalizado (estilo Windguru) para cualquier
- * ubicación buscada por nombre o por lat/lon.
- *
- * Provider actual: Open-Meteo (gratis, sin API key, soporta datos marinos).
- *
- * ────────────────────────────────────────────────────────────────────
- * CÓMO SWAPPEAR A WINDGURU REAL:
- * ────────────────────────────────────────────────────────────────────
- * 1. Pedile a Lovable que agregue los secrets:
- *      WINDGURU_STATION_ID, WINDGURU_PASSWORD, WINDGURU_UID
- * 2. Reemplazá fetchOpenMeteo() por una llamada a:
- *      https://www.windguru.cz/int/iapi.php?q=forecast&id_model=3
- *        &id_spot={station}&uid={uid}&password={pw}
- *    (Windguru entrega CSV/XML — parsealo y mapealo a WeatherHour[].)
- * 3. NO uses process.env.WINDGURU_* fuera del handler — el server route
- *    los inyecta solo en runtime.
- * ────────────────────────────────────────────────────────────────────
- */
-
-const QuerySchema = z.object({
-  q: z.string().min(1).max(120).optional(),
-  lat: z.coerce.number().min(-90).max(90).optional(),
-  lon: z.coerce.number().min(-180).max(180).optional(),
-  days: z.coerce.number().int().min(1).max(14).optional().default(5),
-});
-
-const CORS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
-} as const;
-
-export const Route = createFileRoute("/api/weather")({
-  server: {
-    handlers: {
-      OPTIONS: async () => new Response(null, { status: 204, headers: CORS }),
-      GET: async ({ request }) => {
-        try {
-          const url = new URL(request.url);
-          const parsed = QuerySchema.safeParse({
-            q: url.searchParams.get("q") ?? undefined,
-            lat: url.searchParams.get("lat") ?? undefined,
-            lon: url.searchParams.get("lon") ?? undefined,
-            days: url.searchParams.get("days") ?? undefined,
-          });
-          if (!parsed.success) {
-            return json({ error: "Parámetros inválidos" }, 400);
-          }
-          const { q, lat, lon, days } = parsed.data;
-
-          // Cache en memoria del worker: fresh 10 min, stale-on-429 hasta 1h.
-          const cacheKey = `${q ?? ""}|${lat ?? ""}|${lon ?? ""}|${days}`;
-          const cached = MEMO.get(cacheKey);
-          const now = Date.now();
-          if (cached && now - cached.at < 10 * 60_000) {
-            return json(cached.data, 200, { "Cache-Control": "public, max-age=600" });
-          }
-
-          let spot: WeatherSpot;
-          if (typeof lat === "number" && typeof lon === "number") {
-            spot = { name: q ?? `${lat.toFixed(2)}, ${lon.toFixed(2)}`, latitude: lat, longitude: lon };
-          } else if (q) {
-            const geo = await geocode(q);
-            if (!geo) return json({ error: `No encontré "${q}"` }, 404);
-            spot = geo;
-          } else {
-            return json({ error: "Indicá un destino o coordenadas" }, 400);
-          }
-
-          // Intentamos Open-Meteo primero (con timeout corto); si falla o tarda,
-          // caemos a wttr.in. Sin retry loops para no exceder el CPU budget del worker.
-          try {
-            const data = await fetchOpenMeteo(spot, days);
-            MEMO.set(cacheKey, { at: now, data });
-            return json(data, 200, { "Cache-Control": "public, max-age=600" });
-          } catch (err) {
-            console.warn("open-meteo failed, trying wttr", err);
-            if (cached) {
-              return json(cached.data, 200, {
-                "Cache-Control": "public, max-age=60",
-                "X-Weather-Stale": "true",
-              });
-            }
-            try {
-              const fallback = await fetchWttr(spot, days);
-              MEMO.set(cacheKey, { at: now, data: fallback });
-              return json(fallback, 200, { "Cache-Control": "public, max-age=300" });
-            } catch (fallbackErr) {
-              console.error("wttr fallback failed", fallbackErr);
-              return json(
-                { error: "No pude obtener el clima ahora. Probá de nuevo en unos segundos." },
-                503,
-              );
-            }
-          }
-        } catch (err) {
-          console.error("weather route error", err);
-          return json({ error: "No pude obtener el clima ahora" }, 502);
-        }
-      },
-    },
-  },
-});
-
-// Cache en memoria del worker (best-effort; se reinicia con cold starts).
 const MEMO = new Map<string, { at: number; data: WeatherForecastResponse }>();
 
-function json(body: unknown, status = 200, extra: Record<string, string> = {}) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "Content-Type": "application/json", ...CORS, ...extra },
-  });
-}
-
-// ── fetch con timeout (CF Workers a veces cuelgan en upstreams lentos) ──
 async function fetchWithTimeout(url: string, ms = 6000, init?: RequestInit): Promise<Response> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), ms);
@@ -135,7 +17,6 @@ async function fetchWithTimeout(url: string, ms = 6000, init?: RequestInit): Pro
   }
 }
 
-// ── Geocoding (Open-Meteo, gratis) ────────────────────────────────
 async function geocode(name: string): Promise<WeatherSpot | null> {
   const url = new URL("https://geocoding-api.open-meteo.com/v1/search");
   url.searchParams.set("name", name);
@@ -164,7 +45,6 @@ async function geocode(name: string): Promise<WeatherSpot | null> {
   };
 }
 
-// ── Forecast fetcher ──────────────────────────────────────────────
 async function fetchOpenMeteo(spot: WeatherSpot, days: number): Promise<WeatherForecastResponse> {
   const fc = new URL("https://api.open-meteo.com/v1/forecast");
   fc.searchParams.set("latitude", String(spot.latitude));
@@ -181,7 +61,6 @@ async function fetchOpenMeteo(spot: WeatherSpot, days: number): Promise<WeatherF
   );
   fc.searchParams.set("current", "temperature_2m,precipitation,wind_speed_10m,wind_gusts_10m,wind_direction_10m");
 
-  // API marina (olas) — endpoint separado en Open-Meteo
   const mr = new URL("https://marine-api.open-meteo.com/v1/marine");
   mr.searchParams.set("latitude", String(spot.latitude));
   mr.searchParams.set("longitude", String(spot.longitude));
@@ -191,7 +70,7 @@ async function fetchOpenMeteo(spot: WeatherSpot, days: number): Promise<WeatherF
 
   const [fr, mrRes] = await Promise.all([
     fetchWithTimeout(fc.toString(), 7000),
-    fetchWithTimeout(mr.toString(), 5000).catch(() => null), // olas pueden no existir tierra adentro
+    fetchWithTimeout(mr.toString(), 5000).catch(() => null),
   ]);
   if (!fr.ok) throw new Error(`open-meteo ${fr.status}`);
   const fJson = (await fr.json()) as OpenMeteoForecast;
@@ -262,7 +141,6 @@ function maxWaveForDay(m: OpenMeteoMarine, date: string): number | null {
 
 const round = (n: number) => Math.round(n * 10) / 10;
 
-// ── Tipos del provider (Open-Meteo) ───────────────────────────────
 type OpenMeteoForecast = {
   timezone?: string;
   current: {
@@ -300,7 +178,30 @@ type OpenMeteoMarine = {
   };
 };
 
-// ── Fallback provider: wttr.in (gratis, sin API key) ──────────────
+type WttrHour = {
+  time: string;
+  tempC: string;
+  precipMM: string;
+  windspeedKmph: string;
+  WindGustKmph?: string;
+  winddirDegree: string;
+};
+
+type WttrResponse = {
+  current_condition?: Array<{
+    temp_C: string;
+    precipMM: string;
+    windspeedKmph: string;
+    winddirDegree: string;
+  }>;
+  weather: Array<{
+    date: string;
+    maxtempC: string;
+    mintempC: string;
+    hourly: WttrHour[];
+  }>;
+};
+
 async function fetchWttr(spot: WeatherSpot, days: number): Promise<WeatherForecastResponse> {
   const loc = `${spot.latitude},${spot.longitude}`;
   const res = await fetchWithTimeout(`https://wttr.in/${loc}?format=j1`, 8000, {
@@ -315,7 +216,6 @@ async function fetchWttr(spot: WeatherSpot, days: number): Promise<WeatherForeca
   const hourly: WeatherHour[] = [];
   for (const d of j.weather.slice(0, days)) {
     for (const h of d.hourly) {
-      // "time" en wttr es "0","300","600"... (HHMM sin ceros)
       const hh = String(h.time).padStart(4, "0").slice(0, 2);
       const iso = `${d.date}T${hh}:00`;
       hourly.push({
@@ -366,25 +266,45 @@ async function fetchWttr(spot: WeatherSpot, days: number): Promise<WeatherForeca
   };
 }
 
-type WttrHour = {
-  time: string;
-  tempC: string;
-  precipMM: string;
-  windspeedKmph: string;
-  WindGustKmph?: string;
-  winddirDegree: string;
-};
-type WttrResponse = {
-  current_condition?: Array<{
-    temp_C: string;
-    precipMM: string;
-    windspeedKmph: string;
-    winddirDegree: string;
-  }>;
-  weather: Array<{
-    date: string;
-    maxtempC: string;
-    mintempC: string;
-    hourly: WttrHour[];
-  }>;
-};
+export async function getWeatherForecast(params: {
+  query?: string;
+  lat?: number;
+  lon?: number;
+  days?: number;
+  signal?: AbortSignal;
+}): Promise<WeatherForecastResponse> {
+  const days = Math.min(14, Math.max(1, params.days ?? 5));
+  const cacheKey = `${params.query ?? ""}|${params.lat ?? ""}|${params.lon ?? ""}|${days}`;
+  const cached = MEMO.get(cacheKey);
+  const now = Date.now();
+  if (cached && now - cached.at < 10 * 60_000) {
+    return cached.data;
+  }
+
+  let spot: WeatherSpot;
+  if (params.lat != null && params.lon != null) {
+    spot = {
+      name: params.query ?? `${params.lat.toFixed(2)}, ${params.lon.toFixed(2)}`,
+      latitude: params.lat,
+      longitude: params.lon,
+    };
+  } else if (params.query) {
+    const geo = await geocode(params.query);
+    if (!geo) throw new Error(`No encontré "${params.query}"`);
+    spot = geo;
+  } else {
+    throw new Error("Indicá un destino o coordenadas");
+  }
+
+  try {
+    const data = await fetchOpenMeteo(spot, days);
+    MEMO.set(cacheKey, { at: now, data });
+    return data;
+  } catch (err) {
+    console.warn("open-meteo failed, trying wttr", err);
+    if (cached) return cached.data;
+    const fallback = await fetchWttr(spot, days);
+    MEMO.set(cacheKey, { at: now, data: fallback });
+    return fallback;
+  }
+}

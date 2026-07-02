@@ -25,6 +25,7 @@ import { toast } from "sonner";
 import { useSuitcasesStore, type SuitcaseType } from "@/lib/suitcases-store";
 import { useChecklistsStore } from "@/lib/checklists-store";
 import { useChatStore, type ChatMessage, type ChatSuggestion } from "@/lib/chat-store";
+import { generatePackSuggestion } from "@/lib/pack-service";
 
 export const Route = createFileRoute("/_layout/assistant")({
   component: AssistantPage,
@@ -126,45 +127,10 @@ function AssistantPage() {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/pack", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          prompt: userText,
-          destination,
-          days,
-          suitcaseCapacityKg: Math.round(form.suitcaseCapacityKg),
-          occasion: occasion || undefined,
-          notes: notes || undefined,
-          from: form.from,
-          to: form.to,
-        }),
+      const { suggestion: data } = await generatePackSuggestion({
+        prompt: userText,
+        suitcaseCapacityKg: Math.round(form.suitcaseCapacityKg),
       });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: "Error" }));
-        if (res.status === 429) {
-          toast.error("Demasiadas consultas, esperá un momento.");
-        } else if (res.status === 402) {
-          toast.error("Sin créditos de IA. Agregalos en Settings → Usage.");
-        } else {
-          toast.error(err.error || "No pude generar la lista");
-        }
-        addMessage({
-          id: (Date.now() + 1).toString(),
-          role: "assistant",
-          content: "Tuve un problema generando la lista. ¿Probamos de nuevo?",
-        });
-        return;
-      }
-      const data = (await res.json()) as {
-        destination: string;
-        weather: string;
-        days: number;
-        occasion: string;
-        items: SuggestionItem[];
-        suitcaseCapacityKg?: number;
-        forecast?: import("@/lib/chat-store").ForecastDay[];
-      };
       const totalWeight = data.items.reduce(
         (acc, it) => acc + it.weight * (it.quantity ?? 1),
         0,

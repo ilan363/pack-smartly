@@ -68,6 +68,8 @@ export const useSuitcasesStore = create<State & Actions>()((set, get) => ({
       destination: data.destination,
       type: data.type,
       maxWeight: data.maxWeight,
+      originAirport: data.originAirport,
+      departureDate: data.departureDate,
       items: (data.items ?? []).map((i) => ({ ...i, id: uid() })),
       createdAt: Date.now(),
     };

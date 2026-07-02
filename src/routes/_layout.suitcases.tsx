@@ -28,6 +28,8 @@ import {
   type SuitcaseType,
 } from "@/lib/suitcases-store";
 import { ExcessBaggageEstimateCard } from "@/components/suitcases/ExcessBaggageEstimate";
+import { IataAirportCombobox } from "@/components/suitcases/IataAirportCombobox";
+import { isValidIataCode } from "@/lib/airports/iata";
 
 export const Route = createFileRoute("/_layout/suitcases")({
   component: SuitcasesPage,
@@ -519,7 +521,7 @@ function suitcaseToForm(s: import("@/lib/suitcases-store").Suitcase): SuitcaseFo
     destination: s.destination,
     type: s.type,
     maxWeight: s.maxWeight,
-    originAirport: s.originAirport ?? "EZE",
+    originAirport: s.originAirport ?? "",
     departureDate: s.departureDate ?? defaultDepartureDate(),
   };
 }
@@ -545,7 +547,7 @@ function SuitcaseDialog({
     destination: "",
     type: "cabina",
     maxWeight: 10,
-    originAirport: "EZE",
+    originAirport: "",
     departureDate: defaultDepartureDate(),
   });
 
@@ -562,7 +564,7 @@ function SuitcaseDialog({
         destination: "",
         type: "cabina",
         maxWeight: 10,
-        originAirport: "EZE",
+        originAirport: "",
         departureDate: defaultDepartureDate(),
       });
     }
@@ -571,6 +573,10 @@ function SuitcaseDialog({
   const submit = () => {
     if (!form.name.trim() || !form.destination.trim() || form.maxWeight <= 0) {
       toast.error("Completá nombre, destino y peso máximo.");
+      return;
+    }
+    if (!form.originAirport.trim() || !isValidIataCode(form.originAirport)) {
+      toast.error("Elegí un aeropuerto de origen válido (código IATA de 3 letras).");
       return;
     }
     if (dialog?.mode === "edit") onUpdate(dialog.id, form);
@@ -608,17 +614,16 @@ function SuitcaseDialog({
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Origen (IATA)</label>
-              <Input
-                placeholder="EZE"
-                maxLength={3}
+              <label className="text-sm font-medium" htmlFor="origin-iata">
+                Origen{" "}
+                <span className="font-normal text-muted-foreground">
+                  (código IATA del aeropuerto de salida, ej: EZE, MIA, MAD)
+                </span>
+              </label>
+              <IataAirportCombobox
+                id="origin-iata"
                 value={form.originAirport}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    originAirport: e.target.value.toUpperCase().slice(0, 3),
-                  })
-                }
+                onChange={(code) => setForm({ ...form, originAirport: code })}
               />
             </div>
             <div className="space-y-2">

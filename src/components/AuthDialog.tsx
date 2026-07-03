@@ -1,5 +1,5 @@
-import { useEffect, useState, type FormEvent } from "react";
-import { ShieldCheck } from "lucide-react";
+import { useEffect, useState, type FormEvent, type KeyboardEvent } from "react";
+import { Eye, EyeOff, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -15,6 +15,54 @@ import { useAuthStore } from "@/lib/auth-store";
 import { toast } from "sonner";
 
 type AuthTab = "login" | "register" | "admin";
+
+type PasswordFieldProps = {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  showPassword: boolean;
+  onToggleShow: () => void;
+  placeholder?: string;
+  onKeyDown?: (event: KeyboardEvent<HTMLInputElement>) => void;
+};
+
+function PasswordField({
+  id,
+  label,
+  value,
+  onChange,
+  showPassword,
+  onToggleShow,
+  placeholder,
+  onKeyDown,
+}: PasswordFieldProps) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <label htmlFor={id} className="text-sm font-medium">
+          {label}
+        </label>
+        <button
+          type="button"
+          onClick={onToggleShow}
+          className="text-muted-foreground transition-colors hover:text-foreground"
+          aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+        >
+          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+        </button>
+      </div>
+      <Input
+        id={id}
+        type={showPassword ? "text" : "password"}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        onKeyDown={onKeyDown}
+      />
+    </div>
+  );
+}
 
 type AuthDialogProps = {
   open: boolean;
@@ -38,6 +86,8 @@ export function AuthDialog({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   useEffect(() => {
     if (open) setTab(defaultTab);
@@ -47,6 +97,8 @@ export function AuthDialog({
     setEmail("");
     setPassword("");
     setConfirmPassword("");
+    setShowPassword(false);
+    setShowConfirmPassword(false);
   };
 
   const handleClose = (nextOpen: boolean) => {
@@ -138,15 +190,15 @@ export function AuthDialog({
                 onKeyDown={(e) => e.key === "Enter" && handleAdminLogin()}
               />
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Contraseña</label>
-              <Input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleAdminLogin()}
-              />
-            </div>
+            <PasswordField
+              id="admin-password"
+              label="Contraseña"
+              value={password}
+              onChange={setPassword}
+              showPassword={showPassword}
+              onToggleShow={() => setShowPassword((prev) => !prev)}
+              onKeyDown={(e) => e.key === "Enter" && handleAdminLogin()}
+            />
           </div>
         ) : (
           <Tabs
@@ -169,15 +221,15 @@ export function AuthDialog({
                   onKeyDown={(e) => e.key === "Enter" && handleLogin()}
                 />
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Contraseña</label>
-                <Input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-                />
-              </div>
+              <PasswordField
+                id="login-password"
+                label="Contraseña"
+                value={password}
+                onChange={setPassword}
+                showPassword={showPassword}
+                onToggleShow={() => setShowPassword((prev) => !prev)}
+                onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+              />
             </TabsContent>
 
             <TabsContent value="register" className="space-y-3">
@@ -190,24 +242,24 @@ export function AuthDialog({
                   placeholder="tu@email.com"
                 />
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Contraseña</label>
-                <Input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Mínimo 6 caracteres"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Confirmar contraseña</label>
-                <Input
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleRegister()}
-                />
-              </div>
+              <PasswordField
+                id="register-password"
+                label="Contraseña"
+                value={password}
+                onChange={setPassword}
+                showPassword={showPassword}
+                onToggleShow={() => setShowPassword((prev) => !prev)}
+                placeholder="Mínimo 6 caracteres"
+              />
+              <PasswordField
+                id="register-confirm-password"
+                label="Confirmar contraseña"
+                value={confirmPassword}
+                onChange={setConfirmPassword}
+                showPassword={showConfirmPassword}
+                onToggleShow={() => setShowConfirmPassword((prev) => !prev)}
+                onKeyDown={(e) => e.key === "Enter" && handleRegister()}
+              />
             </TabsContent>
           </Tabs>
         )}

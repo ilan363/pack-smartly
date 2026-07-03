@@ -32,7 +32,6 @@ function Navbar() {
           <div className="flex items-center gap-4">
             <Button
               variant="ghost"
-              className="hidden sm:inline-flex"
               onClick={() => openAuth("login")}
             >
               Ingresar

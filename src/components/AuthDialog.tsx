@@ -103,7 +103,9 @@ export function AuthDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent>
+      <DialogContent
+        className="max-md:fixed max-md:inset-0 max-md:left-0 max-md:top-0 max-md:flex max-md:h-[100dvh] max-md:max-h-[100dvh] max-md:w-full max-md:max-w-none max-md:translate-x-0 max-md:translate-y-0 max-md:flex-col max-md:overflow-y-auto max-md:rounded-none max-md:border-0 max-md:p-6 max-md:pt-14 max-md:data-[state=closed]:slide-out-to-bottom max-md:data-[state=open]:slide-in-from-bottom max-md:data-[state=closed]:zoom-out-100 max-md:data-[state=open]:zoom-in-100 max-md:[&>button]:right-4 max-md:[&>button]:top-4 max-md:[&>button]:size-10 max-md:[&>button]:opacity-100 max-md:[&>button_svg]:size-5"
+      >
         <DialogHeader>
           <DialogTitle>
             {tab === "admin" ? "Panel de administración" : "Accedé a Travel Wolf"}
@@ -217,7 +219,7 @@ export function AuthDialog({
           </Button>
         )}
 
-        <DialogFooter className="gap-2 sm:gap-0">
+        <DialogFooter className="mt-auto gap-2 pt-4 sm:gap-0">
           {tab === "admin" && (
             <Button variant="ghost" onClick={() => setTab("login")}>
               Volver

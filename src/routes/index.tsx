@@ -37,9 +37,6 @@ function Navbar() {
             >
               Ingresar
             </Button>
-            <Link to="/dashboard">
-              <Button className="rounded-full">Comenzar gratis</Button>
-            </Link>
           </div>
         </div>
       </nav>

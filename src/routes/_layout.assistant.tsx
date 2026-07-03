@@ -27,6 +27,7 @@ import { useSuitcasesStore, type SuitcaseType } from "@/lib/suitcases-store";
 import { useChecklistsStore } from "@/lib/checklists-store";
 import { useChatStore, type ChatMessage, type ChatSuggestion } from "@/lib/chat-store";
 import { generatePackSuggestion } from "@/lib/pack-service";
+import { DestinationCombobox } from "@/components/assistant/DestinationCombobox";
 
 export const Route = createFileRoute("/_layout/assistant")({
   component: AssistantPage,
@@ -263,14 +264,14 @@ function AssistantPage() {
           <div className="space-y-3">
             <div>
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Destino</label>
-              <Input
-                placeholder="Ej: Madrid, España"
-                value={form.destination}
-                onChange={(e) => setForm({ ...form, destination: e.target.value })}
-                disabled={loading}
-                className="mt-1"
-                maxLength={120}
-              />
+              <div className="mt-1">
+                <DestinationCombobox
+                  value={form.destination}
+                  onChange={(destination) => setForm({ ...form, destination })}
+                  disabled={loading}
+                  placeholder="Ej: Estados Unidos, Miami, Madrid…"
+                />
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -95,7 +95,8 @@ export function AuthDialog({
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = (e?: FormEvent) => {
+    e?.preventDefault();
     if (tab === "login") handleLogin();
     else if (tab === "admin") handleAdminLogin();
     else handleRegister();
@@ -106,6 +107,10 @@ export function AuthDialog({
       <DialogContent
         className="max-md:fixed max-md:inset-0 max-md:left-0 max-md:top-0 max-md:flex max-md:h-[100dvh] max-md:max-h-[100dvh] max-md:w-full max-md:max-w-none max-md:translate-x-0 max-md:translate-y-0 max-md:flex-col max-md:overflow-y-auto max-md:rounded-none max-md:border-0 max-md:p-6 max-md:pt-14 max-md:data-[state=closed]:slide-out-to-bottom max-md:data-[state=open]:slide-in-from-bottom max-md:data-[state=closed]:zoom-out-100 max-md:data-[state=open]:zoom-in-100 max-md:[&>button]:right-4 max-md:[&>button]:top-4 max-md:[&>button]:size-10 max-md:[&>button]:opacity-100 max-md:[&>button_svg]:size-5"
       >
+        <form
+          className="flex flex-1 flex-col gap-4"
+          onSubmit={(e) => handleSubmit(e)}
+        >
         <DialogHeader>
           <DialogTitle>
             {tab === "admin" ? "Panel de administración" : "Accedé a Travel Wolf"}
@@ -208,32 +213,35 @@ export function AuthDialog({
         )}
 
         {tab !== "admin" && (
-          <Button
-            type="button"
-            variant="ghost"
-            className="w-full text-muted-foreground hover:text-foreground"
-            onClick={() => setTab("admin")}
-          >
-            <ShieldCheck className="mr-2 h-4 w-4" />
-            Panel de administración
-          </Button>
+          <div className="flex justify-center px-2">
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full max-w-xs justify-center text-center text-muted-foreground hover:text-foreground"
+              onClick={() => setTab("admin")}
+            >
+              <ShieldCheck className="mr-2 h-4 w-4 shrink-0" />
+              Panel de administración
+            </Button>
+          </div>
         )}
 
         <DialogFooter className="mt-auto gap-2 pt-4 sm:gap-0">
           {tab === "admin" && (
-            <Button variant="ghost" onClick={() => setTab("login")}>
+            <Button type="button" variant="ghost" onClick={() => setTab("login")}>
               Volver
             </Button>
           )}
-          <Button variant="outline" onClick={() => handleClose(false)}>
+          <Button type="button" variant="outline" onClick={() => handleClose(false)}>
             Cancelar
           </Button>
-          <Button onClick={handleSubmit}>
+          <Button type="submit">
             {tab === "login" && "Ingresar"}
             {tab === "register" && "Crear cuenta"}
             {tab === "admin" && "Ingresar como admin"}
           </Button>
         </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );

@@ -118,7 +118,8 @@ export const useAuthStore = create<AuthState>()(
         }
 
         if (normalized === ADMIN_EMAIL) {
-          return { ok: false, error: "Usá el acceso de administrador" };
+          set({ email: normalized, isAdmin: true, oauthProvider: provider });
+          return { ok: true };
         }
 
         set({ email: normalized, isAdmin: false, oauthProvider: provider });

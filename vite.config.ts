@@ -12,13 +12,20 @@ function supabaseEnvDefine() {
   const dev = loadEnv("development", cwd, "VITE_");
   const prod = loadEnv("production", cwd, "VITE_");
 
+  const url =
+    process.env.VITE_SUPABASE_URL ||
+    prod.VITE_SUPABASE_URL ||
+    dev.VITE_SUPABASE_URL ||
+    "";
+  const key =
+    process.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+    prod.VITE_SUPABASE_PUBLISHABLE_KEY ||
+    dev.VITE_SUPABASE_PUBLISHABLE_KEY ||
+    "";
+
   return {
-    "import.meta.env.VITE_SUPABASE_URL": JSON.stringify(
-      dev.VITE_SUPABASE_URL || prod.VITE_SUPABASE_URL || "",
-    ),
-    "import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY": JSON.stringify(
-      dev.VITE_SUPABASE_PUBLISHABLE_KEY || prod.VITE_SUPABASE_PUBLISHABLE_KEY || "",
-    ),
+    "import.meta.env.VITE_SUPABASE_URL": JSON.stringify(url),
+    "import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY": JSON.stringify(key),
   };
 }
 

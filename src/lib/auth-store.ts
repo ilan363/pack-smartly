@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import type { OAuthProviderId } from "@/lib/oauth";
 
 export const ADMIN_EMAIL = "i.manbrut@wolfsohn.edu.ar";
 const ADMIN_PASSWORD = "ilan20enero";
@@ -14,10 +15,13 @@ type AuthResult = { ok: true } | { ok: false; error: string };
 type AuthState = {
   email: string | null;
   isAdmin: boolean;
+  oauthProvider: OAuthProviderId | null;
   users: RegisteredUser[];
   login: (email: string, password: string) => AuthResult;
   loginAdmin: (email: string, password: string) => AuthResult;
   register: (email: string, password: string) => AuthResult;
+  setOAuthSession: (email: string, provider: OAuthProviderId | null) => AuthResult;
+  clearOAuthSession: () => void;
   removeUser: (email: string) => void;
   logout: () => void;
   resetSession: () => void;
@@ -36,6 +40,7 @@ export const useAuthStore = create<AuthState>()(
     (set, get) => ({
       email: null,
       isAdmin: false,
+      oauthProvider: null,
       users: [],
       login: (email, password) => {
         const normalized = normalizeEmail(email);
@@ -105,20 +110,40 @@ export const useAuthStore = create<AuthState>()(
         });
         return { ok: true };
       },
+      setOAuthSession: (email, provider) => {
+        const normalized = normalizeEmail(email);
+
+        if (!normalized || !isValidEmail(normalized)) {
+          return { ok: false, error: "No se pudo obtener un email válido del proveedor" };
+        }
+
+        if (normalized === ADMIN_EMAIL) {
+          return { ok: false, error: "Usá el acceso de administrador" };
+        }
+
+        set({ email: normalized, isAdmin: false, oauthProvider: provider });
+        return { ok: true };
+      },
+      clearOAuthSession: () => {
+        if (get().oauthProvider) {
+          set({ email: null, isAdmin: false, oauthProvider: null });
+        }
+      },
       removeUser: (email) => {
         const normalized = normalizeEmail(email);
         set({
           users: get().users.filter((u) => u.email !== normalized),
         });
       },
-      logout: () => set({ email: null, isAdmin: false }),
-      resetSession: () => set({ email: null, isAdmin: false, users: [] }),
+      logout: () => set({ email: null, isAdmin: false, oauthProvider: null }),
+      resetSession: () => set({ email: null, isAdmin: false, oauthProvider: null, users: [] }),
     }),
     {
       name: "pack-smartly-auth",
       partialize: (state) => ({
         email: state.email,
         isAdmin: state.isAdmin,
+        oauthProvider: state.oauthProvider,
         users: state.users,
       }),
     },

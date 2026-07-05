@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as LayoutRouteImport } from './routes/_layout'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as LayoutWeatherRouteImport } from './routes/_layout.weather'
 import { Route as LayoutSuitcasesRouteImport } from './routes/_layout.suitcases'
 import { Route as LayoutSavedSuitcasesRouteImport } from './routes/_layout.saved-suitcases'
@@ -26,6 +27,11 @@ const LayoutRoute = LayoutRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthCallbackRoute = AuthCallbackRouteImport.update({
+  id: '/auth/callback',
+  path: '/auth/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LayoutWeatherRoute = LayoutWeatherRouteImport.update({
@@ -73,6 +79,7 @@ export interface FileRoutesByFullPath {
   '/saved-suitcases': typeof LayoutSavedSuitcasesRoute
   '/suitcases': typeof LayoutSuitcasesRoute
   '/weather': typeof LayoutWeatherRoute
+  '/auth/callback': typeof AuthCallbackRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -83,6 +90,7 @@ export interface FileRoutesByTo {
   '/saved-suitcases': typeof LayoutSavedSuitcasesRoute
   '/suitcases': typeof LayoutSuitcasesRoute
   '/weather': typeof LayoutWeatherRoute
+  '/auth/callback': typeof AuthCallbackRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -95,6 +103,7 @@ export interface FileRoutesById {
   '/_layout/saved-suitcases': typeof LayoutSavedSuitcasesRoute
   '/_layout/suitcases': typeof LayoutSuitcasesRoute
   '/_layout/weather': typeof LayoutWeatherRoute
+  '/auth/callback': typeof AuthCallbackRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -107,6 +116,7 @@ export interface FileRouteTypes {
     | '/saved-suitcases'
     | '/suitcases'
     | '/weather'
+    | '/auth/callback'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -117,6 +127,7 @@ export interface FileRouteTypes {
     | '/saved-suitcases'
     | '/suitcases'
     | '/weather'
+    | '/auth/callback'
   id:
     | '__root__'
     | '/'
@@ -128,11 +139,13 @@ export interface FileRouteTypes {
     | '/_layout/saved-suitcases'
     | '/_layout/suitcases'
     | '/_layout/weather'
+    | '/auth/callback'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LayoutRoute: typeof LayoutRouteWithChildren
+  AuthCallbackRoute: typeof AuthCallbackRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -149,6 +162,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/callback': {
+      id: '/auth/callback'
+      path: '/auth/callback'
+      fullPath: '/auth/callback'
+      preLoaderRoute: typeof AuthCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_layout/weather': {
@@ -229,6 +249,7 @@ const LayoutRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LayoutRoute: LayoutRouteWithChildren,
+  AuthCallbackRoute: AuthCallbackRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

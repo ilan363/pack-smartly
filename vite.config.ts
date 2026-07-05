@@ -5,6 +5,22 @@
 //     error logger plugins, and sandbox detection (port/host/strictPort).
 // You can pass additional config via defineConfig({ vite: { ... } }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
+import { loadEnv } from "vite";
+
+function supabaseEnvDefine() {
+  const cwd = process.cwd();
+  const dev = loadEnv("development", cwd, "VITE_");
+  const prod = loadEnv("production", cwd, "VITE_");
+
+  return {
+    "import.meta.env.VITE_SUPABASE_URL": JSON.stringify(
+      dev.VITE_SUPABASE_URL || prod.VITE_SUPABASE_URL || "",
+    ),
+    "import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY": JSON.stringify(
+      dev.VITE_SUPABASE_PUBLISHABLE_KEY || prod.VITE_SUPABASE_PUBLISHABLE_KEY || "",
+    ),
+  };
+}
 
 export default defineConfig({
   tanstackStart: {
@@ -16,6 +32,7 @@ export default defineConfig({
     },
   },
   vite: {
+    define: supabaseEnvDefine(),
     build: {
       outDir: "dist",
     },

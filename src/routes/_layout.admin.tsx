@@ -13,6 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ADMIN_EMAIL, useAuthStore } from "@/lib/auth-store";
+import { logoutWithOAuth } from "@/hooks/use-supabase-auth-sync";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_layout/admin")({
@@ -25,7 +26,6 @@ function AdminPage() {
   const email = useAuthStore((s) => s.email);
   const users = useAuthStore((s) => s.users);
   const removeUser = useAuthStore((s) => s.removeUser);
-  const logout = useAuthStore((s) => s.logout);
 
   useEffect(() => {
     if (!isAdmin) {
@@ -42,7 +42,7 @@ function AdminPage() {
   };
 
   const handleLogout = () => {
-    logout();
+    void logoutWithOAuth();
     toast.success("Sesión de administrador cerrada");
     navigate({ to: "/" });
   };

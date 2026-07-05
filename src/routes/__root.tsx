@@ -9,6 +9,8 @@ import {
 } from "@tanstack/react-router";
 import { useEffect } from "react";
 
+import { useSupabaseAuthSync } from "@/hooks/use-supabase-auth-sync";
+import { Toaster } from "@/components/ui/sonner";
 import { clearLegacyAppStorage } from "@/lib/clear-legacy-storage";
 import appCss from "../styles.css?url";
 
@@ -113,6 +115,8 @@ function RootShell({ children }: { children: React.ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
+  useSupabaseAuthSync();
+
   useEffect(() => {
     clearLegacyAppStorage();
   }, []);
@@ -120,6 +124,7 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <Outlet />
+      <Toaster richColors position="top-right" />
     </QueryClientProvider>
   );
 }

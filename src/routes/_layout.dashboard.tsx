@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useSuitcasesStore, totalWeight } from "@/lib/suitcases-store";
 import { AuthDialog } from "@/components/AuthDialog";
 import { useAuthStore } from "@/lib/auth-store";
+import { logoutWithOAuth } from "@/hooks/use-supabase-auth-sync";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -17,7 +18,6 @@ function DashboardPage() {
   const suitcases = useSuitcasesStore((s) => s.suitcases);
   const setActive = useSuitcasesStore((s) => s.setActive);
   const authedEmail = useAuthStore((s) => s.email);
-  const logout = useAuthStore((s) => s.logout);
   const [loginOpen, setLoginOpen] = useState(false);
 
   const totalItems = suitcases.reduce(
@@ -45,7 +45,7 @@ function DashboardPage() {
           <div className="flex items-center gap-2 border border-border rounded-lg px-3 py-2 bg-card">
             <ShieldCheck className="h-4 w-4 text-primary" />
             <span className="text-sm font-medium">{authedEmail}</span>
-            <Button variant="ghost" size="sm" onClick={() => { logout(); toast.success("Sesión cerrada"); }}>
+            <Button variant="ghost" size="sm" onClick={() => { void logoutWithOAuth(); toast.success("Sesión cerrada"); }}>
               <LogOut className="h-4 w-4 mr-1" /> Salir
             </Button>
           </div>

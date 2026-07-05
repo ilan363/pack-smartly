@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { OAuthButtons } from "@/components/OAuthButtons";
 import { useAuthStore } from "@/lib/auth-store";
 import { toast } from "sonner";
 
@@ -265,17 +266,20 @@ export function AuthDialog({
         )}
 
         {tab !== "admin" && (
-          <div className="flex justify-center px-2">
-            <Button
-              type="button"
-              variant="ghost"
-              className="w-full max-w-xs justify-center text-center text-muted-foreground hover:text-foreground"
-              onClick={() => setTab("admin")}
-            >
-              <ShieldCheck className="mr-2 h-4 w-4 shrink-0" />
-              Panel de administración
-            </Button>
-          </div>
+          <>
+            <OAuthButtons />
+            <div className="flex justify-center px-2">
+              <Button
+                type="button"
+                variant="ghost"
+                className="w-full max-w-xs justify-center text-center text-muted-foreground hover:text-foreground"
+                onClick={() => setTab("admin")}
+              >
+                <ShieldCheck className="mr-2 h-4 w-4 shrink-0" />
+                Panel de administración
+              </Button>
+            </div>
+          </>
         )}
 
         <DialogFooter className="mt-auto gap-2 pt-4 sm:gap-0">

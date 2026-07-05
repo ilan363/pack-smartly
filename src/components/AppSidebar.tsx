@@ -11,6 +11,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
+import { logoutWithOAuth } from "@/hooks/use-supabase-auth-sync";
 import { resetAppState } from "@/lib/reset-app";
 import { toast } from "sonner";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
@@ -40,7 +41,6 @@ type SidebarContentProps = {
 function SidebarContent({ onNavigate }: SidebarContentProps) {
   const location = useLocation();
   const navigate = useNavigate();
-  const logout = useAuthStore((s) => s.logout);
   const isAdmin = useAuthStore((s) => s.isAdmin);
 
   const items = isAdmin
@@ -95,7 +95,7 @@ function SidebarContent({ onNavigate }: SidebarContentProps) {
           type="button"
           onClick={() =>
             closeAndRun(() => {
-              logout();
+              void logoutWithOAuth();
               toast.success("Sesión cerrada");
               navigate({ to: "/" });
             })

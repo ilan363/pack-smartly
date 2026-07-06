@@ -237,12 +237,86 @@ function extractExtras(text: string): PackItem[] {
   return out;
 }
 
+function parseNoteLines(prompt: string, tripNotes?: string[]): string[] {
+  if (tripNotes?.length) {
+    return tripNotes.map((n) => n.trim()).filter(Boolean);
+  }
+  const block = prompt.match(/notas?\s*:\s*([\s\S]+)$/i)?.[1]?.trim() ?? "";
+  if (!block) return [];
+  return block
+    .split(/\n+/)
+    .map((line) => line.replace(/^[-•*]\s*/, "").trim())
+    .filter(Boolean);
+}
+
+function estimateNoteWeight(text: string, category: Category): number {
+  const t = normalizeText(text);
+  if (/laptop|notebook/.test(t)) return 1.4;
+  if (/camara|zapatilla|bota/.test(t)) return 0.8;
+  if (/mate|termo/.test(t)) return 0.5;
+  if (/libro/.test(t)) return 0.3;
+  if (/medic|pastilla/.test(t)) return 0.15;
+  return normalizeWeight(category, 1, 0.25);
+}
+
+function itemFromUserNote(note: string): PackItem {
+  const trimmed = note.trim();
+  const n = normalizeText(trimmed);
+
+  for (const e of NOTE_EXTRAS) {
+    if (e.match.test(n)) {
+      return { ...e.item };
+    }
+  }
+
+  const category = normalizeCategory(undefined, trimmed);
+  const name = titleCase(trimmed);
+  const weight = estimateNoteWeight(trimmed, category);
+  return {
+    category,
+    name,
+    quantity: 1,
+    weight: Number(weight.toFixed(2)),
+  };
+}
+
+function buildNoteItems(noteLines: string[]): PackItem[] {
+  const out: PackItem[] = [];
+  for (const line of noteLines) {
+    const item = itemFromUserNote(line);
+    const key = normalizeText(item.name);
+    if (!out.some((o) => normalizeText(o.name) === key)) {
+      out.push(item);
+    }
+  }
+  return out;
+}
+
+function noteItemMatchesExisting(item: PackItem, existing: PackItem): boolean {
+  const key = normalizeText(item.name);
+  const other = normalizeText(existing.name);
+  return key === other || other.includes(key) || key.includes(other);
+}
+
+function ensureUserNotesInItems(items: PackItem[], noteLines: string[]): PackItem[] {
+  if (noteLines.length === 0) return items;
+  const result = [...items];
+  for (const line of noteLines) {
+    const noteItem = itemFromUserNote(line);
+    const exists = result.some((it) => noteItemMatchesExisting(noteItem, it));
+    if (!exists) result.push(noteItem);
+  }
+  return result;
+}
+
 export type TripInput = {
   destination: string;
   days: number;
   dateFrom?: string;
   dateTo?: string;
   occasion?: string;
+  /** Notas individuales del formulario del asistente */
+  notes?: string[];
 };
 
 function computeDaysFromDates(dateFrom?: string, dateTo?: string): number | null {
@@ -255,17 +329,9 @@ function computeDaysFromDates(dateFrom?: string, dateTo?: string): number | null
   return Math.max(1, Math.round((end.getTime() - start.getTime()) / 86400000) + 1);
 }
 
-/** Normaliza notas en lista (viñetas o líneas) a un bloque que la IA y extractExtras pueden usar. */
-function parseStructuredNotes(prompt: string): string {
-  const block = prompt.match(/notas?\s*:\s*([\s\S]+)$/i)?.[1]?.trim() ?? "";
-  if (!block) return "";
-
-  const lines = block
-    .split(/\n+/)
-    .map((line) => line.replace(/^[-•*]\s*/, "").trim())
-    .filter(Boolean);
-
-  return lines.length > 0 ? lines.join(". ") : block;
+/** Normaliza notas en lista (viñetas o líneas) a un bloque de texto continuo. */
+function parseStructuredNotes(prompt: string, tripNotes?: string[]): string {
+  return parseNoteLines(prompt, tripNotes).join(". ");
 }
 
 function extractTripContext(prompt: string, trip?: TripInput) {
@@ -277,7 +343,9 @@ function extractTripContext(prompt: string, trip?: TripInput) {
   const structDateFrom = prompt.match(/desde\s*:\s*(\d{4}-\d{2}-\d{2})/i)?.[1];
   const structDateTo = prompt.match(/hasta\s*:\s*(\d{4}-\d{2}-\d{2})/i)?.[1];
   const structOccasion = prompt.match(/ocasi[oó]n\s*:\s*([^\n]+)/i)?.[1]?.trim();
-  const structNotes = parseStructuredNotes(prompt);
+  const noteLines = parseNoteLines(prompt, trip?.notes);
+  const structNotes = parseStructuredNotes(prompt, trip?.notes);
+  const noteItems = buildNoteItems(noteLines);
 
   const daysFromDates = computeDaysFromDates(
     trip?.dateFrom ?? structDateFrom,
@@ -348,7 +416,10 @@ function extractTripContext(prompt: string, trip?: TripInput) {
                 ? "Frío / nieve"
                 : "Viaje urbano";
 
-  const extras = extractExtras(`${structNotes} ${prompt}`);
+  const extras = [...noteItems, ...extractExtras(structNotes)].filter(
+    (item, index, list) =>
+      list.findIndex((other) => normalizeText(other.name) === normalizeText(item.name)) === index,
+  );
 
   const destBlob = normalizeText(`${destination} ${structDestination ?? ""} ${prompt}`);
   const usaWarm =
@@ -381,7 +452,9 @@ function extractTripContext(prompt: string, trip?: TripInput) {
       usaCold ||
       usaSeasonCold,
     formal: /casamiento|boda|matrimonio|gala|evento formal/.test(normalized),
+    noteLines,
     notes: structNotes,
+    noteItems,
     extras,
   };
 }
@@ -952,9 +1025,9 @@ function requiredItems(context: ReturnType<typeof extractTripContext>, destinati
     items.push({ category: "Abrigos", name: "Campera liviana", quantity: 1, weight: 0.45 });
   }
 
-  // Extras pedidos en las notas del usuario (anteojos, libro, mate, etc.)
-  for (const extra of context.extras) {
-    const exists = items.some((i) => normalizeText(i.name) === normalizeText(extra.name));
+  // Ítems pedidos explícitamente en las notas del usuario (siempre obligatorios)
+  for (const extra of [...context.noteItems, ...context.extras]) {
+    const exists = items.some((i) => noteItemMatchesExisting(extra, i));
     if (!exists) items.push(extra);
   }
 
@@ -1123,15 +1196,18 @@ function normalizeSuggestion(
     clampCapacityKg(suitcaseCapacityKg) ??
     clampCapacityKg((data as { suitcaseCapacityKg?: unknown }).suitcaseCapacityKg);
 
-  const items = capacity
-    ? applyCapacityBudget({
-        items: merged,
-        required,
-        capacityKg: capacity,
-        days,
-        prompt,
-      })
-    : merged.slice(0, 22);
+  const itemsWithNotes = ensureUserNotesInItems(
+    capacity
+      ? applyCapacityBudget({
+          items: merged,
+          required,
+          capacityKg: capacity,
+          days,
+          prompt,
+        })
+      : merged.slice(0, 22),
+    context.noteLines,
+  );
 
   return {
     destination,
@@ -1139,7 +1215,7 @@ function normalizeSuggestion(
     weather,
     occasion,
     suitcaseCapacityKg: capacity,
-    items,
+    items: itemsWithNotes,
     forecast: [],
   };
 }
@@ -1176,11 +1252,15 @@ Formato exacto: {"destination":"Ciudad o país","days":3,"weather":"resumen brev
 Reglas críticas:
 - USÁ EXACTAMENTE los días, destino y ocasión que indica el usuario (no inventes ni cambies).
 - Cantidades de ropa según días y destino (no fijas): viajes cortos ≈ ceil(N/2) remeras; largos (>21 días) asumí lavandería y menos prendas por día (ej. 60 días ≈ 11 remeras, 5 pantalones; 8 días ≈ 4 remeras, 2 pantalones). Ajustá por clima (playa/calor → más shorts; frío → más abrigos) y ocasión.
-- Si el usuario puso notas (anteojos, mate, pijama, remera deportiva, etc.), incluí TODAS como ítems aparte con quantity 1.
+- Si el usuario puso notas, incluí TODAS como ítems aparte (quantity 1). No omitas ninguna nota de la lista.
 - Si hay casamiento/boda incluí conjunto y zapatos formales; si es playa incluí traje de baño/protector; si no hay nieve no sugieras ropa de nieve.
 - Si el usuario indicó capacidad de valija en kg, mantené la lista compacta y priorizá lo esencial.
 - Para calcetines usá siempre "Medias" (nunca "Medios").`,
-          prompt: `Solicitud del usuario: ${input.prompt}\nContexto detectado: destino=${context.destination}, días=${context.days}, ocasión=${context.occasion}${capacity ? `, capacidad=${capacity}kg` : ""}${context.notes ? `, notas="${context.notes}"` : ""}.`,
+          prompt: `Solicitud del usuario: ${input.prompt}\nContexto detectado: destino=${context.destination}, días=${context.days}, ocasión=${context.occasion}${capacity ? `, capacidad=${capacity}kg` : ""}${
+            context.noteLines.length
+              ? `\nNotas del usuario (incluir TODAS en items, una por nota):\n${context.noteLines.map((n, i) => `${i + 1}. ${n}`).join("\n")}`
+              : ""
+          }`,
         });
         return {
           suggestion: await enrichWithForecast(

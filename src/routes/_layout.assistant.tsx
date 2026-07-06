@@ -139,6 +139,7 @@ function AssistantPage() {
           dateFrom: form.from,
           dateTo: form.to,
           occasion: occasion || undefined,
+          notes: form.notes.map((n) => n.trim()).filter(Boolean),
         },
       });
       const totalWeight = data.items.reduce(

@@ -255,6 +255,19 @@ function computeDaysFromDates(dateFrom?: string, dateTo?: string): number | null
   return Math.max(1, Math.round((end.getTime() - start.getTime()) / 86400000) + 1);
 }
 
+/** Normaliza notas en lista (viñetas o líneas) a un bloque que la IA y extractExtras pueden usar. */
+function parseStructuredNotes(prompt: string): string {
+  const block = prompt.match(/notas?\s*:\s*([\s\S]+)$/i)?.[1]?.trim() ?? "";
+  if (!block) return "";
+
+  const lines = block
+    .split(/\n+/)
+    .map((line) => line.replace(/^[-•*]\s*/, "").trim())
+    .filter(Boolean);
+
+  return lines.length > 0 ? lines.join(". ") : block;
+}
+
 function extractTripContext(prompt: string, trip?: TripInput) {
   const normalized = normalizeText(prompt);
 
@@ -264,7 +277,7 @@ function extractTripContext(prompt: string, trip?: TripInput) {
   const structDateFrom = prompt.match(/desde\s*:\s*(\d{4}-\d{2}-\d{2})/i)?.[1];
   const structDateTo = prompt.match(/hasta\s*:\s*(\d{4}-\d{2}-\d{2})/i)?.[1];
   const structOccasion = prompt.match(/ocasi[oó]n\s*:\s*([^\n]+)/i)?.[1]?.trim();
-  const structNotes = prompt.match(/notas?\s*:\s*([\s\S]+)$/i)?.[1]?.trim() ?? "";
+  const structNotes = parseStructuredNotes(prompt);
 
   const daysFromDates = computeDaysFromDates(
     trip?.dateFrom ?? structDateFrom,
@@ -1163,7 +1176,7 @@ Formato exacto: {"destination":"Ciudad o país","days":3,"weather":"resumen brev
 Reglas críticas:
 - USÁ EXACTAMENTE los días, destino y ocasión que indica el usuario (no inventes ni cambies).
 - Cantidades de ropa según días y destino (no fijas): viajes cortos ≈ ceil(N/2) remeras; largos (>21 días) asumí lavandería y menos prendas por día (ej. 60 días ≈ 11 remeras, 5 pantalones; 8 días ≈ 4 remeras, 2 pantalones). Ajustá por clima (playa/calor → más shorts; frío → más abrigos) y ocasión.
-- Si el usuario puso notas (anteojos, mate, pijama, remera deportiva, etc.), incluilas como ítems aparte con quantity 1.
+- Si el usuario puso notas (anteojos, mate, pijama, remera deportiva, etc.), incluí TODAS como ítems aparte con quantity 1.
 - Si hay casamiento/boda incluí conjunto y zapatos formales; si es playa incluí traje de baño/protector; si no hay nieve no sugieras ropa de nieve.
 - Si el usuario indicó capacidad de valija en kg, mantené la lista compacta y priorizá lo esencial.
 - Para calcetines usá siempre "Medias" (nunca "Medios").`,

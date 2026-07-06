@@ -28,6 +28,7 @@ import { useChecklistsStore } from "@/lib/checklists-store";
 import { useChatStore, type ChatMessage, type ChatSuggestion } from "@/lib/chat-store";
 import { generatePackSuggestion } from "@/lib/pack-service";
 import { DestinationCombobox } from "@/components/assistant/DestinationCombobox";
+import { TripNotesField, formatTripNotesForPrompt } from "@/components/assistant/TripNotesField";
 
 export const Route = createFileRoute("/_layout/assistant")({
   component: AssistantPage,
@@ -58,7 +59,7 @@ function AssistantPage() {
     from: "",
     to: "",
     occasion: "",
-    notes: "",
+    notes: [""],
     suitcaseCapacityKg: 23,
   });
   const [loading, setLoading] = useState(false);
@@ -112,7 +113,7 @@ function AssistantPage() {
       return;
     }
     const occasion = form.occasion.trim();
-    const notes = form.notes.trim();
+    const notesBlock = formatTripNotesForPrompt(form.notes);
     const userText = [
       `Destino: ${destination}`,
       `Desde: ${form.from}`,
@@ -120,7 +121,7 @@ function AssistantPage() {
       `Días: ${days}`,
       `Capacidad de valija: ${Math.round(form.suitcaseCapacityKg)} kg`,
       occasion ? `Ocasión: ${occasion}` : null,
-      notes ? `Notas: ${notes}` : null,
+      notesBlock,
     ]
       .filter(Boolean)
       .join("\n");
@@ -309,8 +310,17 @@ function AssistantPage() {
               </div>
             </div>
             <div>
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Notas (opcional)</label>
-              <Input placeholder="Algo más a tener en cuenta" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} disabled={loading} className="mt-1" maxLength={300} />
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Notas (opcional)
+              </label>
+              <p className="text-[11px] text-muted-foreground mt-0.5 mb-1.5">
+                Agregá todo lo que quieras que la IA tenga en cuenta
+              </p>
+              <TripNotesField
+                notes={form.notes}
+                onChange={(notes) => setForm({ ...form, notes })}
+                disabled={loading}
+              />
             </div>
           </div>
 

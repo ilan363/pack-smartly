@@ -1,4 +1,6 @@
 import { create } from "zustand";
+import { createJSONStorage, persist } from "zustand/middleware";
+import { createSafeLocalStorage } from "@/lib/safe-storage";
 
 export type SuitcaseType = "cabina" | "bodega";
 
@@ -52,78 +54,88 @@ type Actions = {
   reset: () => void;
 };
 
-const defaultSuitcases: Suitcase[] = [];
+export const useSuitcasesStore = create<State & Actions>()(
+  persist(
+    (set, get) => ({
+      suitcases: [],
+      activeSuitcaseId: null,
 
-export const useSuitcasesStore = create<State & Actions>()((set, get) => ({
-  suitcases: defaultSuitcases,
-  activeSuitcaseId: null,
+      setActive: (id) => set({ activeSuitcaseId: id }),
 
-  setActive: (id) => set({ activeSuitcaseId: id }),
+      addSuitcase: (data) => {
+        const id = uid();
+        const newSuitcase: Suitcase = {
+          id,
+          name: data.name,
+          destination: data.destination,
+          type: data.type,
+          maxWeight: data.maxWeight,
+          originAirport: data.originAirport?.trim() || undefined,
+          departureDate: data.departureDate,
+          items: (data.items ?? []).map((i) => ({ ...i, id: uid() })),
+          createdAt: Date.now(),
+        };
+        set((s) => ({ suitcases: [...s.suitcases, newSuitcase], activeSuitcaseId: id }));
+        return id;
+      },
 
-  addSuitcase: (data) => {
-    const id = uid();
-    const newSuitcase: Suitcase = {
-      id,
-      name: data.name,
-      destination: data.destination,
-      type: data.type,
-      maxWeight: data.maxWeight,
-      originAirport: data.originAirport?.trim() || undefined,
-      departureDate: data.departureDate,
-      items: (data.items ?? []).map((i) => ({ ...i, id: uid() })),
-      createdAt: Date.now(),
-    };
-    set((s) => ({ suitcases: [...s.suitcases, newSuitcase], activeSuitcaseId: id }));
-    return id;
-  },
+      updateSuitcase: (id, patch) =>
+        set((s) => ({
+          suitcases: s.suitcases.map((sc) => (sc.id === id ? { ...sc, ...patch } : sc)),
+        })),
 
-  updateSuitcase: (id, patch) =>
-    set((s) => ({
-      suitcases: s.suitcases.map((sc) => (sc.id === id ? { ...sc, ...patch } : sc)),
-    })),
+      removeSuitcase: (id) =>
+        set((s) => {
+          const suitcases = s.suitcases.filter((sc) => sc.id !== id);
+          return {
+            suitcases,
+            activeSuitcaseId:
+              s.activeSuitcaseId === id ? suitcases[0]?.id ?? null : s.activeSuitcaseId,
+          };
+        }),
 
-  removeSuitcase: (id) =>
-    set((s) => {
-      const suitcases = s.suitcases.filter((sc) => sc.id !== id);
-      return {
-        suitcases,
-        activeSuitcaseId:
-          s.activeSuitcaseId === id ? suitcases[0]?.id ?? null : s.activeSuitcaseId,
-      };
+      addItem: (suitcaseId, item) =>
+        set((s) => ({
+          suitcases: s.suitcases.map((sc) =>
+            sc.id === suitcaseId ? { ...sc, items: [...sc.items, { ...item, id: uid() }] } : sc,
+          ),
+        })),
+
+      updateItem: (suitcaseId, itemId, patch) =>
+        set((s) => ({
+          suitcases: s.suitcases.map((sc) =>
+            sc.id === suitcaseId
+              ? {
+                  ...sc,
+                  items: sc.items.map((it) => (it.id === itemId ? { ...it, ...patch } : it)),
+                }
+              : sc,
+          ),
+        })),
+
+      removeItem: (suitcaseId, itemId) =>
+        set((s) => ({
+          suitcases: s.suitcases.map((sc) =>
+            sc.id === suitcaseId ? { ...sc, items: sc.items.filter((it) => it.id !== itemId) } : sc,
+          ),
+        })),
+
+      createFromSuggestion: (input) => {
+        return get().addSuitcase(input);
+      },
+
+      reset: () => set({ suitcases: [], activeSuitcaseId: null }),
     }),
-
-  addItem: (suitcaseId, item) =>
-    set((s) => ({
-      suitcases: s.suitcases.map((sc) =>
-        sc.id === suitcaseId ? { ...sc, items: [...sc.items, { ...item, id: uid() }] } : sc,
-      ),
-    })),
-
-  updateItem: (suitcaseId, itemId, patch) =>
-    set((s) => ({
-      suitcases: s.suitcases.map((sc) =>
-        sc.id === suitcaseId
-          ? {
-              ...sc,
-              items: sc.items.map((it) => (it.id === itemId ? { ...it, ...patch } : it)),
-            }
-          : sc,
-      ),
-    })),
-
-  removeItem: (suitcaseId, itemId) =>
-    set((s) => ({
-      suitcases: s.suitcases.map((sc) =>
-        sc.id === suitcaseId ? { ...sc, items: sc.items.filter((it) => it.id !== itemId) } : sc,
-      ),
-    })),
-
-  createFromSuggestion: (input) => {
-    return get().addSuitcase(input);
-  },
-
-  reset: () => set({ suitcases: [], activeSuitcaseId: null }),
-}));
+    {
+      name: "pack-smartly-suitcases",
+      storage: createJSONStorage(() => createSafeLocalStorage()),
+      partialize: (state) => ({
+        suitcases: state.suitcases,
+        activeSuitcaseId: state.activeSuitcaseId,
+      }),
+    },
+  ),
+);
 
 export const itemLineWeight = (item: Pick<Item, "weight" | "quantity">) =>
   item.weight * item.quantity;

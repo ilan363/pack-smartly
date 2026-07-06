@@ -1,3 +1,5 @@
+import { createSafeLocalStorage } from "@/lib/safe-storage";
+
 export type SavedListItem = {
   id: string;
   name: string;
@@ -21,14 +23,28 @@ export type SavedList = {
   lastReminderAt?: string;
 };
 
-let savedLists: SavedList[] = [];
+const STORAGE_KEY = "pack-smartly-saved-lists";
+const storage = createSafeLocalStorage();
 
 function readAll(): SavedList[] {
-  return savedLists;
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = storage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    return Array.isArray(parsed) ? (parsed as SavedList[]) : [];
+  } catch {
+    return [];
+  }
 }
 
 function writeAll(lists: SavedList[]) {
-  savedLists = lists;
+  if (typeof window === "undefined") return;
+  try {
+    storage.setItem(STORAGE_KEY, JSON.stringify(lists));
+  } catch {
+    // Quota exceeded or private browsing — ignore.
+  }
 }
 
 export function getSavedLists(): SavedList[] {

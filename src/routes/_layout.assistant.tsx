@@ -49,6 +49,31 @@ const CATEGORIES = [
   "Otros",
 ];
 
+function buildSuitcaseFromSuggestion(
+  suggestion: ChatSuggestion,
+  opts: {
+    name: string;
+    type?: SuitcaseType;
+    maxWeight?: number;
+    departureDate?: string;
+  },
+) {
+  const capacity = suggestion.suitcaseCapacityKg ?? 23;
+  return {
+    name: opts.name,
+    destination: suggestion.destination,
+    type: opts.type ?? (capacity <= 12 ? "cabina" : "bodega"),
+    maxWeight: opts.maxWeight ?? capacity,
+    departureDate: opts.departureDate,
+    items: suggestion.items.map((it) => ({
+      name: it.name,
+      category: it.category,
+      quantity: it.quantity ?? 1,
+      weight: it.weight,
+    })),
+  };
+}
+
 function AssistantPage() {
   const messages = useChatStore((s) => s.messages);
   const addMessage = useChatStore((s) => s.addMessage);
@@ -171,7 +196,8 @@ function AssistantPage() {
   const saveAsChecklist = (msg: Message) => {
     if (!msg.suggestion) return;
     const s = msg.suggestion;
-    const id = addChecklist({
+    const suitcaseName = `Valija ${s.destination.split(",")[0]}`;
+    addChecklist({
       title: `${s.destination}${s.days ? ` · ${s.days}d` : ""}${s.occasion ? ` · ${s.occasion}` : ""}`,
       destination: s.destination,
       days: s.days ?? 1,
@@ -184,11 +210,17 @@ function AssistantPage() {
         weight: it.weight,
       })),
     });
+    const suitcaseId = addSuitcase(
+      buildSuitcaseFromSuggestion(s, {
+        name: suitcaseName,
+        departureDate: form.from || undefined,
+      }),
+    );
+    setActive(suitcaseId);
     toast.success("Lista guardada", {
-      description: "La podés tachar a medida que la metes en la valija.",
-      action: { label: "Ver", onClick: () => navigate({ to: "/checklists" }) },
+      description: "Aparece en el Dashboard y en Mis Valijas. Podés tachar ítems en Listas guardadas.",
+      action: { label: "Ver dashboard", onClick: () => navigate({ to: "/dashboard" }) },
     });
-    return id;
   };
 
 
@@ -207,8 +239,8 @@ function AssistantPage() {
     if (!msg.suggestion) return;
     setCreateForm({
       name: `Valija ${msg.suggestion.destination.split(",")[0]}`,
-      type: "cabina",
-      maxWeight: 10,
+      type: (msg.suggestion.suitcaseCapacityKg ?? 23) <= 12 ? "cabina" : "bodega",
+      maxWeight: msg.suggestion.suitcaseCapacityKg ?? 23,
     });
     setCreateMsgId(msg.id);
   };
@@ -219,18 +251,14 @@ function AssistantPage() {
       toast.error("Completá nombre y peso máximo.");
       return;
     }
-    const id = addSuitcase({
-      name: createForm.name,
-      destination: createMsg.suggestion.destination,
-      type: createForm.type,
-      maxWeight: createForm.maxWeight,
-      items: createMsg.suggestion.items.map((it) => ({
-        name: it.name,
-        category: it.category,
-        quantity: it.quantity ?? 1,
-        weight: it.weight,
-      })),
-    });
+    const id = addSuitcase(
+      buildSuitcaseFromSuggestion(createMsg.suggestion, {
+        name: createForm.name,
+        type: createForm.type,
+        maxWeight: createForm.maxWeight,
+        departureDate: form.from || undefined,
+      }),
+    );
     setActive(id);
     setCreateMsgId(null);
     toast.success(`Valija "${createForm.name}" creada con ${createMsg.suggestion.items.length} items`);

@@ -1,7 +1,6 @@
 import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { BaggageClaim, Menu } from "lucide-react";
 import { useState } from "react";
-import { Toaster } from "@/components/ui/sonner";
 import { Button } from "@/components/ui/button";
 import { AppSidebar, MobileAppSidebar } from "@/components/AppSidebar";
 
@@ -38,8 +37,6 @@ function AppLayout() {
           <Outlet />
         </main>
       </div>
-
-      <Toaster richColors position="top-right" />
     </div>
   );
 }

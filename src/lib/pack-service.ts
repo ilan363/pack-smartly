@@ -199,6 +199,14 @@ const normalizeText = (value: string) =>
     .replace(/\s+/g, " ")
     .trim();
 
+/** Corrige errores frecuentes de la IA en español rioplatense (ej. "medios" → "Medias"). */
+function fixSpanishClothingName(name: string): string {
+  const normalized = normalizeText(name);
+  if (/^medios?$|^par de medios|^medios de/.test(normalized)) return "Medias";
+  if (/calcetin/.test(normalized)) return "Medias";
+  return name.replace(/\bmedios\b/gi, "Medias");
+}
+
 type ExtraSpec = { match: RegExp; item: PackItem };
 const NOTE_EXTRAS: ExtraSpec[] = [
   { match: /anteojos?\s*de\s*sol|gafas\s*de\s*sol|lentes\s*de\s*sol/, item: { category: "Accesorios", name: "Anteojos de sol", quantity: 1, weight: 0.08 } },
@@ -578,6 +586,7 @@ function normalizeCategory(category: string | undefined, name: string): Category
   if (/cargador|adaptador|celular|auricular|electron/.test(text)) return "Electrónica";
   if (/cepillo|shampoo|higiene|perfume|desodorante|protector/.test(text)) return "Higiene";
   if (/documento|pasaporte|anteojo|cinturon|reloj|accesorio/.test(text)) return "Accesorios";
+  if (/^medios?$|^media$|^medias$|calcetin/.test(text)) return "Otros";
   return "Otros";
 }
 
@@ -599,13 +608,14 @@ function normalizeWeight(category: Category, quantity: number, rawWeight: number
 }
 
 function normalizeItem(item: RawPackItem): PackItem | null {
-  const name = item.name?.trim();
-  if (!name) return null;
+  const rawName = item.name?.trim();
+  if (!rawName) return null;
+  const name = fixSpanishClothingName(rawName);
   const quantity = Math.max(1, Math.min(Number(item.quantity ?? 1), 10));
   const category = normalizeCategory(item.category, name);
   const weight = normalizeWeight(category, quantity, Number(item.weight ?? 0.2));
   return {
-    name,
+    name: normalizeText(name) === "medias" ? "Medias" : name,
     category,
     quantity,
     weight: Number(weight.toFixed(2)),
@@ -773,7 +783,7 @@ function clothingSlot(item: PackItem): ClothingSlot | null {
   if (/zapat|sandalia|ojota|bota/.test(t)) return "footwear";
   if (/short|bermuda/.test(t)) return "shorts";
   if (/ropa interior|calzon|bombacha|boxer|braga/.test(t)) return "underwear";
-  if (/^medias$|^media$|calcetin|calcetines/.test(t)) return "socks";
+  if (/^medios?$|^media$|^medias$|calcetin|calcetines|par de medios/.test(t)) return "socks";
   if (/remera deportiva|musculosa|remera running/.test(t)) return "other_clothing";
   if (/pijama/.test(t)) return "other_clothing";
   if (item.category === "Abrigos" || /campera|abrigo|tapado|piloto|impermeable|buzo|sweater|sueter|chaqueta/.test(t)) {
@@ -960,7 +970,7 @@ function perUnitVolumeLiters(item: Pick<PackItem, "category" | "name" | "weight"
   if (/cargador|adaptador|auricular/.test(t)) return 1.2;
   if (/remera|camisa|blusa|top|chomba/.test(t)) return 2.2;
   if (/ropa interior|calzon|bombacha|boxer|braga/.test(t)) return 0.5;
-  if (/media|medias|calcetin|calcetines/.test(t)) return 0.4;
+  if (/media|medias|medios|calcetin|calcetines/.test(t)) return 0.4;
   return Math.max(0.8, Math.min(9, item.weight * 5)); // fallback: correlate with weight
 }
 
@@ -977,9 +987,9 @@ function weightOf(items: PackItem[]) {
 
 function adjustRequiredToFitWeight(required: PackItem[], capacityKg: number) {
   const weightBudget = capacityKg * 0.95; // leave a bit of headroom
-  const fixed = required.filter((it) => !/remera|tops|pantalon|jean|jean versátil|ropa interior|medias/.test(normalizeText(`${it.category} ${it.name}`)));
+  const fixed = required.filter((it) => !/remera|tops|pantalon|jean|jean versátil|ropa interior|medias|medios/.test(normalizeText(`${it.category} ${it.name}`)));
   const adjustable = required.filter((it) =>
-    /remera|tops|pantalon|jean|ropa interior|medias/.test(normalizeText(`${it.category} ${it.name}`)),
+    /remera|tops|pantalon|jean|ropa interior|medias|medios/.test(normalizeText(`${it.category} ${it.name}`)),
   );
 
   const fixedWeight = weightOf(fixed);
@@ -1004,7 +1014,7 @@ function adjustRequiredToFitWeight(required: PackItem[], capacityKg: number) {
   if (current <= weightBudget) return adjusted;
 
   const decOrder = [...adjusted]
-    .filter((it) => /remera|tops|pantalon|jean|ropa interior|medias/.test(normalizeText(`${it.category} ${it.name}`)) && it.quantity > 1)
+    .filter((it) => /remera|tops|pantalon|jean|ropa interior|medias|medios/.test(normalizeText(`${it.category} ${it.name}`)) && it.quantity > 1)
     .sort((a, b) => b.weight - a.weight); // reduce heavier units first
 
   while (current > weightBudget) {
@@ -1155,7 +1165,8 @@ Reglas críticas:
 - Cantidades de ropa según días y destino (no fijas): viajes cortos ≈ ceil(N/2) remeras; largos (>21 días) asumí lavandería y menos prendas por día (ej. 60 días ≈ 11 remeras, 5 pantalones; 8 días ≈ 4 remeras, 2 pantalones). Ajustá por clima (playa/calor → más shorts; frío → más abrigos) y ocasión.
 - Si el usuario puso notas (anteojos, mate, pijama, remera deportiva, etc.), incluilas como ítems aparte con quantity 1.
 - Si hay casamiento/boda incluí conjunto y zapatos formales; si es playa incluí traje de baño/protector; si no hay nieve no sugieras ropa de nieve.
-- Si el usuario indicó capacidad de valija en kg, mantené la lista compacta y priorizá lo esencial.`,
+- Si el usuario indicó capacidad de valija en kg, mantené la lista compacta y priorizá lo esencial.
+- Para calcetines usá siempre "Medias" (nunca "Medios").`,
           prompt: `Solicitud del usuario: ${input.prompt}\nContexto detectado: destino=${context.destination}, días=${context.days}, ocasión=${context.occasion}${capacity ? `, capacidad=${capacity}kg` : ""}${context.notes ? `, notas="${context.notes}"` : ""}.`,
         });
         return {

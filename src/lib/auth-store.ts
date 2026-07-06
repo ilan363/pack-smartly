@@ -1,6 +1,7 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { createJSONStorage, persist } from "zustand/middleware";
 import type { OAuthProviderId } from "@/lib/oauth";
+import { createSafeLocalStorage } from "@/lib/safe-storage";
 
 export const ADMIN_EMAIL = "i.manbrut@wolfsohn.edu.ar";
 const ADMIN_PASSWORD = "ilan20enero";
@@ -141,6 +142,7 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: "pack-smartly-auth",
+      storage: createJSONStorage(() => createSafeLocalStorage()),
       partialize: (state) => ({
         email: state.email,
         isAdmin: state.isAdmin,

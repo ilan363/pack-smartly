@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useAuthStore } from "@/lib/auth-store";
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase/client";
 import { resolveOAuthProviderFromUser, signOutOAuth } from "@/lib/oauth";
@@ -10,7 +10,7 @@ import { resolveOAuthProviderFromUser, signOutOAuth } from "@/lib/oauth";
 export function useSupabaseAuthSync() {
   const setOAuthSession = useAuthStore((s) => s.setOAuthSession);
   const clearOAuthSession = useAuthStore((s) => s.clearOAuthSession);
-  const oauthProvider = useAuthStore((s) => s.oauthProvider);
+  const initialSyncDone = useRef(false);
 
   useEffect(() => {
     if (!isSupabaseConfigured()) return;
@@ -28,12 +28,15 @@ export function useSupabaseAuthSync() {
         return;
       }
 
-      if (oauthProvider) {
+      if (useAuthStore.getState().oauthProvider) {
         clearOAuthSession();
       }
     };
 
-    void syncSession();
+    if (!initialSyncDone.current) {
+      initialSyncDone.current = true;
+      void syncSession();
+    }
 
     const {
       data: { subscription },
@@ -52,7 +55,7 @@ export function useSupabaseAuthSync() {
     });
 
     return () => subscription.unsubscribe();
-  }, [clearOAuthSession, oauthProvider, setOAuthSession]);
+  }, [clearOAuthSession, setOAuthSession]);
 }
 
 export async function logoutWithOAuth(): Promise<void> {

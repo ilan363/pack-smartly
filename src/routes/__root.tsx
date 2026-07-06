@@ -12,6 +12,7 @@ import { useEffect } from "react";
 import { useSupabaseAuthSync } from "@/hooks/use-supabase-auth-sync";
 import { Toaster } from "@/components/ui/sonner";
 import { clearLegacyAppStorage } from "@/lib/clear-legacy-storage";
+import { registerChunkLoadRecovery, isRecoverableLoadError, tryRecoverFromStaleChunks } from "@/lib/recoverable-errors";
 import appCss from "../styles.css?url";
 
 function NotFoundComponent() {
@@ -40,30 +41,42 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
   const router = useRouter();
 
+  useEffect(() => {
+    tryRecoverFromStaleChunks(error);
+  }, [error]);
+
+  const isStaleBundle = isRecoverableLoadError(error);
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
         <h1 className="text-xl font-semibold tracking-tight text-foreground">
-          This page didn't load
+          {isStaleBundle ? "Hay una versión nueva disponible" : "No se pudo cargar la página"}
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Something went wrong on our end. You can try refreshing or head back home.
+          {isStaleBundle
+            ? "La app se actualizó recientemente. Recargá para continuar."
+            : "Algo salió mal. Podés intentar de nuevo o volver al inicio."}
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
             onClick={() => {
+              if (isStaleBundle) {
+                window.location.reload();
+                return;
+              }
               router.invalidate();
               reset();
             }}
             className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
-            Try again
+            {isStaleBundle ? "Recargar" : "Reintentar"}
           </button>
           <a
             href="/"
             className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
           >
-            Go home
+            Ir al inicio
           </a>
         </div>
       </div>
@@ -119,6 +132,7 @@ function RootComponent() {
 
   useEffect(() => {
     clearLegacyAppStorage();
+    return registerChunkLoadRecovery();
   }, []);
 
   return (

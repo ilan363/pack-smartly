@@ -25,6 +25,9 @@ export type ChatSuggestion = {
   days?: number;
   occasion?: string;
   suitcaseCapacityKg?: number;
+  capacityMode?: "fill" | "reserve";
+  shoppingReserveKg?: number;
+  packingLimitKg?: number;
   items: ChatSuggestionItem[];
   totalWeight: number;
   forecast?: ForecastDay[];

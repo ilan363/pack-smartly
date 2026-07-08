@@ -88,12 +88,24 @@ type PackItem = {
   weight: number;
 };
 
+export type CapacityMode = "fill" | "reserve";
+
+export type PackingCapacity = {
+  capacityKg: number;
+  packingLimitKg: number;
+  reserveKg: number;
+  capacityMode: CapacityMode;
+};
+
 export type PackSuggestion = {
   destination: string;
   days: number;
   weather: string;
   occasion: string;
   suitcaseCapacityKg?: number;
+  capacityMode?: CapacityMode;
+  shoppingReserveKg?: number;
+  packingLimitKg?: number;
   items: PackItem[];
   forecast: ForecastDay[];
 };
@@ -317,7 +329,49 @@ export type TripInput = {
   occasion?: string;
   /** Notas individuales del formulario del asistente */
   notes?: string[];
+  /** Llenar toda la valija o dejar espacio para compras en destino */
+  capacityMode?: CapacityMode;
+  /** Kg reservados para compras (solo si capacityMode === "reserve") */
+  shoppingReserveKg?: number;
 };
+
+export function defaultShoppingReserveKg(capacityKg: number): number {
+  const cap = clampCapacityKg(capacityKg) ?? 23;
+  const raw = cap * 0.2;
+  const rounded = Math.round(raw * 2) / 2;
+  return Math.min(cap - 3, Math.max(2, rounded));
+}
+
+export function resolvePackingCapacity(input: {
+  suitcaseCapacityKg: number;
+  capacityMode?: CapacityMode;
+  shoppingReserveKg?: number;
+}): PackingCapacity | undefined {
+  const cap = clampCapacityKg(input.suitcaseCapacityKg);
+  if (!cap) return undefined;
+
+  const mode = input.capacityMode ?? "fill";
+  if (mode === "fill") {
+    return {
+      capacityKg: cap,
+      packingLimitKg: Number((cap * 0.98).toFixed(2)),
+      reserveKg: 0,
+      capacityMode: "fill",
+    };
+  }
+
+  const reserve = Math.min(
+    cap - 3,
+    Math.max(2, input.shoppingReserveKg ?? defaultShoppingReserveKg(cap)),
+  );
+  const available = cap - reserve;
+  return {
+    capacityKg: cap,
+    packingLimitKg: Number((available * 0.92).toFixed(2)),
+    reserveKg: reserve,
+    capacityMode: "reserve",
+  };
+}
 
 function computeDaysFromDates(dateFrom?: string, dateTo?: string): number | null {
   if (!dateFrom || !dateTo) return null;
@@ -1071,8 +1125,8 @@ function weightOf(items: PackItem[]) {
   return items.reduce((acc, it) => acc + it.weight * it.quantity, 0);
 }
 
-function adjustRequiredToFitWeight(required: PackItem[], capacityKg: number) {
-  const weightBudget = capacityKg * 0.95; // leave a bit of headroom
+function adjustRequiredToFitWeight(required: PackItem[], packingLimitKg: number) {
+  const weightBudget = packingLimitKg;
   const fixed = required.filter((it) => !/remera|tops|pantalon|jean|jean versátil|ropa interior|medias|medios/.test(normalizeText(`${it.category} ${it.name}`)));
   const adjustable = required.filter((it) =>
     /remera|tops|pantalon|jean|ropa interior|medias|medios/.test(normalizeText(`${it.category} ${it.name}`)),
@@ -1117,6 +1171,8 @@ function applyCapacityBudget(input: {
   items: PackItem[];
   required: PackItem[];
   capacityKg: number;
+  packingLimitKg: number;
+  capacityMode?: CapacityMode;
   days: number;
   prompt: string;
 }) {
@@ -1124,10 +1180,11 @@ function applyCapacityBudget(input: {
   const isRequired = (it: PackItem) => requiredKeys.has(normalizeText(`${it.category}|${it.name}`));
 
   const capKg = input.capacityKg;
-  const maxItems = budgetItemLimit(capKg, input.days);
-  const weightBudget = capKg * 0.95; // headroom
+  const reserveFactor = input.capacityMode === "reserve" ? 0.85 : 1;
+  const maxItems = Math.max(8, Math.floor(budgetItemLimit(capKg, input.days) * reserveFactor));
+  const weightBudget = input.packingLimitKg;
 
-  const requiredAdjusted = adjustRequiredToFitWeight(input.required, capKg);
+  const requiredAdjusted = adjustRequiredToFitWeight(input.required, weightBudget);
   const requiredWeight = weightOf(requiredAdjusted);
 
   const score = (it: PackItem) => {
@@ -1172,6 +1229,7 @@ function normalizeSuggestion(
   prompt: string,
   suitcaseCapacityKg?: number,
   trip?: TripInput,
+  packing?: PackingCapacity,
 ): PackSuggestion {
   const context = extractTripContext(prompt, trip);
   const parsed = RawSuggestionSchema.safeParse(raw);
@@ -1196,12 +1254,24 @@ function normalizeSuggestion(
     clampCapacityKg(suitcaseCapacityKg) ??
     clampCapacityKg((data as { suitcaseCapacityKg?: unknown }).suitcaseCapacityKg);
 
+  const resolvedPacking =
+    packing ??
+    (capacity
+      ? resolvePackingCapacity({
+          suitcaseCapacityKg: capacity,
+          capacityMode: trip?.capacityMode,
+          shoppingReserveKg: trip?.shoppingReserveKg,
+        })
+      : undefined);
+
   const itemsWithNotes = ensureUserNotesInItems(
-    capacity
+    resolvedPacking
       ? applyCapacityBudget({
           items: merged,
           required,
-          capacityKg: capacity,
+          capacityKg: resolvedPacking.capacityKg,
+          packingLimitKg: resolvedPacking.packingLimitKg,
+          capacityMode: resolvedPacking.capacityMode,
           days,
           prompt,
         })
@@ -1215,9 +1285,20 @@ function normalizeSuggestion(
     weather,
     occasion,
     suitcaseCapacityKg: capacity,
+    capacityMode: resolvedPacking?.capacityMode,
+    shoppingReserveKg: resolvedPacking?.reserveKg,
+    packingLimitKg: resolvedPacking?.packingLimitKg,
     items: itemsWithNotes,
     forecast: [],
   };
+}
+
+function buildCapacityPromptContext(packing?: PackingCapacity): string {
+  if (!packing) return "";
+  if (packing.capacityMode === "fill") {
+    return `, modo=llenar valija (usá hasta ~${packing.packingLimitKg} kg de ${packing.capacityKg} kg, priorizá aprovechar el espacio)`;
+  }
+  return `, modo=dejar espacio para compras (reservá ${packing.reserveKg} kg libres; armá la lista hasta ~${packing.packingLimitKg} kg, no llenes toda la valija)`;
 }
 
 export async function generatePackSuggestion(input: {
@@ -1227,6 +1308,13 @@ export async function generatePackSuggestion(input: {
 }): Promise<{ suggestion: PackSuggestion; providerUsed: string }> {
   const context = extractTripContext(input.prompt, input.trip);
   const capacity = clampCapacityKg(input.suitcaseCapacityKg);
+  const packing = capacity
+    ? resolvePackingCapacity({
+        suitcaseCapacityKg: capacity,
+        capacityMode: input.trip?.capacityMode,
+        shoppingReserveKg: input.trip?.shoppingReserveKg,
+      })
+    : undefined;
   const chain = await buildProviderChain();
   let lastError: unknown;
 
@@ -1254,9 +1342,9 @@ Reglas críticas:
 - Cantidades de ropa según días y destino (no fijas): viajes cortos ≈ ceil(N/2) remeras; largos (>21 días) asumí lavandería y menos prendas por día (ej. 60 días ≈ 11 remeras, 5 pantalones; 8 días ≈ 4 remeras, 2 pantalones). Ajustá por clima (playa/calor → más shorts; frío → más abrigos) y ocasión.
 - Si el usuario puso notas, incluí TODAS como ítems aparte (quantity 1). No omitas ninguna nota de la lista.
 - Si hay casamiento/boda incluí conjunto y zapatos formales; si es playa incluí traje de baño/protector; si no hay nieve no sugieras ropa de nieve.
-- Si el usuario indicó capacidad de valija en kg, mantené la lista compacta y priorizá lo esencial.
+- Si el usuario indicó capacidad de valija en kg, respetá el modo: "llenar" → aprovechá casi todo el peso disponible; "remanente/compras" → dejá espacio libre y no completes el peso máximo.
 - Para calcetines usá siempre "Medias" (nunca "Medios").`,
-          prompt: `Solicitud del usuario: ${input.prompt}\nContexto detectado: destino=${context.destination}, días=${context.days}, ocasión=${context.occasion}${capacity ? `, capacidad=${capacity}kg` : ""}${
+          prompt: `Solicitud del usuario: ${input.prompt}\nContexto detectado: destino=${context.destination}, días=${context.days}, ocasión=${context.occasion}${capacity ? `, capacidad=${capacity}kg${buildCapacityPromptContext(packing)}` : ""}${
             context.noteLines.length
               ? `\nNotas del usuario (incluir TODAS en items, una por nota):\n${context.noteLines.map((n, i) => `${i + 1}. ${n}`).join("\n")}`
               : ""
@@ -1269,6 +1357,7 @@ Reglas críticas:
               input.prompt,
               capacity,
               input.trip,
+              packing,
             ),
             context,
           ),
@@ -1286,7 +1375,7 @@ Reglas críticas:
   console.warn("[pack] Sin proveedores IA disponibles, usando fallback determinista", lastError);
   return {
     suggestion: await enrichWithForecast(
-      normalizeSuggestion({}, input.prompt, capacity, input.trip),
+      normalizeSuggestion({}, input.prompt, capacity, input.trip, packing),
       context,
     ),
     providerUsed: "fallback-local",

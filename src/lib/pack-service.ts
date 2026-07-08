@@ -88,12 +88,24 @@ type PackItem = {
   weight: number;
 };
 
+export type CapacityMode = "fill" | "reserve";
+
+export type PackingCapacity = {
+  capacityKg: number;
+  packingLimitKg: number;
+  reserveKg: number;
+  capacityMode: CapacityMode;
+};
+
 export type PackSuggestion = {
   destination: string;
   days: number;
   weather: string;
   occasion: string;
   suitcaseCapacityKg?: number;
+  capacityMode?: CapacityMode;
+  shoppingReserveKg?: number;
+  packingLimitKg?: number;
   items: PackItem[];
   forecast: ForecastDay[];
 };
@@ -321,9 +333,49 @@ export type TripInput = {
   sharedSuitcase?: boolean;
   /** Cantidad de personas que comparten la valija (mín. 2 si sharedSuitcase) */
   sharedPeople?: number;
-  /** true = usar ~95% del peso; false = usar ~80% (dejar 20% libre) */
-  fillSuitcase?: boolean;
+  /** Llenar toda la valija o dejar espacio para compras en destino */
+  capacityMode?: CapacityMode;
+  /** Kg reservados para compras (solo si capacityMode === "reserve") */
+  shoppingReserveKg?: number;
 };
+
+export function defaultShoppingReserveKg(capacityKg: number): number {
+  const cap = clampCapacityKg(capacityKg) ?? 23;
+  const raw = cap * 0.2;
+  const rounded = Math.round(raw * 2) / 2;
+  return Math.min(cap - 3, Math.max(2, rounded));
+}
+
+export function resolvePackingCapacity(input: {
+  suitcaseCapacityKg: number;
+  capacityMode?: CapacityMode;
+  shoppingReserveKg?: number;
+}): PackingCapacity | undefined {
+  const cap = clampCapacityKg(input.suitcaseCapacityKg);
+  if (!cap) return undefined;
+
+  const mode = input.capacityMode ?? "fill";
+  if (mode === "fill") {
+    return {
+      capacityKg: cap,
+      packingLimitKg: Number((cap * 0.98).toFixed(2)),
+      reserveKg: 0,
+      capacityMode: "fill",
+    };
+  }
+
+  const reserve = Math.min(
+    cap - 3,
+    Math.max(2, input.shoppingReserveKg ?? defaultShoppingReserveKg(cap)),
+  );
+  const available = cap - reserve;
+  return {
+    capacityKg: cap,
+    packingLimitKg: Number((available * 0.92).toFixed(2)),
+    reserveKg: reserve,
+    capacityMode: "reserve",
+  };
+}
 
 function computeDaysFromDates(dateFrom?: string, dateTo?: string): number | null {
   if (!dateFrom || !dateTo) return null;
@@ -446,6 +498,7 @@ function extractTripContext(prompt: string, trip?: TripInput) {
   const structShared = prompt.match(/valija compartida\s*:\s*(si|s[ií]|no)/i)?.[1];
   const structPeople = prompt.match(/personas en la valija\s*:\s*(\d+)/i)?.[1];
   const structFill = prompt.match(/llenar valija\s*:\s*(si|s[ií]|no)/i)?.[1];
+  const structReserveKg = prompt.match(/dejar\s+([\d.]+)\s*kg\s+libres/i)?.[1];
 
   const sharedSuitcase =
     trip?.sharedSuitcase ??
@@ -459,9 +512,20 @@ function extractTripContext(prompt: string, trip?: TripInput) {
       )
     : 1;
 
-  const fillSuitcase =
-    trip?.fillSuitcase ??
-    (structFill ? /^(si|s[ií])$/i.test(structFill) : true);
+  let capacityMode: CapacityMode = trip?.capacityMode ?? "fill";
+  if (!trip?.capacityMode) {
+    if (/dejar\s+[\d.]+\s*kg\s+libres|dejar espacio|remanente|compras/i.test(prompt)) {
+      capacityMode = "reserve";
+    } else if (structFill && /^no$/i.test(structFill)) {
+      capacityMode = "reserve";
+    }
+  }
+
+  const shoppingReserveKg =
+    trip?.shoppingReserveKg ??
+    (structReserveKg && Number.isFinite(Number(structReserveKg))
+      ? Number(structReserveKg)
+      : undefined);
 
   return {
     destination,
@@ -471,7 +535,8 @@ function extractTripContext(prompt: string, trip?: TripInput) {
     occasion,
     sharedSuitcase,
     sharedPeople,
-    fillSuitcase,
+    capacityMode,
+    shoppingReserveKg,
     warm:
       /brasil|rio|salvador|playa|caribe|cancun|punta cana|cartagena|costa|miami|hawaii|florida|tailandia|bali/.test(
         destBlob,
@@ -765,6 +830,7 @@ type ClothingSlot =
   | "swimwear"
   | "formal"
   | "footwear"
+  | "towels"
   | "other_clothing";
 
 /** Prendas de rotación (remeras, pantalones): se reusan entre lavados. */
@@ -923,6 +989,7 @@ function clothingSlot(item: PackItem): ClothingSlot | null {
   }
 
   if (/traje de bano|traje de baño|malla|bikini/.test(t)) return "swimwear";
+  if (/toalla/.test(t)) return "towels";
   if (/conjunto formal|smoking|corbata|moño|traje sastre/.test(t)) return "formal";
   if (/vestido|falda larga/.test(t)) return "formal";
   if (/zapat|sandalia|ojota|bota/.test(t)) return "footwear";
@@ -988,11 +1055,12 @@ function enforceClothingBudget(
     shorts: budget.shorts,
     underwear: budget.underwear,
     socks: budget.socks,
-    outerwear: budget.outerwear,
+    outerwear: Math.min(budget.outerwear, 2 * people),
     swimwear: 2 * people,
     formal: (context.formal ? 3 : 2) * people,
     footwear: 3 * people,
     other_clothing: 4 * people,
+    towels: 2 * people,
   };
 
   const nonClothing: PackItem[] = [];
@@ -1132,16 +1200,176 @@ function weightOf(items: PackItem[]) {
   return items.reduce((acc, it) => acc + it.weight * it.quantity, 0);
 }
 
-function resolveWeightBudgetRatio(fillSuitcase: boolean): number {
-  return fillSuitcase ? 0.95 : 0.8;
+type ItemCapKind = "shirts" | "pants" | "jackets" | "sweatshirts" | "shoes" | "towels" | "underwear";
+
+function computeAbsoluteCaps(days: number, people = 1) {
+  const p = Math.max(1, people);
+  return {
+    shirts: Math.min(14 * p, Math.max(4 * p, Math.ceil(days * 0.8) * p)),
+    pants: 4 * p,
+    jackets: 2 * p,
+    sweatshirts: 2 * p,
+    shoes: 3 * p,
+    towels: 2 * p,
+    underwear: Math.min(12 * p, Math.max(4 * p, Math.ceil(days * 0.85) * p)),
+  };
 }
 
-function adjustRequiredToFitWeight(
-  required: PackItem[],
-  capacityKg: number,
-  fillSuitcase = true,
-) {
-  const weightBudget = capacityKg * resolveWeightBudgetRatio(fillSuitcase);
+function itemCapKind(item: PackItem): ItemCapKind | null {
+  const t = normalizeText(`${item.category} ${item.name}`);
+  if (/toalla/.test(t)) return "towels";
+  if (/zapat|sandalia|ojota|bota/.test(t)) return "shoes";
+  if (/campera|abrigo|tapado|piloto|impermeable/.test(t)) return "jackets";
+  if (/buzo|sweater|sueter|hoodie/.test(t)) return "sweatshirts";
+  if (/ropa interior|calzon|bombacha|boxer|braga/.test(t)) return "underwear";
+  if (item.category === "Remeras" || /remera|camisa|blusa|top|chomba|polo/.test(t)) return "shirts";
+  if (/short|bermuda/.test(t)) return null;
+  if (item.category === "Pantalones" || /pantalon|jean|jogger|legging|falda|pollera/.test(t)) {
+    return "pants";
+  }
+  return null;
+}
+
+function countItemsByCapKind(items: PackItem[], kind: ItemCapKind): number {
+  return items.reduce((sum, it) => sum + (itemCapKind(it) === kind ? it.quantity : 0), 0);
+}
+
+function shouldAddSweatshirtForFill(
+  context: ReturnType<typeof extractTripContext>,
+  destination: string,
+): boolean {
+  if (context.cold) return false;
+  const { zone } = detectClimate(destination);
+  if (zone === "temperate" || zone === "mediterranean" || zone === "unknown") return true;
+  if (context.warm && context.days > 7) return true;
+  return false;
+}
+
+function shouldAddExtraShoes(
+  context: ReturnType<typeof extractTripContext>,
+  items: PackItem[],
+): boolean {
+  const shoeCount = countItemsByCapKind(items, "shoes");
+  if (shoeCount >= 2) return false;
+  const occasion = normalizeText(context.occasion);
+  if (/trekking|senderismo|montana|montaña|hiking|acampar/.test(occasion)) return true;
+  if (context.formal && shoeCount === 1) return true;
+  if (context.days > 10 && shoeCount <= 1) return true;
+  return false;
+}
+
+function addOrMergeItem(items: PackItem[], toAdd: PackItem): PackItem[] {
+  const kind = itemCapKind(toAdd);
+  if (kind) {
+    const idx = items.findIndex((it) => itemCapKind(it) === kind);
+    if (idx >= 0) {
+      const copy = [...items];
+      copy[idx] = { ...copy[idx], quantity: copy[idx].quantity + toAdd.quantity };
+      return copy;
+    }
+  }
+  return [...items, toAdd];
+}
+
+function enforceAbsoluteCaps(items: PackItem[], days: number, people = 1): PackItem[] {
+  const caps = computeAbsoluteCaps(days, people);
+  const used: Record<ItemCapKind, number> = {
+    shirts: 0,
+    pants: 0,
+    jackets: 0,
+    sweatshirts: 0,
+    shoes: 0,
+    towels: 0,
+    underwear: 0,
+  };
+  const result: PackItem[] = [];
+
+  for (const item of items) {
+    const kind = itemCapKind(item);
+    if (!kind) {
+      result.push(item);
+      continue;
+    }
+    const max = caps[kind];
+    const remaining = Math.max(0, max - used[kind]);
+    if (remaining <= 0) continue;
+    const qty = Math.min(item.quantity, remaining);
+    if (qty <= 0) continue;
+    result.push({ ...item, quantity: qty });
+    used[kind] += qty;
+  }
+
+  return result;
+}
+
+function fillLeftoverSpace(
+  items: PackItem[],
+  opts: {
+    packingLimitKg: number;
+    capacityMode?: CapacityMode;
+    days: number;
+    people?: number;
+    context: ReturnType<typeof extractTripContext>;
+    destination: string;
+  },
+): PackItem[] {
+  if (opts.capacityMode !== "fill") return items;
+
+  const leftoverMinKg = 0.25;
+  let result = [...items];
+  let currentWeight = weightOf(result);
+  if (currentWeight >= opts.packingLimitKg - leftoverMinKg) return result;
+
+  const caps = computeAbsoluteCaps(opts.days, opts.people ?? 1);
+  const fillSteps: Array<{
+    kind: ItemCapKind;
+    item: PackItem;
+    allowed: () => boolean;
+  }> = [
+    {
+      kind: "shirts",
+      item: { category: "Remeras", name: "Remeras o tops cómodos", quantity: 1, weight: 0.18 },
+      allowed: () => countItemsByCapKind(result, "shirts") < caps.shirts,
+    },
+    {
+      kind: "underwear",
+      item: { category: "Otros", name: "Ropa interior", quantity: 1, weight: 0.05 },
+      allowed: () => countItemsByCapKind(result, "underwear") < caps.underwear,
+    },
+    {
+      kind: "pants",
+      item: { category: "Pantalones", name: "Pantalón o jean versátil", quantity: 1, weight: 0.55 },
+      allowed: () => countItemsByCapKind(result, "pants") < caps.pants,
+    },
+    {
+      kind: "sweatshirts",
+      item: { category: "Abrigos", name: "Buzo o sweater térmico", quantity: 1, weight: 0.55 },
+      allowed: () =>
+        shouldAddSweatshirtForFill(opts.context, opts.destination) &&
+        countItemsByCapKind(result, "sweatshirts") < caps.sweatshirts,
+    },
+    {
+      kind: "shoes",
+      item: { category: "Zapatillas", name: "Zapatillas extra", quantity: 1, weight: 0.75 },
+      allowed: () =>
+        shouldAddExtraShoes(opts.context, result) && countItemsByCapKind(result, "shoes") < caps.shoes,
+    },
+  ];
+
+  for (const step of fillSteps) {
+    if (currentWeight >= opts.packingLimitKg - leftoverMinKg) break;
+    if (!step.allowed()) continue;
+    const addWeight = step.item.weight * step.item.quantity;
+    if (currentWeight + addWeight > opts.packingLimitKg) continue;
+    result = addOrMergeItem(result, step.item);
+    currentWeight += addWeight;
+  }
+
+  return result;
+}
+
+function adjustRequiredToFitWeight(required: PackItem[], packingLimitKg: number) {
+  const weightBudget = packingLimitKg;
   const fixed = required.filter((it) => !/remera|tops|pantalon|jean|jean versátil|ropa interior|medias|medios/.test(normalizeText(`${it.category} ${it.name}`)));
   const adjustable = required.filter((it) =>
     /remera|tops|pantalon|jean|ropa interior|medias|medios/.test(normalizeText(`${it.category} ${it.name}`)),
@@ -1182,52 +1410,27 @@ function adjustRequiredToFitWeight(
   return adjusted;
 }
 
-function tryFillToBudget(items: PackItem[], targetKg: number): PackItem[] {
-  const result = items.map((it) => ({ ...it }));
-  const bumpable = /remera|tops|ropa interior|medias|short|bermuda|pantalon|jean/;
-  let current = weightOf(result);
-  const target = targetKg * 0.92;
-
-  if (current >= target) return result;
-
-  let guard = 0;
-  while (current < target && guard < 300) {
-    guard += 1;
-    const candidates = result.filter((it) =>
-      bumpable.test(normalizeText(`${it.category} ${it.name}`)),
-    );
-    if (!candidates.length) break;
-
-    const pick = candidates.sort((a, b) => b.weight - a.weight)[0];
-    pick.quantity += 1;
-    current += pick.weight;
-    if (current > targetKg) {
-      pick.quantity -= 1;
-      current -= pick.weight;
-      break;
-    }
-  }
-
-  return result;
-}
-
 function applyCapacityBudget(input: {
   items: PackItem[];
   required: PackItem[];
   capacityKg: number;
+  packingLimitKg: number;
+  capacityMode?: CapacityMode;
   days: number;
   prompt: string;
-  fillSuitcase?: boolean;
+  context: ReturnType<typeof extractTripContext>;
+  destination: string;
 }) {
   const requiredKeys = new Set(input.required.map((it) => normalizeText(`${it.category}|${it.name}`)));
   const isRequired = (it: PackItem) => requiredKeys.has(normalizeText(`${it.category}|${it.name}`));
 
   const capKg = input.capacityKg;
-  const fillSuitcase = input.fillSuitcase ?? true;
-  const maxItems = budgetItemLimit(capKg, input.days);
-  const weightBudget = capKg * resolveWeightBudgetRatio(fillSuitcase);
+  const people = input.context.sharedSuitcase ? input.context.sharedPeople : 1;
+  const reserveFactor = input.capacityMode === "reserve" ? 0.85 : 1;
+  const maxItems = Math.max(8, Math.floor(budgetItemLimit(capKg, input.days) * reserveFactor));
+  const weightBudget = input.packingLimitKg;
 
-  const requiredAdjusted = adjustRequiredToFitWeight(input.required, capKg, fillSuitcase);
+  const requiredAdjusted = adjustRequiredToFitWeight(input.required, weightBudget);
   const requiredWeight = weightOf(requiredAdjusted);
 
   const score = (it: PackItem) => {
@@ -1263,11 +1466,19 @@ function applyCapacityBudget(input: {
     currentWeight += addWeight;
   }
 
-  // If required items are already overweight, we still return them (can't satisfy capacity perfectly).
-  let finalItems = picked.slice(0, Math.max(maxItems, requiredAdjusted.length));
-  finalItems = tryFillToBudget(finalItems, weightBudget);
-
-  return finalItems;
+  const capped = enforceAbsoluteCaps(
+    fillLeftoverSpace(picked, {
+      packingLimitKg: weightBudget,
+      capacityMode: input.capacityMode,
+      days: input.days,
+      people,
+      context: input.context,
+      destination: input.destination,
+    }),
+    input.days,
+    people,
+  );
+  return capped.slice(0, Math.max(maxItems, requiredAdjusted.length));
 }
 
 function normalizeSuggestion(
@@ -1275,6 +1486,7 @@ function normalizeSuggestion(
   prompt: string,
   suitcaseCapacityKg?: number,
   trip?: TripInput,
+  packing?: PackingCapacity,
 ): PackSuggestion {
   const context = extractTripContext(prompt, trip);
   const parsed = RawSuggestionSchema.safeParse(raw);
@@ -1299,17 +1511,31 @@ function normalizeSuggestion(
     clampCapacityKg(suitcaseCapacityKg) ??
     clampCapacityKg((data as { suitcaseCapacityKg?: unknown }).suitcaseCapacityKg);
 
+  const resolvedPacking =
+    packing ??
+    (capacity
+      ? resolvePackingCapacity({
+          suitcaseCapacityKg: capacity,
+          capacityMode: trip?.capacityMode ?? context.capacityMode,
+          shoppingReserveKg: trip?.shoppingReserveKg ?? context.shoppingReserveKg,
+        })
+      : undefined);
+
+  const people = context.sharedSuitcase ? context.sharedPeople : 1;
   const itemsWithNotes = ensureUserNotesInItems(
-    capacity
+    resolvedPacking
       ? applyCapacityBudget({
           items: merged,
           required,
-          capacityKg: capacity,
+          capacityKg: resolvedPacking.capacityKg,
+          packingLimitKg: resolvedPacking.packingLimitKg,
+          capacityMode: resolvedPacking.capacityMode,
           days,
           prompt,
-          fillSuitcase: context.fillSuitcase,
+          context,
+          destination,
         })
-      : merged.slice(0, 22),
+      : enforceAbsoluteCaps(merged.slice(0, 22), days, people),
     context.noteLines,
   );
 
@@ -1319,9 +1545,20 @@ function normalizeSuggestion(
     weather,
     occasion,
     suitcaseCapacityKg: capacity,
+    capacityMode: resolvedPacking?.capacityMode,
+    shoppingReserveKg: resolvedPacking?.reserveKg,
+    packingLimitKg: resolvedPacking?.packingLimitKg,
     items: itemsWithNotes,
     forecast: [],
   };
+}
+
+function buildCapacityPromptContext(packing?: PackingCapacity): string {
+  if (!packing) return "";
+  if (packing.capacityMode === "fill") {
+    return `, modo=llenar valija (usá hasta ~${packing.packingLimitKg} kg de ${packing.capacityKg} kg, priorizá aprovechar el espacio)`;
+  }
+  return `, modo=dejar espacio para compras (reservá ${packing.reserveKg} kg libres; armá la lista hasta ~${packing.packingLimitKg} kg, no llenes toda la valija)`;
 }
 
 export async function generatePackSuggestion(input: {
@@ -1331,6 +1568,13 @@ export async function generatePackSuggestion(input: {
 }): Promise<{ suggestion: PackSuggestion; providerUsed: string }> {
   const context = extractTripContext(input.prompt, input.trip);
   const capacity = clampCapacityKg(input.suitcaseCapacityKg);
+  const packing = capacity
+    ? resolvePackingCapacity({
+        suitcaseCapacityKg: capacity,
+        capacityMode: input.trip?.capacityMode ?? context.capacityMode,
+        shoppingReserveKg: input.trip?.shoppingReserveKg ?? context.shoppingReserveKg,
+      })
+    : undefined;
   const chain = await buildProviderChain();
   let lastError: unknown;
 
@@ -1364,11 +1608,11 @@ Reglas críticas:
   · Viajes largos (>21 días) o con lavandería: escalar lento (60 días ≈ 9 remeras, 4 pantalones, 7–8 ropa interior).
 - Si el usuario puso notas, incluí TODAS como ítems aparte (quantity 1). No omitas ninguna nota de la lista.
 - Si hay casamiento/boda incluí conjunto y zapatos formales; si es playa incluí traje de baño/protector; si no hay nieve no sugieras ropa de nieve.
-- Si el usuario indicó capacidad de valija en kg, mantené la lista compacta y priorizá lo esencial.
+- Si el usuario indicó capacidad de valija en kg, respetá el modo: "llenar" → aprovechá casi todo el peso disponible; "remanente/compras" → dejá espacio libre y no completes el peso máximo.
 - Si la valija es compartida, multiplicá las prendas personales por la cantidad de personas indicada.
-- Si el usuario quiere llenar la valija, apuntá a usar ~95% del peso máximo. Si prefiere dejar espacio, usá ~80% del peso (20% libre para compras o extras).
+- Límites máximos de cantidad (nunca superar): remeras ≈ ceil(días×0.8) (ej. 8 en 10 días), pantalones 4, camperas 2, zapatos 3 pares, toallas 2. No repitas la misma prenda en exceso.
 - Para calcetines usá siempre "Medias" (nunca "Medios").`,
-          prompt: `Solicitud del usuario: ${input.prompt}\nContexto detectado: destino=${context.destination}, días=${context.days}, ocasión=${context.occasion}${capacity ? `, capacidad=${capacity}kg` : ""}, valija compartida=${context.sharedSuitcase ? `sí (${context.sharedPeople} personas)` : "no"}, llenar valija=${context.fillSuitcase ? "sí" : "no (80% completo, 20% libre)"}${
+          prompt: `Solicitud del usuario: ${input.prompt}\nContexto detectado: destino=${context.destination}, días=${context.days}, ocasión=${context.occasion}${capacity ? `, capacidad=${capacity}kg${buildCapacityPromptContext(packing)}` : ""}, valija compartida=${context.sharedSuitcase ? `sí (${context.sharedPeople} personas)` : "no"}${
             context.noteLines.length
               ? `\nNotas del usuario (incluir TODAS en items, una por nota):\n${context.noteLines.map((n, i) => `${i + 1}. ${n}`).join("\n")}`
               : ""
@@ -1381,6 +1625,7 @@ Reglas críticas:
               input.prompt,
               capacity,
               input.trip,
+              packing,
             ),
             context,
           ),
@@ -1398,7 +1643,7 @@ Reglas críticas:
   console.warn("[pack] Sin proveedores IA disponibles, usando fallback determinista", lastError);
   return {
     suggestion: await enrichWithForecast(
-      normalizeSuggestion({}, input.prompt, capacity, input.trip),
+      normalizeSuggestion({}, input.prompt, capacity, input.trip, packing),
       context,
     ),
     providerUsed: "fallback-local",

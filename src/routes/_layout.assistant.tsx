@@ -26,10 +26,12 @@ import { toast } from "sonner";
 import { useSuitcasesStore, type SuitcaseType } from "@/lib/suitcases-store";
 import { useChecklistsStore } from "@/lib/checklists-store";
 import { useChatStore, type ChatMessage, type ChatSuggestion } from "@/lib/chat-store";
-import { generatePackSuggestion } from "@/lib/pack-service";
+import { generatePackSuggestion, defaultShoppingReserveKg, resolvePackingCapacity } from "@/lib/pack-service";
 import { DestinationCombobox } from "@/components/assistant/DestinationCombobox";
 import { TripNotesField, formatTripNotesForPrompt } from "@/components/assistant/TripNotesField";
 import { WeightExplainButton } from "@/components/WeightExplainButton";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 
 export const Route = createFileRoute("/_layout/assistant")({
   component: AssistantPage,
@@ -89,7 +91,8 @@ function AssistantPage() {
     suitcaseCapacityKg: 23,
     sharedSuitcase: false,
     sharedPeople: 2,
-    fillSuitcase: true,
+    capacityMode: "fill" as "fill" | "reserve",
+    shoppingReserveKg: defaultShoppingReserveKg(23),
   });
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -120,6 +123,12 @@ function AssistantPage() {
     if (isNaN(a) || isNaN(b) || b < a) return 0;
     return Math.max(1, Math.round((b - a) / 86400000) + 1);
   };
+
+  const packingPreview = resolvePackingCapacity({
+    suitcaseCapacityKg: form.suitcaseCapacityKg,
+    capacityMode: form.capacityMode,
+    shoppingReserveKg: form.shoppingReserveKg,
+  });
 
   const handleSend = async () => {
     if (loading) return;
@@ -153,15 +162,18 @@ function AssistantPage() {
     }
     const occasion = form.occasion.trim();
     const notesBlock = formatTripNotesForPrompt(form.notes);
+    const capacityLine =
+      form.capacityMode === "reserve"
+        ? `Capacidad de valija: ${Math.round(form.suitcaseCapacityKg)} kg (dejar ${form.shoppingReserveKg} kg libres para compras)`
+        : `Capacidad de valija: ${Math.round(form.suitcaseCapacityKg)} kg (llenar la valija)`;
     const userText = [
       `Destino: ${destination}`,
       `Desde: ${form.from}`,
       `Hasta: ${form.to}`,
       `Días: ${days}`,
-      `Capacidad de valija: ${Math.round(form.suitcaseCapacityKg)} kg`,
+      capacityLine,
       `Valija compartida: ${form.sharedSuitcase ? "sí" : "no"}`,
       form.sharedSuitcase ? `Personas en la valija: ${Math.round(form.sharedPeople)}` : null,
-      `Llenar valija: ${form.fillSuitcase ? "sí" : "no"}`,
       occasion ? `Ocasión: ${occasion}` : null,
       notesBlock,
     ]
@@ -184,7 +196,9 @@ function AssistantPage() {
           notes: form.notes.map((n) => n.trim()).filter(Boolean),
           sharedSuitcase: form.sharedSuitcase,
           sharedPeople: form.sharedSuitcase ? Math.round(form.sharedPeople) : undefined,
-          fillSuitcase: form.fillSuitcase,
+          capacityMode: form.capacityMode,
+          shoppingReserveKg:
+            form.capacityMode === "reserve" ? form.shoppingReserveKg : undefined,
         },
       });
       const totalWeight = data.items.reduce(
@@ -203,6 +217,9 @@ function AssistantPage() {
           items: data.items,
           totalWeight,
           suitcaseCapacityKg: data.suitcaseCapacityKg,
+          capacityMode: data.capacityMode,
+          shoppingReserveKg: data.shoppingReserveKg,
+          packingLimitKg: data.packingLimitKg,
           forecast: data.forecast,
         },
       });
@@ -345,12 +362,14 @@ function AssistantPage() {
                 max={60}
                 step={0.5}
                 value={form.suitcaseCapacityKg}
-                onChange={(e) =>
+                onChange={(e) => {
+                  const nextCapacity = parseFloat(e.target.value) || 0;
                   setForm({
                     ...form,
-                    suitcaseCapacityKg: parseFloat(e.target.value) || 0,
-                  })
-                }
+                    suitcaseCapacityKg: nextCapacity,
+                    shoppingReserveKg: defaultShoppingReserveKg(nextCapacity),
+                  });
+                }}
                 disabled={loading}
                 className="mt-1"
               />
@@ -408,28 +427,71 @@ function AssistantPage() {
 
             <div>
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                ¿Querés llenar la valija?
+                ¿Cómo querés usar el espacio?
               </label>
-              <p className="text-[11px] text-muted-foreground mt-0.5 mb-1.5">
-                {form.fillSuitcase
-                  ? "La IA arma la lista para ocupar casi todo el espacio disponible (~95%)."
-                  : "La valija queda ~80% completa y ~20% libre para compras o extras."}
-              </p>
-              <div className="flex gap-2">
-                {([true, false] as const).map((option) => (
-                  <Button
-                    key={option ? "fill-yes" : "fill-no"}
-                    type="button"
-                    variant={form.fillSuitcase === option ? "default" : "outline"}
-                    size="sm"
-                    className="flex-1"
+              <RadioGroup
+                value={form.capacityMode}
+                onValueChange={(value) =>
+                  setForm({
+                    ...form,
+                    capacityMode: value as "fill" | "reserve",
+                    shoppingReserveKg:
+                      value === "reserve"
+                        ? defaultShoppingReserveKg(form.suitcaseCapacityKg)
+                        : form.shoppingReserveKg,
+                  })
+                }
+                disabled={loading}
+                className="mt-2 space-y-2"
+              >
+                <div className="flex items-start gap-2 rounded-lg border border-border p-3">
+                  <RadioGroupItem value="fill" id="capacity-fill" className="mt-0.5" />
+                  <Label htmlFor="capacity-fill" className="font-normal cursor-pointer leading-snug">
+                    <span className="font-medium text-foreground">Llenar la valija</span>
+                    <span className="block text-xs text-muted-foreground mt-0.5">
+                      La IA aprovecha casi todo el peso disponible
+                    </span>
+                  </Label>
+                </div>
+                <div className="flex items-start gap-2 rounded-lg border border-border p-3">
+                  <RadioGroupItem value="reserve" id="capacity-reserve" className="mt-0.5" />
+                  <Label htmlFor="capacity-reserve" className="font-normal cursor-pointer leading-snug">
+                    <span className="font-medium text-foreground">Dejar espacio para compras</span>
+                    <span className="block text-xs text-muted-foreground mt-0.5">
+                      Reservá kilos libres para traer cosas del destino
+                    </span>
+                  </Label>
+                </div>
+              </RadioGroup>
+              {form.capacityMode === "reserve" ? (
+                <div className="mt-3">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Espacio libre para compras (kg)
+                  </label>
+                  <Input
+                    type="number"
+                    min={2}
+                    max={Math.max(2, form.suitcaseCapacityKg - 3)}
+                    step={0.5}
+                    value={form.shoppingReserveKg}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        shoppingReserveKg: parseFloat(e.target.value) || 0,
+                      })
+                    }
                     disabled={loading}
-                    onClick={() => setForm({ ...form, fillSuitcase: option })}
-                  >
-                    {option ? "Sí, llenar" : "No, dejar espacio"}
-                  </Button>
-                ))}
-              </div>
+                    className="mt-1"
+                  />
+                </div>
+              ) : null}
+              {packingPreview ? (
+                <div className="text-xs text-muted-foreground mt-2">
+                  {form.capacityMode === "fill"
+                    ? `La IA armará hasta ~${packingPreview.packingLimitKg} kg de ${packingPreview.capacityKg} kg.`
+                    : `Quedan ~${packingPreview.reserveKg} kg libres; la IA armará hasta ~${packingPreview.packingLimitKg} kg.`}
+                </div>
+              ) : null}
             </div>
 
             <div>
@@ -488,6 +550,11 @@ function AssistantPage() {
                           <Badge variant="secondary">{msg.suggestion.occasion}</Badge>
                           {msg.suggestion.suitcaseCapacityKg ? (
                             <Badge variant="secondary">{msg.suggestion.suitcaseCapacityKg} kg</Badge>
+                          ) : null}
+                          {msg.suggestion.capacityMode === "reserve" && msg.suggestion.shoppingReserveKg ? (
+                            <Badge variant="secondary">
+                              {msg.suggestion.shoppingReserveKg} kg libres
+                            </Badge>
                           ) : null}
                           <Badge className="bg-primary/15 text-primary border-primary/20 hover:bg-primary/20">{msg.suggestion.items.length} items</Badge>
                         </div>

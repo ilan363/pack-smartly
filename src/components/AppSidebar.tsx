@@ -15,12 +15,13 @@ import { logoutWithOAuth } from "@/hooks/use-supabase-auth-sync";
 import { resetAppState } from "@/lib/reset-app";
 import { toast } from "sonner";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { cn } from "@/lib/utils";
 
-const navigation: { name: string; href: string; icon: LucideIcon }[] = [
-  { name: "Dashboard", href: "/dashboard", icon: Home },
-  { name: "Asistente IA", href: "/assistant", icon: Bot },
-  { name: "Clima", href: "/weather", icon: CloudSun },
-  { name: "Listas", href: "/checklists", icon: ListChecks },
+const navigation: { name: string; shortName: string; href: string; icon: LucideIcon }[] = [
+  { name: "Dashboard", shortName: "Inicio", href: "/dashboard", icon: Home },
+  { name: "Asistente IA", shortName: "Asistente", href: "/assistant", icon: Bot },
+  { name: "Clima", shortName: "Clima", href: "/weather", icon: CloudSun },
+  { name: "Listas", shortName: "Listas", href: "/checklists", icon: ListChecks },
 ];
 
 function SidebarBrand() {
@@ -127,11 +128,46 @@ type MobileAppSidebarProps = {
 export function MobileAppSidebar({ open, onOpenChange }: MobileAppSidebarProps) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="left" className="flex w-64 flex-col p-0 sm:max-w-xs">
+      <SheetContent side="left" className="flex w-[min(100vw-2rem,16rem)] flex-col p-0 sm:max-w-xs">
         <SheetTitle className="sr-only">Menú de navegación</SheetTitle>
         <SidebarBrand />
         <SidebarContent onNavigate={() => onOpenChange(false)} />
       </SheetContent>
     </Sheet>
+  );
+}
+
+export function MobileBottomNav() {
+  const location = useLocation();
+  const isAdmin = useAuthStore((s) => s.isAdmin);
+
+  const items = isAdmin
+    ? [...navigation, { name: "Administración", shortName: "Admin", href: "/admin", icon: ShieldCheck }]
+    : navigation;
+
+  return (
+    <nav
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:hidden"
+      aria-label="Navegación principal"
+    >
+      <div className="mx-auto flex max-w-lg items-stretch justify-around px-1 pb-[env(safe-area-inset-bottom)]">
+        {items.map((item) => {
+          const isActive = location.pathname.startsWith(item.href);
+          return (
+            <Link
+              key={item.href}
+              to={item.href}
+              className={cn(
+                "flex min-w-0 flex-1 flex-col items-center gap-0.5 px-1 py-2.5 text-[10px] font-medium transition-colors",
+                isActive ? "text-primary" : "text-muted-foreground",
+              )}
+            >
+              <item.icon className={cn("h-5 w-5 shrink-0", isActive && "stroke-[2.5px]")} />
+              <span className="truncate w-full text-center">{item.shortName}</span>
+            </Link>
+          );
+        })}
+      </div>
+    </nav>
   );
 }

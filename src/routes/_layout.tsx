@@ -2,7 +2,7 @@ import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { BaggageClaim, Menu } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { AppSidebar, MobileAppSidebar } from "@/components/AppSidebar";
+import { AppSidebar, MobileAppSidebar, MobileBottomNav } from "@/components/AppSidebar";
 
 export const Route = createFileRoute("/_layout")({
   component: AppLayout,
@@ -33,9 +33,10 @@ function AppLayout() {
           </Button>
         </header>
 
-        <main className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6 md:p-8">
+        <main className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 pb-20 sm:p-6 md:p-8 md:pb-8">
           <Outlet />
         </main>
+        <MobileBottomNav />
       </div>
     </div>
   );

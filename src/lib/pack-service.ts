@@ -317,6 +317,12 @@ export type TripInput = {
   occasion?: string;
   /** Notas individuales del formulario del asistente */
   notes?: string[];
+  /** Valija compartida entre varias personas */
+  sharedSuitcase?: boolean;
+  /** Cantidad de personas que comparten la valija (mín. 2 si sharedSuitcase) */
+  sharedPeople?: number;
+  /** true = usar ~95% del peso; false = usar ~80% (dejar 20% libre) */
+  fillSuitcase?: boolean;
 };
 
 function computeDaysFromDates(dateFrom?: string, dateTo?: string): number | null {
@@ -437,12 +443,35 @@ function extractTripContext(prompt: string, trip?: TripInput) {
   const tripMonth = monthFromDate(trip?.dateFrom ?? structDateFrom);
   const usaSeasonCold = isUsa && !usaWarm && isColdSeasonMonth(tripMonth, "N");
 
+  const structShared = prompt.match(/valija compartida\s*:\s*(si|s[ií]|no)/i)?.[1];
+  const structPeople = prompt.match(/personas en la valija\s*:\s*(\d+)/i)?.[1];
+  const structFill = prompt.match(/llenar valija\s*:\s*(si|s[ií]|no)/i)?.[1];
+
+  const sharedSuitcase =
+    trip?.sharedSuitcase ??
+    (structShared ? /^(si|s[ií])$/i.test(structShared) : false);
+
+  const sharedPeople = sharedSuitcase
+    ? clampInt(
+        trip?.sharedPeople ?? (structPeople ? Number(structPeople) : 2),
+        2,
+        8,
+      )
+    : 1;
+
+  const fillSuitcase =
+    trip?.fillSuitcase ??
+    (structFill ? /^(si|s[ií])$/i.test(structFill) : true);
+
   return {
     destination,
     days,
     dateFrom: trip?.dateFrom ?? structDateFrom,
     dateTo: trip?.dateTo ?? structDateTo,
     occasion,
+    sharedSuitcase,
+    sharedPeople,
+    fillSuitcase,
     warm:
       /brasil|rio|salvador|playa|caribe|cancun|punta cana|cartagena|costa|miami|hawaii|florida|tailandia|bali/.test(
         destBlob,
@@ -738,6 +767,50 @@ type ClothingSlot =
   | "footwear"
   | "other_clothing";
 
+/** Prendas de rotación (remeras, pantalones): se reusan entre lavados. */
+function topsForDays(days: number, warm: boolean): number {
+  if (days <= 2) return days + 1;
+  if (days <= 4) return warm ? days : days + 1;
+  if (days <= 7) return warm ? 4 : 5;
+  if (days <= 14) return warm ? 5 : 6;
+  if (days <= 21) return warm ? 6 : 7;
+  if (days <= 45) return warm ? 7 : 8;
+  return warm ? 9 : 10;
+}
+
+/** Ropa interior: asumimos lavado a mitad de viaje si supera 6 días. */
+function underwearForDays(days: number, laundry: boolean): number {
+  if (days <= 3) return days + 1;
+  if (laundry) return clampInt(4 + Math.ceil(days / 12), 5, 8);
+  if (days <= 6) return days + 1;
+  // Mitad del viaje + 1 de repuesto (lavado intermedio implícito)
+  return clampInt(Math.ceil(days / 2) + 1, 5, 8);
+}
+
+/** Medias: un poco menos que ropa interior (se pueden reutilizar más). */
+function socksForDays(days: number, laundry: boolean): number {
+  if (days <= 3) return days;
+  if (laundry) return clampInt(3 + Math.ceil(days / 10), 4, 7);
+  if (days <= 6) return days;
+  return clampInt(Math.ceil(days / 2), 4, 7);
+}
+
+/** Pantalones: versátiles, se rotan con poca frecuencia. */
+function pantsForDays(days: number, laundry: boolean): number {
+  if (days <= 4) return 1;
+  if (days <= 10) return 2;
+  if (days <= 21) return laundry ? 2 : 3;
+  return laundry ? 3 : clampInt(2 + Math.floor(days / 14), 3, 5);
+}
+
+/** Shorts en destinos cálidos: techo bajo, no escalan linealmente. */
+function shortsForBeach(days: number): number {
+  if (days <= 4) return 1;
+  if (days <= 10) return 2;
+  if (days <= 21) return 3;
+  return 4;
+}
+
 function computeClothingBudget(
   context: ReturnType<typeof extractTripContext>,
   destination: string,
@@ -749,73 +822,49 @@ function computeClothingBudget(
 
   const longStay = days > 21;
   const extendedStay = days > 45;
+  const explicitLaundry = /lavander|lavarrop|laundry|wash and wear/.test(notesNorm);
+  const noLaundry = /sin lavander|no lavar|no laundry|sin lavarrop/.test(notesNorm);
   const assumesLaundry =
-    longStay && !/sin lavander|no lavar|no laundry|sin lavarrop/.test(notesNorm);
-
-  // Cantidades según duración (viajes largos = menos prendas por día, se asume lavandería).
-  let shirts: number;
-  if (days <= 5) {
-    shirts = Math.max(2, Math.ceil(days * 0.65) + 1);
-  } else if (days <= 14) {
-    shirts = Math.max(3, Math.ceil(days / 2));
-  } else if (days <= 30) {
-    shirts = assumesLaundry ? 4 + Math.ceil(days / 9) : Math.ceil(days / 3);
-  } else {
-    shirts = assumesLaundry ? 5 + Math.floor(days / 10) : Math.ceil(days / 4);
-  }
-
-  let pants: number;
-  if (days <= 7) {
-    pants = Math.max(1, Math.ceil(days / 5));
-  } else if (days <= 21) {
-    pants = Math.max(2, Math.ceil(days / 6));
-  } else {
-    pants = assumesLaundry ? 2 + Math.floor(days / 16) : Math.ceil(days / 8);
-  }
-
-  let underwear: number;
-  let socks: number;
-  if (assumesLaundry) {
-    underwear = 4 + Math.ceil(days / 8);
-    socks = 4 + Math.ceil(days / 7);
-  } else {
-    underwear = Math.ceil(days * 0.85);
-    socks = Math.ceil(days * 0.75);
-  }
-
-  const shirtCap = extendedStay ? 14 : longStay ? 11 : days <= 7 ? 6 : 9;
-  const pantsCap = extendedStay ? 7 : longStay ? 5 : 4;
-  shirts = clampInt(shirts, 2, shirtCap);
-  pants = clampInt(pants, 1, pantsCap);
-  underwear = clampInt(underwear, 3, extendedStay ? 14 : longStay ? 12 : 10);
-  socks = clampInt(socks, 3, extendedStay ? 14 : longStay ? 12 : 10);
-
-  let shorts = 0;
-  let outerwear = context.cold ? 2 : 1;
+    !noLaundry && (explicitLaundry || longStay);
 
   const beach =
     context.warm ||
     /playa|mar|costa|caribe|cancun|punta cana|miami|hawaii|florida|bali|phuket/.test(destNorm) ||
     occasionNorm.includes("playa");
 
+  let shirts = topsForDays(days, context.warm || beach);
+  let pants = pantsForDays(days, assumesLaundry);
+  let underwear = underwearForDays(days, assumesLaundry);
+  let socks = socksForDays(days, assumesLaundry);
+  let shorts = beach ? shortsForBeach(days) : 0;
+  let outerwear = context.cold ? (longStay ? 3 : 2) : 1;
+
+  const shirtCap = extendedStay ? 12 : longStay ? 10 : days <= 7 ? 6 : 8;
+  const pantsCap = extendedStay ? 6 : longStay ? 4 : 3;
+  const shortsCap = extendedStay ? 4 : 3;
+
+  shirts = clampInt(shirts, 2, shirtCap);
+  pants = clampInt(pants, 1, pantsCap);
+  underwear = clampInt(underwear, 3, extendedStay ? 10 : 8);
+  socks = clampInt(socks, 3, extendedStay ? 9 : 7);
+  shorts = clampInt(shorts, 0, shortsCap);
+
+  // Destino playa: más shorts, menos pantalones y tops pesados
   if (beach) {
-    shorts = clampInt(days <= 10 ? 1 + Math.floor(days / 6) : 2 + Math.floor(days / 12), 1, extendedStay ? 5 : 3);
-    pants = clampInt(pants - (days <= 14 ? 1 : 0), 1, pantsCap);
-    shirts = clampInt(shirts - (days <= 10 ? 1 : 0), 2, shirtCap);
+    if (pants > 1) pants = clampInt(pants - 1, 1, pantsCap);
+    if (days <= 14 && shirts > 3) shirts = clampInt(shirts - 1, 3, shirtCap);
   }
 
   if (context.cold) {
     outerwear = longStay ? 3 : 2;
     shirts = clampInt(shirts + 1, 2, shirtCap + 1);
-    socks = clampInt(socks + 1, 3, extendedStay ? 15 : 12);
+    socks = clampInt(socks + 1, 3, extendedStay ? 10 : 8);
+    pants = clampInt(pants + 1, 1, pantsCap + 1);
   }
 
   if (/estados unidos|usa\b|united states|eeuu|ee uu|new york|los angeles|miami|chicago|boston/.test(destNorm)) {
-    if (context.cold) {
-      pants = clampInt(pants + 1, 1, pantsCap + 1);
-    }
-    if (beach && !context.cold) {
-      shorts = clampInt(shorts + 1, 1, extendedStay ? 6 : 4);
+    if (beach && !context.cold && shorts < shortsCap) {
+      shorts = clampInt(shorts + 1, 1, shortsCap);
     }
   }
 
@@ -826,27 +875,37 @@ function computeClothingBudget(
 
   if (/trabajo|negocio|conferencia|reunion|oficina|work|business/.test(occasionNorm)) {
     shirts = clampInt(shirts + 1, 2, shirtCap + 1);
-    pants = clampInt(pants + (longStay ? 2 : 1), 1, pantsCap + 2);
+    pants = clampInt(pants + (longStay ? 1 : 0), 1, pantsCap + 1);
   }
 
   if (/trekking|senderismo|montana|acampar|campamento|hiking/.test(occasionNorm)) {
-    socks = clampInt(socks + 2, 3, extendedStay ? 16 : 13);
+    socks = clampInt(socks + 2, 3, extendedStay ? 10 : 8);
     shirts = clampInt(shirts + 1, 2, shirtCap + 1);
   }
 
-  if (/lavander|lavarrop|laundry|wash and wear/.test(notesNorm)) {
-    shirts = clampInt(3 + Math.ceil(days / 10), 2, shirtCap);
-    pants = clampInt(1 + Math.ceil(days / 14), 1, pantsCap);
-    underwear = clampInt(3 + Math.ceil(days / 9), 3, extendedStay ? 12 : 10);
-    socks = clampInt(3 + Math.ceil(days / 8), 3, extendedStay ? 12 : 10);
+  if (explicitLaundry) {
+    shirts = clampInt(3 + Math.ceil(days / 12), 3, shirtCap);
+    pants = clampInt(1 + Math.ceil(days / 16), 1, pantsCap);
+    underwear = clampInt(4 + Math.ceil(days / 10), 4, 8);
+    socks = clampInt(3 + Math.ceil(days / 9), 3, 7);
   }
 
   if (/equipaje de mano|carry on|carry-on|valija chica|valija peque|poco espacio|minimal|liviano|solo mochila/.test(notesNorm)) {
     shirts = clampInt(shirts - 2, 2, shirtCap);
     pants = clampInt(pants - 1, 1, pantsCap);
-    underwear = clampInt(underwear - 2, 2, extendedStay ? 10 : 8);
-    socks = clampInt(socks - 2, 2, extendedStay ? 10 : 8);
+    underwear = clampInt(underwear - 2, 3, extendedStay ? 8 : 6);
+    socks = clampInt(socks - 1, 3, extendedStay ? 7 : 5);
     shorts = Math.max(0, shorts - 1);
+  }
+
+  const people = context.sharedSuitcase ? context.sharedPeople : 1;
+  if (people > 1) {
+    shirts = clampInt(shirts * people, shirts, shirtCap * people);
+    pants = clampInt(pants * people, pants, pantsCap * people);
+    underwear = clampInt(underwear * people, underwear, (extendedStay ? 10 : 8) * people);
+    socks = clampInt(socks * people, socks, (extendedStay ? 9 : 7) * people);
+    shorts = clampInt(shorts * people, shorts, shortsCap * people);
+    outerwear = clampInt(outerwear * people, outerwear, 3 * people);
   }
 
   return { shirts, pants, shorts, underwear, socks, outerwear };
@@ -922,6 +981,7 @@ function enforceClothingBudget(
   destination: string,
 ): PackItem[] {
   const budget = computeClothingBudget(context, destination);
+  const people = context.sharedSuitcase ? context.sharedPeople : 1;
   const slotLimits: Record<ClothingSlot, number> = {
     shirts: budget.shirts,
     pants: budget.pants,
@@ -929,10 +989,10 @@ function enforceClothingBudget(
     underwear: budget.underwear,
     socks: budget.socks,
     outerwear: budget.outerwear,
-    swimwear: 2,
-    formal: context.formal ? 3 : 2,
-    footwear: 3,
-    other_clothing: 4,
+    swimwear: 2 * people,
+    formal: (context.formal ? 3 : 2) * people,
+    footwear: 3 * people,
+    other_clothing: 4 * people,
   };
 
   const nonClothing: PackItem[] = [];
@@ -981,15 +1041,16 @@ function enforceClothingBudget(
 
 function requiredItems(context: ReturnType<typeof extractTripContext>, destination: string): PackItem[] {
   const budget = computeClothingBudget(context, destination);
+  const people = context.sharedSuitcase ? context.sharedPeople : 1;
 
   const items: PackItem[] = [
     { category: "Remeras", name: "Remeras o tops cómodos", quantity: budget.shirts, weight: 0.18 },
     { category: "Pantalones", name: "Pantalón o jean versátil", quantity: budget.pants, weight: 0.55 },
     { category: "Otros", name: "Ropa interior", quantity: budget.underwear, weight: 0.05 },
     { category: "Otros", name: "Medias", quantity: budget.socks, weight: 0.04 },
-    { category: "Higiene", name: "Neceser de higiene personal", quantity: 1, weight: 0.45 },
-    { category: "Electrónica", name: "Cargador de celular", quantity: 1, weight: 0.12 },
-    { category: "Accesorios", name: "Documento, pasaporte y reservas", quantity: 1, weight: 0.08 },
+    { category: "Higiene", name: "Neceser de higiene personal", quantity: people, weight: 0.45 },
+    { category: "Electrónica", name: "Cargador de celular", quantity: people, weight: 0.12 },
+    { category: "Accesorios", name: "Documento, pasaporte y reservas", quantity: people, weight: 0.08 },
   ];
 
   if (budget.shorts > 0) {
@@ -1003,26 +1064,26 @@ function requiredItems(context: ReturnType<typeof extractTripContext>, destinati
 
   if (context.formal) {
     items.push(
-      { category: "Otros", name: "Conjunto formal para el casamiento", quantity: 1, weight: 0.9 },
-      { category: "Zapatillas", name: "Zapatos formales", quantity: 1, weight: 0.8 },
-      { category: "Accesorios", name: "Accesorios formales", quantity: 1, weight: 0.15 },
+      { category: "Otros", name: "Conjunto formal para el casamiento", quantity: people, weight: 0.9 },
+      { category: "Zapatillas", name: "Zapatos formales", quantity: people, weight: 0.8 },
+      { category: "Accesorios", name: "Accesorios formales", quantity: people, weight: 0.15 },
     );
   }
   if (context.warm || /playa|brasil|caribe|costa/i.test(destination)) {
     items.push(
-      { category: "Otros", name: "Traje de baño", quantity: 1, weight: 0.18 },
+      { category: "Otros", name: "Traje de baño", quantity: people, weight: 0.18 },
       { category: "Higiene", name: "Protector solar", quantity: 1, weight: 0.25 },
-      { category: "Zapatillas", name: "Sandalias u ojotas", quantity: 1, weight: 0.35 },
+      { category: "Zapatillas", name: "Sandalias u ojotas", quantity: people, weight: 0.35 },
     );
   }
   if (context.cold) {
     items.push(
-      { category: "Abrigos", name: "Campera de abrigo", quantity: 1, weight: 1.1 },
-      { category: "Abrigos", name: "Buzo o sweater térmico", quantity: 1, weight: 0.55 },
-      { category: "Accesorios", name: "Gorro y guantes", quantity: 1, weight: 0.18 },
+      { category: "Abrigos", name: "Campera de abrigo", quantity: people, weight: 1.1 },
+      { category: "Abrigos", name: "Buzo o sweater térmico", quantity: people, weight: 0.55 },
+      { category: "Accesorios", name: "Gorro y guantes", quantity: people, weight: 0.18 },
     );
   } else {
-    items.push({ category: "Abrigos", name: "Campera liviana", quantity: 1, weight: 0.45 });
+    items.push({ category: "Abrigos", name: "Campera liviana", quantity: people, weight: 0.45 });
   }
 
   // Ítems pedidos explícitamente en las notas del usuario (siempre obligatorios)
@@ -1071,8 +1132,16 @@ function weightOf(items: PackItem[]) {
   return items.reduce((acc, it) => acc + it.weight * it.quantity, 0);
 }
 
-function adjustRequiredToFitWeight(required: PackItem[], capacityKg: number) {
-  const weightBudget = capacityKg * 0.95; // leave a bit of headroom
+function resolveWeightBudgetRatio(fillSuitcase: boolean): number {
+  return fillSuitcase ? 0.95 : 0.8;
+}
+
+function adjustRequiredToFitWeight(
+  required: PackItem[],
+  capacityKg: number,
+  fillSuitcase = true,
+) {
+  const weightBudget = capacityKg * resolveWeightBudgetRatio(fillSuitcase);
   const fixed = required.filter((it) => !/remera|tops|pantalon|jean|jean versátil|ropa interior|medias|medios/.test(normalizeText(`${it.category} ${it.name}`)));
   const adjustable = required.filter((it) =>
     /remera|tops|pantalon|jean|ropa interior|medias|medios/.test(normalizeText(`${it.category} ${it.name}`)),
@@ -1113,21 +1182,52 @@ function adjustRequiredToFitWeight(required: PackItem[], capacityKg: number) {
   return adjusted;
 }
 
+function tryFillToBudget(items: PackItem[], targetKg: number): PackItem[] {
+  const result = items.map((it) => ({ ...it }));
+  const bumpable = /remera|tops|ropa interior|medias|short|bermuda|pantalon|jean/;
+  let current = weightOf(result);
+  const target = targetKg * 0.92;
+
+  if (current >= target) return result;
+
+  let guard = 0;
+  while (current < target && guard < 300) {
+    guard += 1;
+    const candidates = result.filter((it) =>
+      bumpable.test(normalizeText(`${it.category} ${it.name}`)),
+    );
+    if (!candidates.length) break;
+
+    const pick = candidates.sort((a, b) => b.weight - a.weight)[0];
+    pick.quantity += 1;
+    current += pick.weight;
+    if (current > targetKg) {
+      pick.quantity -= 1;
+      current -= pick.weight;
+      break;
+    }
+  }
+
+  return result;
+}
+
 function applyCapacityBudget(input: {
   items: PackItem[];
   required: PackItem[];
   capacityKg: number;
   days: number;
   prompt: string;
+  fillSuitcase?: boolean;
 }) {
   const requiredKeys = new Set(input.required.map((it) => normalizeText(`${it.category}|${it.name}`)));
   const isRequired = (it: PackItem) => requiredKeys.has(normalizeText(`${it.category}|${it.name}`));
 
   const capKg = input.capacityKg;
+  const fillSuitcase = input.fillSuitcase ?? true;
   const maxItems = budgetItemLimit(capKg, input.days);
-  const weightBudget = capKg * 0.95; // headroom
+  const weightBudget = capKg * resolveWeightBudgetRatio(fillSuitcase);
 
-  const requiredAdjusted = adjustRequiredToFitWeight(input.required, capKg);
+  const requiredAdjusted = adjustRequiredToFitWeight(input.required, capKg, fillSuitcase);
   const requiredWeight = weightOf(requiredAdjusted);
 
   const score = (it: PackItem) => {
@@ -1164,7 +1264,10 @@ function applyCapacityBudget(input: {
   }
 
   // If required items are already overweight, we still return them (can't satisfy capacity perfectly).
-  return picked.slice(0, Math.max(maxItems, requiredAdjusted.length));
+  let finalItems = picked.slice(0, Math.max(maxItems, requiredAdjusted.length));
+  finalItems = tryFillToBudget(finalItems, weightBudget);
+
+  return finalItems;
 }
 
 function normalizeSuggestion(
@@ -1204,6 +1307,7 @@ function normalizeSuggestion(
           capacityKg: capacity,
           days,
           prompt,
+          fillSuitcase: context.fillSuitcase,
         })
       : merged.slice(0, 22),
     context.noteLines,
@@ -1251,12 +1355,20 @@ export async function generatePackSuggestion(input: {
 Formato exacto: {"destination":"Ciudad o país","days":3,"weather":"resumen breve","occasion":"motivo","items":[{"category":"Remeras|Pantalones|Abrigos|Zapatillas|Accesorios|Higiene|Electrónica|Otros","name":"item","quantity":1,"weight":0.2}]}.
 Reglas críticas:
 - USÁ EXACTAMENTE los días, destino y ocasión que indica el usuario (no inventes ni cambies).
-- Cantidades de ropa según días y destino (no fijas): viajes cortos ≈ ceil(N/2) remeras; largos (>21 días) asumí lavandería y menos prendas por día (ej. 60 días ≈ 11 remeras, 5 pantalones; 8 días ≈ 4 remeras, 2 pantalones). Ajustá por clima (playa/calor → más shorts; frío → más abrigos) y ocasión.
+- Cantidades realistas con rotación de prendas (no 1 por día salvo viajes muy cortos):
+  · Remeras/tops: 3–4 (≤7 días), 5–6 (8–14 días), 6–8 (15–21 días). En playa/calor, menos remeras y más shorts.
+  · Pantalones: 1 (≤4 días), 2 (5–14 días), 3 (15–21 días). Se reusan entre lavados.
+  · Ropa interior: mitad del viaje + 1 repuesto si >6 días (ej. 11 días → 7, no 10). Con lavandería explícita, menos.
+  · Medias: un poco menos que ropa interior (ej. 11 días → 5–6).
+  · Shorts en playa: 2–3 máximo para viajes de 2 semanas.
+  · Viajes largos (>21 días) o con lavandería: escalar lento (60 días ≈ 9 remeras, 4 pantalones, 7–8 ropa interior).
 - Si el usuario puso notas, incluí TODAS como ítems aparte (quantity 1). No omitas ninguna nota de la lista.
 - Si hay casamiento/boda incluí conjunto y zapatos formales; si es playa incluí traje de baño/protector; si no hay nieve no sugieras ropa de nieve.
 - Si el usuario indicó capacidad de valija en kg, mantené la lista compacta y priorizá lo esencial.
+- Si la valija es compartida, multiplicá las prendas personales por la cantidad de personas indicada.
+- Si el usuario quiere llenar la valija, apuntá a usar ~95% del peso máximo. Si prefiere dejar espacio, usá ~80% del peso (20% libre para compras o extras).
 - Para calcetines usá siempre "Medias" (nunca "Medios").`,
-          prompt: `Solicitud del usuario: ${input.prompt}\nContexto detectado: destino=${context.destination}, días=${context.days}, ocasión=${context.occasion}${capacity ? `, capacidad=${capacity}kg` : ""}${
+          prompt: `Solicitud del usuario: ${input.prompt}\nContexto detectado: destino=${context.destination}, días=${context.days}, ocasión=${context.occasion}${capacity ? `, capacidad=${capacity}kg` : ""}, valija compartida=${context.sharedSuitcase ? `sí (${context.sharedPeople} personas)` : "no"}, llenar valija=${context.fillSuitcase ? "sí" : "no (80% completo, 20% libre)"}${
             context.noteLines.length
               ? `\nNotas del usuario (incluir TODAS en items, una por nota):\n${context.noteLines.map((n, i) => `${i + 1}. ${n}`).join("\n")}`
               : ""

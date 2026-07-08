@@ -87,6 +87,9 @@ function AssistantPage() {
     occasion: "",
     notes: [""],
     suitcaseCapacityKg: 23,
+    sharedSuitcase: false,
+    sharedPeople: 2,
+    fillSuitcase: true,
   });
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -138,6 +141,16 @@ function AssistantPage() {
       toast.error("Indicá la capacidad de la valija (mín. 5 kg)");
       return;
     }
+    if (form.sharedSuitcase) {
+      if (!Number.isFinite(form.sharedPeople) || form.sharedPeople < 2) {
+        toast.error("Indicá al menos 2 personas para valija compartida");
+        return;
+      }
+      if (form.sharedPeople > 8) {
+        toast.error("Máximo 8 personas por valija compartida");
+        return;
+      }
+    }
     const occasion = form.occasion.trim();
     const notesBlock = formatTripNotesForPrompt(form.notes);
     const userText = [
@@ -146,6 +159,9 @@ function AssistantPage() {
       `Hasta: ${form.to}`,
       `Días: ${days}`,
       `Capacidad de valija: ${Math.round(form.suitcaseCapacityKg)} kg`,
+      `Valija compartida: ${form.sharedSuitcase ? "sí" : "no"}`,
+      form.sharedSuitcase ? `Personas en la valija: ${Math.round(form.sharedPeople)}` : null,
+      `Llenar valija: ${form.fillSuitcase ? "sí" : "no"}`,
       occasion ? `Ocasión: ${occasion}` : null,
       notesBlock,
     ]
@@ -166,6 +182,9 @@ function AssistantPage() {
           dateTo: form.to,
           occasion: occasion || undefined,
           notes: form.notes.map((n) => n.trim()).filter(Boolean),
+          sharedSuitcase: form.sharedSuitcase,
+          sharedPeople: form.sharedSuitcase ? Math.round(form.sharedPeople) : undefined,
+          fillSuitcase: form.fillSuitcase,
         },
       });
       const totalWeight = data.items.reduce(
@@ -267,21 +286,21 @@ function AssistantPage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto pb-10">
-      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Asistente IA</h1>
-          <p className="text-muted-foreground mt-1">Arma tu valija automáticamente</p>
+    <div className="mx-auto w-full min-w-0 max-w-7xl overflow-x-hidden pb-6 md:pb-10">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 sm:mb-6">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Asistente IA</h1>
+          <p className="mt-1 text-sm text-muted-foreground sm:text-base">Arma tu valija automáticamente</p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => resetChat()}>
+        <Button variant="outline" size="sm" onClick={() => resetChat()} className="shrink-0">
           <Plus className="h-4 w-4 mr-2" />
           Nueva consulta
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-6 items-start">
+      <div className="grid min-w-0 grid-cols-1 items-start gap-4 sm:gap-6 lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
         {/* LEFT: Form */}
-        <Card className="p-5 lg:sticky lg:top-4 bg-background border-border shadow-sm">
+        <Card className="min-w-0 border-border bg-background p-4 shadow-sm sm:p-5 lg:sticky lg:top-4">
           <div className="flex items-center gap-2 mb-4">
             <div className="h-9 w-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
               <Sparkles className="h-4 w-4" />
@@ -304,12 +323,12 @@ function AssistantPage() {
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
+            <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2">
+              <div className="min-w-0">
                 <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Desde</label>
                 <Input type="date" value={form.from} onChange={(e) => setForm({ ...form, from: e.target.value })} disabled={loading} className="mt-1" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Hasta</label>
                 <Input type="date" value={form.to} min={form.from || undefined} onChange={(e) => setForm({ ...form, to: e.target.value })} disabled={loading} className="mt-1" />
               </div>
@@ -339,6 +358,80 @@ function AssistantPage() {
                 Ej: cabina 10–12 kg · bodega 20–23 kg
               </div>
             </div>
+
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                ¿Valija compartida?
+              </label>
+              <div className="mt-1.5 flex gap-2">
+                {([true, false] as const).map((option) => (
+                  <Button
+                    key={option ? "shared-yes" : "shared-no"}
+                    type="button"
+                    variant={form.sharedSuitcase === option ? "default" : "outline"}
+                    size="sm"
+                    className="flex-1"
+                    disabled={loading}
+                    onClick={() =>
+                      setForm({
+                        ...form,
+                        sharedSuitcase: option,
+                        sharedPeople: option ? Math.max(2, form.sharedPeople) : 2,
+                      })
+                    }
+                  >
+                    {option ? "Sí" : "No"}
+                  </Button>
+                ))}
+              </div>
+              {form.sharedSuitcase && (
+                <div className="mt-2">
+                  <label className="text-xs text-muted-foreground">Cantidad de personas</label>
+                  <Input
+                    type="number"
+                    min={2}
+                    max={8}
+                    step={1}
+                    value={form.sharedPeople}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        sharedPeople: parseInt(e.target.value, 10) || 2,
+                      })
+                    }
+                    disabled={loading}
+                    className="mt-1"
+                  />
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                ¿Querés llenar la valija?
+              </label>
+              <p className="text-[11px] text-muted-foreground mt-0.5 mb-1.5">
+                {form.fillSuitcase
+                  ? "La IA arma la lista para ocupar casi todo el espacio disponible (~95%)."
+                  : "La valija queda ~80% completa y ~20% libre para compras o extras."}
+              </p>
+              <div className="flex gap-2">
+                {([true, false] as const).map((option) => (
+                  <Button
+                    key={option ? "fill-yes" : "fill-no"}
+                    type="button"
+                    variant={form.fillSuitcase === option ? "default" : "outline"}
+                    size="sm"
+                    className="flex-1"
+                    disabled={loading}
+                    onClick={() => setForm({ ...form, fillSuitcase: option })}
+                  >
+                    {option ? "Sí, llenar" : "No, dejar espacio"}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
             <div>
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Notas (opcional)
@@ -370,27 +463,27 @@ function AssistantPage() {
         </Card>
 
         {/* RIGHT: Conversation + Results */}
-        <div ref={scrollRef} className="space-y-6 min-h-[60vh]">
+        <div ref={scrollRef} className="min-w-0 space-y-4 sm:space-y-6">
           {messages.map((msg) => (
-            <div key={msg.id} className="space-y-4">
-              <div className={`flex gap-3 ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
+            <div key={msg.id} className="min-w-0 space-y-3 sm:space-y-4">
+              <div className={`flex min-w-0 gap-2 sm:gap-3 ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
                 <div className={`h-8 w-8 shrink-0 rounded-lg flex items-center justify-center ${msg.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted text-foreground border border-border"}`}>
                   {msg.role === "user" ? <User size={16} /> : <Bot size={16} />}
                 </div>
-                <div className={`px-4 py-3 rounded-2xl max-w-[85%] text-sm whitespace-pre-line ${msg.role === "user" ? "bg-primary text-primary-foreground rounded-tr-sm" : "bg-muted/50 text-foreground border border-border rounded-tl-sm"}`}>
+                <div className={`min-w-0 max-w-[calc(100%-2.5rem)] px-3 py-2.5 sm:px-4 sm:py-3 rounded-2xl text-sm whitespace-pre-line break-words ${msg.role === "user" ? "bg-primary text-primary-foreground rounded-tr-sm" : "bg-muted/50 text-foreground border border-border rounded-tl-sm"}`}>
                   {msg.content}
                 </div>
               </div>
 
               {msg.suggestion && (
-                <div className="space-y-4">
+                <div className="min-w-0 space-y-3 sm:space-y-4">
                   {/* HEADER summary */}
-                  <Card className="p-5 bg-gradient-to-br from-primary/10 via-primary/5 to-background border-primary/20">
-                    <div className="flex items-start justify-between gap-4 flex-wrap">
-                      <div>
+                  <Card className="min-w-0 overflow-hidden border-primary/20 bg-gradient-to-br from-primary/10 via-primary/5 to-background p-4 sm:p-5">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0 flex-1">
                         <div className="text-xs uppercase tracking-wider text-primary/80 font-semibold">Lista sugerida</div>
-                        <h2 className="text-2xl font-bold mt-1">{msg.suggestion.destination}</h2>
-                        <div className="flex items-center gap-2 mt-2 flex-wrap">
+                        <h2 className="mt-1 text-xl font-bold break-words sm:text-2xl">{msg.suggestion.destination}</h2>
+                        <div className="mt-2 flex flex-wrap items-center gap-1.5 sm:gap-2">
                           <Badge variant="secondary">{msg.suggestion.days} día{msg.suggestion.days === 1 ? "" : "s"}</Badge>
                           <Badge variant="secondary">{msg.suggestion.occasion}</Badge>
                           {msg.suggestion.suitcaseCapacityKg ? (
@@ -398,50 +491,51 @@ function AssistantPage() {
                           ) : null}
                           <Badge className="bg-primary/15 text-primary border-primary/20 hover:bg-primary/20">{msg.suggestion.items.length} items</Badge>
                         </div>
-                        <p className="text-sm text-muted-foreground mt-3 max-w-xl">{msg.suggestion.weather}</p>
+                        <p className="mt-2 text-sm text-muted-foreground sm:mt-3">{msg.suggestion.weather}</p>
                       </div>
-                      <div className="text-right">
-                        <div className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Peso total</div>
-                        <div className="text-3xl font-bold text-primary">{msg.suggestion.totalWeight.toFixed(2)}<span className="text-base font-medium text-muted-foreground ml-1">kg</span></div>
+                      <div className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-background/60 px-3 py-2 sm:block sm:border-0 sm:bg-transparent sm:p-0 sm:text-right">
+                        <div className="text-xs uppercase tracking-wider text-muted-foreground font-semibold sm:mb-0">Peso total</div>
+                        <div className="text-2xl font-bold text-primary sm:text-3xl">{msg.suggestion.totalWeight.toFixed(2)}<span className="ml-1 text-sm font-medium text-muted-foreground sm:text-base">kg</span></div>
                       </div>
                     </div>
 
-                    <div className="flex flex-wrap gap-2 mt-5">
-                      <Button onClick={() => openCreate(msg)} className="flex-1 min-w-[180px]">
+                    <div className="mt-4 flex flex-col gap-2 sm:mt-5 sm:flex-row sm:flex-wrap">
+                      <Button onClick={() => openCreate(msg)} className="w-full sm:flex-1 sm:min-w-[180px]">
                         Crear valija con esta lista
                       </Button>
-                      <Button variant="secondary" onClick={() => saveAsChecklist(msg)}>
+                      <Button variant="secondary" onClick={() => saveAsChecklist(msg)} className="w-full sm:w-auto">
                         <BookmarkPlus className="h-4 w-4 mr-1" /> Guardar lista
                       </Button>
-                      <Button variant="outline" onClick={() => setEditingMsgId(msg.id)}>
+                      <Button variant="outline" onClick={() => setEditingMsgId(msg.id)} className="w-full sm:w-auto">
                         Modificar
                       </Button>
                     </div>
                   </Card>
 
-                  {/* WEATHER SCHEDULE — prominent */}
+                  {/* WEATHER SCHEDULE */}
                   {msg.suggestion.forecast && msg.suggestion.forecast.length > 0 && (
-                    <Card className="overflow-hidden border-border">
+                    <Card className="min-w-0 overflow-hidden border-border">
                       <Collapsible defaultOpen>
-                        <CollapsibleTrigger className="w-full flex items-center justify-between p-4 hover:bg-muted/30 transition-colors group border-b border-border">
-                          <div className="flex items-center gap-3">
-                            <div className="h-9 w-9 rounded-lg bg-sky-500/10 text-sky-500 flex items-center justify-center">
-                              <CloudSun className="h-5 w-5" />
+                        <CollapsibleTrigger className="group flex w-full items-center justify-between gap-2 p-3 transition-colors hover:bg-muted/30 sm:p-4 border-b border-border">
+                          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+                            <div className="h-8 w-8 shrink-0 rounded-lg bg-sky-500/10 text-sky-500 flex items-center justify-center sm:h-9 sm:w-9">
+                              <CloudSun className="h-4 w-4 sm:h-5 sm:w-5" />
                             </div>
-                            <div className="text-left">
-                              <div className="font-bold">Clima del viaje</div>
-                              <div className="text-xs text-muted-foreground">
+                            <div className="min-w-0 text-left">
+                              <div className="font-bold text-sm sm:text-base">Clima del viaje</div>
+                              <div className="text-xs text-muted-foreground truncate">
                                 Pronóstico por fecha · {msg.suggestion.forecast.length} día
                                 {msg.suggestion.forecast.length === 1 ? "" : "s"}
                               </div>
                             </div>
                           </div>
-                          <ChevronDown className="h-5 w-5 text-muted-foreground transition-transform group-data-[state=closed]:rotate-[-90deg]" />
+                          <ChevronDown className="h-5 w-5 shrink-0 text-muted-foreground transition-transform group-data-[state=closed]:rotate-[-90deg]" />
                         </CollapsibleTrigger>
                         <CollapsibleContent>
-                          <div className="p-4 pt-2">
+                          <div className="min-w-0 overflow-hidden p-3 sm:p-4">
                             <DailyForecastCards
                               compact
+                              layout="scroll"
                               days={msg.suggestion.forecast.map((f) => ({
                                 date: f.date ?? f.label,
                                 dayNumber: f.day,
@@ -460,22 +554,22 @@ function AssistantPage() {
                   )}
 
                   {/* ITEMS — grouped by category */}
-                  <Card className="overflow-hidden border-border">
+                  <Card className="min-w-0 overflow-hidden border-border">
                     <Collapsible defaultOpen>
-                      <CollapsibleTrigger className="w-full flex items-center justify-between p-4 hover:bg-muted/30 transition-colors group border-b border-border">
-                        <div className="flex items-center gap-3">
-                          <div className="h-9 w-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-                            <Sparkles className="h-5 w-5" />
+                      <CollapsibleTrigger className="group flex w-full items-center justify-between gap-2 p-3 transition-colors hover:bg-muted/30 sm:p-4 border-b border-border">
+                        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+                          <div className="h-8 w-8 shrink-0 rounded-lg bg-primary/10 text-primary flex items-center justify-center sm:h-9 sm:w-9">
+                            <Sparkles className="h-4 w-4 sm:h-5 sm:w-5" />
                           </div>
-                          <div className="text-left">
-                            <div className="font-bold">Prendas recomendadas</div>
-                            <div className="text-xs text-muted-foreground">{msg.suggestion.items.length} items agrupados por categoría</div>
+                          <div className="min-w-0 text-left">
+                            <div className="font-bold text-sm sm:text-base">Prendas recomendadas</div>
+                            <div className="text-xs text-muted-foreground truncate">{msg.suggestion.items.length} items agrupados por categoría</div>
                           </div>
                         </div>
-                        <ChevronDown className="h-5 w-5 text-muted-foreground transition-transform group-data-[state=closed]:rotate-[-90deg]" />
+                        <ChevronDown className="h-5 w-5 shrink-0 text-muted-foreground transition-transform group-data-[state=closed]:rotate-[-90deg]" />
                       </CollapsibleTrigger>
                       <CollapsibleContent>
-                        <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 gap-3 p-3 sm:gap-4 sm:p-4 md:grid-cols-2">
                           {CATEGORIES.map((cat) => {
                             const items = msg.suggestion!.items.filter((it) => it.category === cat);
                             if (items.length === 0) return null;
@@ -536,7 +630,7 @@ function AssistantPage() {
 
       {/* Modify suggestion dialog */}
       <Dialog open={!!editingMsgId} onOpenChange={(o) => !o && setEditingMsgId(null)}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>Modificar lista sugerida</DialogTitle>
             <DialogDescription>
@@ -544,14 +638,14 @@ function AssistantPage() {
             </DialogDescription>
           </DialogHeader>
           {editingMsg?.suggestion && (
-            <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
+            <div className="space-y-3 max-h-[50vh] overflow-y-auto overflow-x-hidden pr-1">
               {editingMsg.suggestion.items.map((it, idx) => (
                 <div
                   key={idx}
-                  className="grid grid-cols-12 gap-2 items-center border border-border rounded-md p-2"
+                  className="space-y-2 rounded-md border border-border p-2 sm:grid sm:grid-cols-12 sm:items-center sm:gap-2 sm:space-y-0"
                 >
                   <Input
-                    className="col-span-4"
+                    className="sm:col-span-4"
                     value={it.name}
                     onChange={(e) => {
                       const items = [...editingMsg.suggestion!.items];
@@ -573,7 +667,7 @@ function AssistantPage() {
                       });
                     }}
                   >
-                    <SelectTrigger className="col-span-3">
+                    <SelectTrigger className="sm:col-span-3">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -584,11 +678,12 @@ function AssistantPage() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <Input
-                    className="col-span-2"
-                    type="number"
-                    min={1}
-                    value={it.quantity ?? 1}
+                  <div className="flex gap-2 sm:contents">
+                    <Input
+                      className="flex-1 sm:col-span-2"
+                      type="number"
+                      min={1}
+                      value={it.quantity ?? 1}
                     onChange={(e) => {
                       const items = [...editingMsg.suggestion!.items];
                       items[idx] = { ...it, quantity: parseInt(e.target.value) || 1 };
@@ -597,12 +692,12 @@ function AssistantPage() {
                         items,
                       });
                     }}
-                  />
-                  <Input
-                    className="col-span-2"
-                    type="number"
-                    step="0.1"
-                    value={it.weight}
+                    />
+                    <Input
+                      className="flex-1 sm:col-span-2"
+                      type="number"
+                      step="0.1"
+                      value={it.weight}
                     onChange={(e) => {
                       const items = [...editingMsg.suggestion!.items];
                       items[idx] = { ...it, weight: parseFloat(e.target.value) || 0 };
@@ -611,11 +706,11 @@ function AssistantPage() {
                         items,
                       });
                     }}
-                  />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="col-span-1 text-muted-foreground hover:text-red-500"
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="shrink-0 text-muted-foreground hover:text-red-500 sm:col-span-1"
                     onClick={() => {
                       const items = editingMsg.suggestion!.items.filter((_, i) => i !== idx);
                       updateMessageSuggestion(editingMsg.id, {
@@ -623,9 +718,10 @@ function AssistantPage() {
                         items,
                       });
                     }}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               ))}
               <Button

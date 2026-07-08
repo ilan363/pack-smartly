@@ -36,6 +36,7 @@ import {
   type SavedListItem,
 } from "@/lib/saved-lists";
 import { requestNotificationPermission } from "@/lib/packing-reminders";
+import { WeightExplainButton } from "@/components/WeightExplainButton";
 
 export const Route = createFileRoute("/_layout/saved-suitcases")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -286,8 +287,14 @@ function SavedListDetail({
                             className={`cursor-pointer block ${item.checked ? "line-through" : ""}`}
                           >
                             <span className="font-medium text-sm">{item.name}</span>
-                            <span className="text-xs text-muted-foreground ml-2">
+                            <span className="ml-2 inline-flex items-center gap-0.5 text-xs text-muted-foreground">
                               {item.weight} kg
+                              <WeightExplainButton
+                                name={item.name}
+                                category={item.category}
+                                weight={item.weight}
+                                source="imported"
+                              />
                             </span>
                           </label>
                         )}

@@ -29,6 +29,7 @@ import {
 } from "@/lib/suitcases-store";
 import { ExcessBaggageEstimateCard } from "@/components/suitcases/ExcessBaggageEstimate";
 import { IataAirportCombobox } from "@/components/suitcases/IataAirportCombobox";
+import { WeightExplainButton } from "@/components/WeightExplainButton";
 
 export const Route = createFileRoute("/_layout/suitcases")({
   component: SuitcasesPage,
@@ -226,13 +227,24 @@ function SuitcasesPage() {
                         </Badge>
                       </td>
                       <td className="p-4 text-right">{item.quantity}</td>
-                      <td className="p-4 text-right text-muted-foreground">
-                        {(item.weight * item.quantity).toFixed(2)} kg
-                        {item.quantity > 1 && (
-                          <span className="block text-[11px] text-muted-foreground/80">
-                            ({item.weight.toFixed(2)} kg c/u)
-                          </span>
-                        )}
+                      <td className="p-4 text-right">
+                        <div className="inline-flex items-center justify-end gap-0.5">
+                          <div className="text-muted-foreground">
+                            {(item.weight * item.quantity).toFixed(2)} kg
+                            {item.quantity > 1 && (
+                              <span className="block text-[11px] text-muted-foreground/80">
+                                ({item.weight.toFixed(2)} kg c/u)
+                              </span>
+                            )}
+                          </div>
+                          <WeightExplainButton
+                            name={item.name}
+                            category={item.category}
+                            weight={item.weight}
+                            quantity={item.quantity}
+                            source="manual"
+                          />
+                        </div>
                       </td>
                       <td className="p-4 text-right">
                         <Button

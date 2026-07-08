@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { useChecklistsStore } from "@/lib/checklists-store";
+import { WeightExplainButton } from "@/components/WeightExplainButton";
 
 export const Route = createFileRoute("/_layout/checklists")({
   component: ChecklistsPage,
@@ -147,8 +148,15 @@ function ChecklistsPage() {
                       <Badge variant="outline" className="text-[10px]">
                         {it.category}
                       </Badge>
-                      <span className="text-xs text-muted-foreground w-16 text-right">
+                      <span className="inline-flex w-20 items-center justify-end gap-0.5 text-xs text-muted-foreground">
                         {(it.weight * it.quantity).toFixed(2)} kg
+                        <WeightExplainButton
+                          name={it.name}
+                          category={it.category}
+                          weight={it.weight}
+                          quantity={it.quantity}
+                          source="imported"
+                        />
                       </span>
                     </button>
                   ))}

@@ -29,6 +29,7 @@ import { useChatStore, type ChatMessage, type ChatSuggestion } from "@/lib/chat-
 import { generatePackSuggestion } from "@/lib/pack-service";
 import { DestinationCombobox } from "@/components/assistant/DestinationCombobox";
 import { TripNotesField, formatTripNotesForPrompt } from "@/components/assistant/TripNotesField";
+import { WeightExplainButton } from "@/components/WeightExplainButton";
 
 export const Route = createFileRoute("/_layout/assistant")({
   component: AssistantPage,
@@ -495,7 +496,16 @@ function AssistantPage() {
                                         {it.name}
                                         {it.quantity && it.quantity > 1 ? <span className="text-muted-foreground"> × {it.quantity}</span> : null}
                                       </span>
-                                      <span className="text-xs text-muted-foreground shrink-0">{(it.weight * (it.quantity ?? 1)).toFixed(2)} kg</span>
+                                      <span className="inline-flex shrink-0 items-center gap-0.5 text-xs text-muted-foreground">
+                                        {(it.weight * (it.quantity ?? 1)).toFixed(2)} kg
+                                        <WeightExplainButton
+                                          name={it.name}
+                                          category={it.category}
+                                          weight={it.weight}
+                                          quantity={it.quantity ?? 1}
+                                          source="assistant"
+                                        />
+                                      </span>
                                     </li>
                                   ))}
                                 </ul>

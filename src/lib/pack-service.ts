@@ -790,6 +790,7 @@ type ClothingSlot =
   | "swimwear"
   | "formal"
   | "footwear"
+  | "towels"
   | "other_clothing";
 
 function computeClothingBudget(
@@ -837,7 +838,7 @@ function computeClothingBudget(
     socks = Math.ceil(days * 0.75);
   }
 
-  const shirtCap = extendedStay ? 14 : longStay ? 11 : days <= 7 ? 6 : 9;
+  const shirtCap = extendedStay ? 14 : longStay ? 11 : Math.min(9, Math.max(6, Math.ceil(days * 0.8)));
   const pantsCap = extendedStay ? 7 : longStay ? 5 : 4;
   shirts = clampInt(shirts, 2, shirtCap);
   pants = clampInt(pants, 1, pantsCap);
@@ -846,6 +847,7 @@ function computeClothingBudget(
 
   let shorts = 0;
   let outerwear = context.cold ? 2 : 1;
+  outerwear = Math.min(outerwear, 2);
 
   const beach =
     context.warm ||
@@ -859,7 +861,7 @@ function computeClothingBudget(
   }
 
   if (context.cold) {
-    outerwear = longStay ? 3 : 2;
+    outerwear = Math.min(longStay ? 3 : 2, 2);
     shirts = clampInt(shirts + 1, 2, shirtCap + 1);
     socks = clampInt(socks + 1, 3, extendedStay ? 15 : 12);
   }
@@ -918,6 +920,7 @@ function clothingSlot(item: PackItem): ClothingSlot | null {
   }
 
   if (/traje de bano|traje de baño|malla|bikini/.test(t)) return "swimwear";
+  if (/toalla/.test(t)) return "towels";
   if (/conjunto formal|smoking|corbata|moño|traje sastre/.test(t)) return "formal";
   if (/vestido|falda larga/.test(t)) return "formal";
   if (/zapat|sandalia|ojota|bota/.test(t)) return "footwear";
@@ -982,11 +985,12 @@ function enforceClothingBudget(
     shorts: budget.shorts,
     underwear: budget.underwear,
     socks: budget.socks,
-    outerwear: budget.outerwear,
+    outerwear: Math.min(budget.outerwear, 2),
     swimwear: 2,
     formal: context.formal ? 3 : 2,
     footwear: 3,
     other_clothing: 4,
+    towels: 2,
   };
 
   const nonClothing: PackItem[] = [];
@@ -1125,6 +1129,172 @@ function weightOf(items: PackItem[]) {
   return items.reduce((acc, it) => acc + it.weight * it.quantity, 0);
 }
 
+type ItemCapKind = "shirts" | "pants" | "jackets" | "sweatshirts" | "shoes" | "towels" | "underwear";
+
+function computeAbsoluteCaps(days: number) {
+  return {
+    shirts: Math.min(14, Math.max(4, Math.ceil(days * 0.8))),
+    pants: 4,
+    jackets: 2,
+    sweatshirts: 2,
+    shoes: 3,
+    towels: 2,
+    underwear: Math.min(12, Math.max(4, Math.ceil(days * 0.85))),
+  };
+}
+
+function itemCapKind(item: PackItem): ItemCapKind | null {
+  const t = normalizeText(`${item.category} ${item.name}`);
+  if (/toalla/.test(t)) return "towels";
+  if (/zapat|sandalia|ojota|bota/.test(t)) return "shoes";
+  if (/campera|abrigo|tapado|piloto|impermeable/.test(t)) return "jackets";
+  if (/buzo|sweater|sueter|hoodie/.test(t)) return "sweatshirts";
+  if (/ropa interior|calzon|bombacha|boxer|braga/.test(t)) return "underwear";
+  if (item.category === "Remeras" || /remera|camisa|blusa|top|chomba|polo/.test(t)) return "shirts";
+  if (/short|bermuda/.test(t)) return null;
+  if (item.category === "Pantalones" || /pantalon|jean|jogger|legging|falda|pollera/.test(t)) {
+    return "pants";
+  }
+  return null;
+}
+
+function countItemsByCapKind(items: PackItem[], kind: ItemCapKind): number {
+  return items.reduce((sum, it) => sum + (itemCapKind(it) === kind ? it.quantity : 0), 0);
+}
+
+function shouldAddSweatshirtForFill(
+  context: ReturnType<typeof extractTripContext>,
+  destination: string,
+): boolean {
+  if (context.cold) return false;
+  const { zone } = detectClimate(destination);
+  if (zone === "temperate" || zone === "mediterranean" || zone === "unknown") return true;
+  if (context.warm && context.days > 7) return true;
+  return false;
+}
+
+function shouldAddExtraShoes(
+  context: ReturnType<typeof extractTripContext>,
+  items: PackItem[],
+): boolean {
+  const shoeCount = countItemsByCapKind(items, "shoes");
+  if (shoeCount >= 2) return false;
+  const occasion = normalizeText(context.occasion);
+  if (/trekking|senderismo|montana|montaña|hiking|acampar/.test(occasion)) return true;
+  if (context.formal && shoeCount === 1) return true;
+  if (context.days > 10 && shoeCount <= 1) return true;
+  return false;
+}
+
+function addOrMergeItem(items: PackItem[], toAdd: PackItem): PackItem[] {
+  const kind = itemCapKind(toAdd);
+  if (kind) {
+    const idx = items.findIndex((it) => itemCapKind(it) === kind);
+    if (idx >= 0) {
+      const copy = [...items];
+      copy[idx] = { ...copy[idx], quantity: copy[idx].quantity + toAdd.quantity };
+      return copy;
+    }
+  }
+  return [...items, toAdd];
+}
+
+function enforceAbsoluteCaps(items: PackItem[], days: number): PackItem[] {
+  const caps = computeAbsoluteCaps(days);
+  const used: Record<ItemCapKind, number> = {
+    shirts: 0,
+    pants: 0,
+    jackets: 0,
+    sweatshirts: 0,
+    shoes: 0,
+    towels: 0,
+    underwear: 0,
+  };
+  const result: PackItem[] = [];
+
+  for (const item of items) {
+    const kind = itemCapKind(item);
+    if (!kind) {
+      result.push(item);
+      continue;
+    }
+    const max = caps[kind];
+    const remaining = Math.max(0, max - used[kind]);
+    if (remaining <= 0) continue;
+    const qty = Math.min(item.quantity, remaining);
+    if (qty <= 0) continue;
+    result.push({ ...item, quantity: qty });
+    used[kind] += qty;
+  }
+
+  return result;
+}
+
+function fillLeftoverSpace(
+  items: PackItem[],
+  opts: {
+    packingLimitKg: number;
+    capacityMode?: CapacityMode;
+    days: number;
+    context: ReturnType<typeof extractTripContext>;
+    destination: string;
+  },
+): PackItem[] {
+  if (opts.capacityMode !== "fill") return items;
+
+  const leftoverMinKg = 0.25;
+  let result = [...items];
+  let currentWeight = weightOf(result);
+  if (currentWeight >= opts.packingLimitKg - leftoverMinKg) return result;
+
+  const caps = computeAbsoluteCaps(opts.days);
+  const fillSteps: Array<{
+    kind: ItemCapKind;
+    item: PackItem;
+    allowed: () => boolean;
+  }> = [
+    {
+      kind: "shirts",
+      item: { category: "Remeras", name: "Remeras o tops cómodos", quantity: 1, weight: 0.18 },
+      allowed: () => countItemsByCapKind(result, "shirts") < caps.shirts,
+    },
+    {
+      kind: "underwear",
+      item: { category: "Otros", name: "Ropa interior", quantity: 1, weight: 0.05 },
+      allowed: () => countItemsByCapKind(result, "underwear") < caps.underwear,
+    },
+    {
+      kind: "pants",
+      item: { category: "Pantalones", name: "Pantalón o jean versátil", quantity: 1, weight: 0.55 },
+      allowed: () => countItemsByCapKind(result, "pants") < caps.pants,
+    },
+    {
+      kind: "sweatshirts",
+      item: { category: "Abrigos", name: "Buzo o sweater térmico", quantity: 1, weight: 0.55 },
+      allowed: () =>
+        shouldAddSweatshirtForFill(opts.context, opts.destination) &&
+        countItemsByCapKind(result, "sweatshirts") < caps.sweatshirts,
+    },
+    {
+      kind: "shoes",
+      item: { category: "Zapatillas", name: "Zapatillas extra", quantity: 1, weight: 0.75 },
+      allowed: () =>
+        shouldAddExtraShoes(opts.context, result) && countItemsByCapKind(result, "shoes") < caps.shoes,
+    },
+  ];
+
+  for (const step of fillSteps) {
+    if (currentWeight >= opts.packingLimitKg - leftoverMinKg) break;
+    if (!step.allowed()) continue;
+    const addWeight = step.item.weight * step.item.quantity;
+    if (currentWeight + addWeight > opts.packingLimitKg) continue;
+    result = addOrMergeItem(result, step.item);
+    currentWeight += addWeight;
+  }
+
+  return result;
+}
+
 function adjustRequiredToFitWeight(required: PackItem[], packingLimitKg: number) {
   const weightBudget = packingLimitKg;
   const fixed = required.filter((it) => !/remera|tops|pantalon|jean|jean versátil|ropa interior|medias|medios/.test(normalizeText(`${it.category} ${it.name}`)));
@@ -1175,6 +1345,8 @@ function applyCapacityBudget(input: {
   capacityMode?: CapacityMode;
   days: number;
   prompt: string;
+  context: ReturnType<typeof extractTripContext>;
+  destination: string;
 }) {
   const requiredKeys = new Set(input.required.map((it) => normalizeText(`${it.category}|${it.name}`)));
   const isRequired = (it: PackItem) => requiredKeys.has(normalizeText(`${it.category}|${it.name}`));
@@ -1221,7 +1393,17 @@ function applyCapacityBudget(input: {
   }
 
   // If required items are already overweight, we still return them (can't satisfy capacity perfectly).
-  return picked.slice(0, Math.max(maxItems, requiredAdjusted.length));
+  const capped = enforceAbsoluteCaps(
+    fillLeftoverSpace(picked, {
+      packingLimitKg: weightBudget,
+      capacityMode: input.capacityMode,
+      days: input.days,
+      context: input.context,
+      destination: input.destination,
+    }),
+    input.days,
+  );
+  return capped.slice(0, Math.max(maxItems, requiredAdjusted.length));
 }
 
 function normalizeSuggestion(
@@ -1274,8 +1456,10 @@ function normalizeSuggestion(
           capacityMode: resolvedPacking.capacityMode,
           days,
           prompt,
+          context,
+          destination,
         })
-      : merged.slice(0, 22),
+      : enforceAbsoluteCaps(merged.slice(0, 22), days),
     context.noteLines,
   );
 
@@ -1343,6 +1527,7 @@ Reglas críticas:
 - Si el usuario puso notas, incluí TODAS como ítems aparte (quantity 1). No omitas ninguna nota de la lista.
 - Si hay casamiento/boda incluí conjunto y zapatos formales; si es playa incluí traje de baño/protector; si no hay nieve no sugieras ropa de nieve.
 - Si el usuario indicó capacidad de valija en kg, respetá el modo: "llenar" → aprovechá casi todo el peso disponible; "remanente/compras" → dejá espacio libre y no completes el peso máximo.
+- Límites máximos de cantidad (nunca superar): remeras ≈ ceil(días×0.8) (ej. 8 en 10 días), pantalones 4, camperas 2, zapatos 3 pares, toallas 2. No repitas la misma prenda en exceso.
 - Para calcetines usá siempre "Medias" (nunca "Medios").`,
           prompt: `Solicitud del usuario: ${input.prompt}\nContexto detectado: destino=${context.destination}, días=${context.days}, ocasión=${context.occasion}${capacity ? `, capacidad=${capacity}kg${buildCapacityPromptContext(packing)}` : ""}${
             context.noteLines.length

@@ -59,11 +59,8 @@ function AuthCallbackPage() {
         return;
       }
 
-      toast.success(
-        useAuthStore.getState().isAdmin ? "Acceso de administrador concedido" : "Sesión iniciada",
-        { description: email },
-      );
-      navigate({ to: useAuthStore.getState().isAdmin ? "/admin" : "/dashboard" });
+      toast.success("Sesión iniciada", { description: email });
+      navigate({ to: "/dashboard" });
     };
 
     void completeAuth();

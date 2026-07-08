@@ -6,9 +6,12 @@ import { createSafeLocalStorage } from "@/lib/safe-storage";
 export const ADMIN_EMAIL = "i.manbrut@wolfsohn.edu.ar";
 const ADMIN_PASSWORD = "ilan20enero";
 
-type RegisteredUser = {
+export type RegisteredUser = {
   email: string;
   password: string;
+  oauthProvider: OAuthProviderId | null;
+  registeredAt: number;
+  lastLoginAt: number;
 };
 
 type AuthResult = { ok: true } | { ok: false; error: string };
@@ -36,6 +39,39 @@ function isValidEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
+function upsertRegisteredUser(
+  users: RegisteredUser[],
+  email: string,
+  patch: Partial<Pick<RegisteredUser, "password" | "oauthProvider">>,
+): RegisteredUser[] {
+  const normalized = normalizeEmail(email);
+  const now = Date.now();
+  const index = users.findIndex((user) => user.email === normalized);
+
+  if (index >= 0) {
+    const current = users[index];
+    const next = [...users];
+    next[index] = {
+      ...current,
+      password: patch.password ?? current.password,
+      oauthProvider: patch.oauthProvider ?? current.oauthProvider,
+      lastLoginAt: now,
+    };
+    return next;
+  }
+
+  return [
+    ...users,
+    {
+      email: normalized,
+      password: patch.password ?? "",
+      oauthProvider: patch.oauthProvider ?? null,
+      registeredAt: now,
+      lastLoginAt: now,
+    },
+  ];
+}
+
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
@@ -60,7 +96,12 @@ export const useAuthStore = create<AuthState>()(
 
         const user = get().users.find((u) => u.email === normalized);
         if (user && user.password === password) {
-          set({ email: normalized, isAdmin: false });
+          set({
+            email: normalized,
+            isAdmin: false,
+            oauthProvider: null,
+            users: upsertRegisteredUser(get().users, normalized, { password }),
+          });
           return { ok: true };
         }
 
@@ -74,7 +115,11 @@ export const useAuthStore = create<AuthState>()(
         }
 
         if (normalized === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
-          set({ email: ADMIN_EMAIL, isAdmin: true });
+          set({
+            email: ADMIN_EMAIL,
+            isAdmin: true,
+            oauthProvider: null,
+          });
           return { ok: true };
         }
 
@@ -105,9 +150,13 @@ export const useAuthStore = create<AuthState>()(
         }
 
         set({
-          users: [...get().users, { email: normalized, password }],
+          users: upsertRegisteredUser(get().users, normalized, {
+            password,
+            oauthProvider: null,
+          }),
           email: normalized,
           isAdmin: false,
+          oauthProvider: null,
         });
         return { ok: true };
       },
@@ -119,11 +168,18 @@ export const useAuthStore = create<AuthState>()(
         }
 
         if (normalized === ADMIN_EMAIL) {
-          set({ email: normalized, isAdmin: true, oauthProvider: provider });
-          return { ok: true };
+          return {
+            ok: false,
+            error: "Para administrar, ingresá desde el panel de administración con tu contraseña.",
+          };
         }
 
-        set({ email: normalized, isAdmin: false, oauthProvider: provider });
+        set({
+          email: normalized,
+          isAdmin: false,
+          oauthProvider: provider,
+          users: upsertRegisteredUser(get().users, normalized, { oauthProvider: provider }),
+        });
         return { ok: true };
       },
       clearOAuthSession: () => {
@@ -138,7 +194,7 @@ export const useAuthStore = create<AuthState>()(
         });
       },
       logout: () => set({ email: null, isAdmin: false, oauthProvider: null }),
-      resetSession: () => set({ email: null, isAdmin: false, oauthProvider: null, users: [] }),
+      resetSession: () => set({ email: null, isAdmin: false, oauthProvider: null }),
     }),
     {
       name: "pack-smartly-auth",
@@ -149,6 +205,28 @@ export const useAuthStore = create<AuthState>()(
         oauthProvider: state.oauthProvider,
         users: state.users,
       }),
+      merge: (persisted, current) => {
+        const saved = (persisted ?? {}) as Partial<AuthState>;
+        const users = (saved.users ?? [])
+          .map((user) => ({
+            email: normalizeEmail(user.email),
+            password: user.password ?? "",
+            oauthProvider: user.oauthProvider ?? null,
+            registeredAt: user.registeredAt ?? Date.now(),
+            lastLoginAt: user.lastLoginAt ?? user.registeredAt ?? Date.now(),
+          }))
+          .filter((user) => user.email !== ADMIN_EMAIL);
+
+        const oauthProvider = saved.oauthProvider ?? null;
+
+        return {
+          ...current,
+          ...saved,
+          oauthProvider,
+          isAdmin: Boolean(saved.isAdmin && !oauthProvider),
+          users,
+        };
+      },
     },
   ),
 );

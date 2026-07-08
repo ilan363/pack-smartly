@@ -29,8 +29,8 @@ function AdminPage() {
 
   useEffect(() => {
     if (!isAdmin) {
-      toast.error("Acceso denegado");
-      navigate({ to: "/dashboard" });
+      toast.error("Acceso denegado. Iniciá sesión desde el panel de administración.");
+      navigate({ to: "/" });
     }
   }, [isAdmin, navigate]);
 
@@ -105,6 +105,8 @@ function AdminPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Email</TableHead>
+                  <TableHead>Método</TableHead>
+                  <TableHead>Último acceso</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
@@ -112,6 +114,21 @@ function AdminPage() {
                 {users.map((user) => (
                   <TableRow key={user.email}>
                     <TableCell className="font-medium">{user.email}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">
+                        {user.oauthProvider
+                          ? user.oauthProvider === "google"
+                            ? "Google"
+                            : "GitHub"
+                          : "Email"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {new Date(user.lastLoginAt).toLocaleString("es-AR", {
+                        dateStyle: "short",
+                        timeStyle: "short",
+                      })}
+                    </TableCell>
                     <TableCell className="text-right">
                       <Button
                         variant="ghost"

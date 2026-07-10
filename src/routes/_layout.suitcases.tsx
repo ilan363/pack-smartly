@@ -30,6 +30,10 @@ import {
 import { ExcessBaggageEstimateCard } from "@/components/suitcases/ExcessBaggageEstimate";
 import { IataAirportCombobox } from "@/components/suitcases/IataAirportCombobox";
 import { WeightExplainButton } from "@/components/WeightExplainButton";
+import {
+  estimateLineWeightKg,
+  estimateUnitWeightKg,
+} from "@/lib/weight-explain";
 
 export const Route = createFileRoute("/_layout/suitcases")({
   component: SuitcasesPage,
@@ -45,6 +49,72 @@ const CATEGORIES = [
   "Electrónica",
   "Otros",
 ];
+
+function EditItemForm({
+  item,
+  onChange,
+}: {
+  item: Item;
+  onChange: (item: Item) => void;
+}) {
+  const unitWeight = estimateUnitWeightKg(item.name, item.category);
+  const lineWeight = estimateLineWeightKg(item.name, item.category, item.quantity);
+
+  const patch = (partial: Partial<Pick<Item, "name" | "category" | "quantity">>) => {
+    const next = { ...item, ...partial };
+    onChange({
+      ...next,
+      weight: estimateUnitWeightKg(next.name, next.category),
+    });
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <label className="text-sm font-medium">Nombre</label>
+        <Input
+          value={item.name}
+          onChange={(e) => patch({ name: e.target.value })}
+        />
+      </div>
+      <div className="space-y-2">
+        <label className="text-sm font-medium">Categoría</label>
+        <Select value={item.category} onValueChange={(v) => patch({ category: v })}>
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {CATEGORIES.map((c) => (
+              <SelectItem key={c} value={c}>
+                {c}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Cantidad</label>
+          <Input
+            type="number"
+            min="1"
+            value={item.quantity}
+            onChange={(e) => patch({ quantity: parseInt(e.target.value) || 1 })}
+          />
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Peso total (kg)</label>
+          <div className="flex h-9 w-full items-center rounded-md border border-input bg-muted/40 px-3 text-sm">
+            {lineWeight.toFixed(2)} kg
+            {item.quantity > 1 && (
+              <span className="text-muted-foreground"> ({unitWeight.toFixed(2)} kg c/u)</span>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function SuitcasesPage() {
   const suitcases = useSuitcasesStore((s) => s.suitcases);
@@ -66,8 +136,17 @@ function SuitcasesPage() {
     name: "",
     category: "",
     quantity: 1,
-    totalWeight: 0,
   });
+
+  const newItemEstimatedTotal = useMemo(() => {
+    if (!newItem.category) return 0;
+    return estimateLineWeightKg(newItem.name, newItem.category, newItem.quantity);
+  }, [newItem.name, newItem.category, newItem.quantity]);
+
+  const newItemUnitWeight = useMemo(() => {
+    if (!newItem.category) return 0;
+    return estimateUnitWeightKg(newItem.name, newItem.category);
+  }, [newItem.name, newItem.category]);
 
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [suitcaseDialog, setSuitcaseDialog] = useState<
@@ -100,21 +179,20 @@ function SuitcasesPage() {
   }
 
   const handleAddItem = () => {
-    if (!newItem.name || !newItem.category || newItem.totalWeight <= 0) {
-      toast.error("Completá nombre, categoría y peso total.");
+    if (!newItem.name.trim() || !newItem.category) {
+      toast.error("Completá nombre y categoría.");
       return;
     }
     const quantity = Math.max(1, newItem.quantity);
-    const weightPerUnit =
-      Math.round((newItem.totalWeight / quantity) * 100) / 100;
+    const weightPerUnit = estimateUnitWeightKg(newItem.name, newItem.category);
     addItem(active.id, {
-      name: newItem.name,
+      name: newItem.name.trim(),
       category: newItem.category,
       quantity,
       weight: weightPerUnit,
     });
-    setNewItem({ name: "", category: "", quantity: 1, totalWeight: 0 });
-    toast.success(`"${newItem.name}" agregado a ${active.name}`);
+    setNewItem({ name: "", category: "", quantity: 1 });
+    toast.success(`"${newItem.name.trim()}" agregado a ${active.name}`);
   };
 
   const handleDeleteSuitcase = () => {
@@ -242,7 +320,7 @@ function SuitcasesPage() {
                             category={item.category}
                             weight={item.weight}
                             quantity={item.quantity}
-                            source="manual"
+                            source="assistant"
                           />
                         </div>
                       </td>
@@ -325,24 +403,27 @@ function SuitcasesPage() {
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Peso total (kg)</label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  placeholder="Ej: 0.90"
-                  value={newItem.totalWeight || ""}
-                  onChange={(e) =>
-                    setNewItem({
-                      ...newItem,
-                      totalWeight: parseFloat(e.target.value) || 0,
-                    })
-                  }
-                />
-                {newItem.quantity > 1 && newItem.totalWeight > 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    ≈ {(newItem.totalWeight / newItem.quantity).toFixed(2)} kg por unidad
-                  </p>
-                )}
+                <div
+                  className="flex h-9 w-full items-center rounded-md border border-input bg-muted/40 px-3 text-sm"
+                  aria-live="polite"
+                >
+                  {newItem.category ? (
+                    <span>
+                      {newItemEstimatedTotal.toFixed(2)} kg
+                      {newItem.quantity > 1 && (
+                        <span className="text-muted-foreground">
+                          {" "}
+                          ({newItemUnitWeight.toFixed(2)} kg c/u)
+                        </span>
+                      )}
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground">Elegí una categoría</span>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Se calcula solo según el tipo de prenda y la cantidad.
+                </p>
               </div>
             </div>
             <Button className="w-full mt-2" onClick={handleAddItem}>
@@ -360,77 +441,10 @@ function SuitcasesPage() {
             <DialogDescription>Modificá los datos del objeto.</DialogDescription>
           </DialogHeader>
           {editingItem && (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Nombre</label>
-                <Input
-                  value={editingItem.name}
-                  onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Categoría</label>
-                <Select
-                  value={editingItem.category}
-                  onValueChange={(v) => setEditingItem({ ...editingItem, category: v })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {CATEGORIES.map((c) => (
-                      <SelectItem key={c} value={c}>
-                        {c}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Cantidad</label>
-                  <Input
-                    type="number"
-                    min="1"
-                    value={editingItem.quantity}
-                    onChange={(e) =>
-                      setEditingItem({
-                        ...editingItem,
-                        quantity: parseInt(e.target.value) || 1,
-                      })
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Peso total (kg)</label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min="0.01"
-                    value={
-                      editingItem
-                        ? (editingItem.weight * editingItem.quantity).toFixed(2)
-                        : ""
-                    }
-                    onChange={(e) => {
-                      if (!editingItem) return;
-                      const total = parseFloat(e.target.value) || 0;
-                      const qty = Math.max(1, editingItem.quantity);
-                      setEditingItem({
-                        ...editingItem,
-                        weight: Math.round((total / qty) * 100) / 100,
-                      });
-                    }}
-                  />
-                  {editingItem && editingItem.quantity > 1 && (
-                    <p className="text-xs text-muted-foreground">
-                      {editingItem.quantity} unidades ·{" "}
-                      {editingItem.weight.toFixed(2)} kg c/u
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
+            <EditItemForm
+              item={editingItem}
+              onChange={setEditingItem}
+            />
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditingItem(null)}>

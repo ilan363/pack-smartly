@@ -1,11 +1,12 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useRef, useEffect } from "react";
-import { Bot, Send, User, Sparkles, Plus, Trash2, BookmarkPlus, Loader2, CloudSun, ChevronDown } from "lucide-react";
+import { Bot, Send, User, Sparkles, Plus, Trash2, BookmarkPlus, Loader2, CloudSun, ChevronDown, AlertTriangle } from "lucide-react";
 import { DailyForecastCards } from "@/components/weather/DailyForecastCards";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -26,7 +27,7 @@ import { toast } from "sonner";
 import { useSuitcasesStore, type SuitcaseType } from "@/lib/suitcases-store";
 import { useChecklistsStore } from "@/lib/checklists-store";
 import { useChatStore, type ChatMessage, type ChatSuggestion } from "@/lib/chat-store";
-import { generatePackSuggestion, defaultShoppingReserveKg, resolvePackingCapacity } from "@/lib/pack-service";
+import { generatePackSuggestion, defaultShoppingReserveKg, resolvePackingCapacity, computeWeightExcessKg } from "@/lib/pack-service";
 import { DestinationCombobox } from "@/components/assistant/DestinationCombobox";
 import { TripNotesField, formatTripNotesForPrompt } from "@/components/assistant/TripNotesField";
 import { WeightExplainButton } from "@/components/WeightExplainButton";
@@ -205,10 +206,16 @@ function AssistantPage() {
         (acc, it) => acc + it.weight * (it.quantity ?? 1),
         0,
       );
+      const weightExcessKg =
+        data.weightExcessKg ?? computeWeightExcessKg(totalWeight, data.suitcaseCapacityKg);
+      const overCapacityNote =
+        weightExcessKg && data.suitcaseCapacityKg
+          ? `\n\n⚠️ El peso total (${totalWeight.toFixed(2)} kg) supera la capacidad de tu valija (${data.suitcaseCapacityKg} kg) en ${weightExcessKg.toFixed(2)} kg. Necesitás una valija con más capacidad.`
+          : "";
       addMessage({
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: `Armé una valija para ${data.days} día${data.days === 1 ? "" : "s"} en ${data.destination} (${data.occasion}). Mirá el cronograma del clima abajo.`,
+        content: `Armé una valija para ${data.days} día${data.days === 1 ? "" : "s"} en ${data.destination} (${data.occasion}). Mirá el cronograma del clima abajo.${overCapacityNote}`,
         suggestion: {
           destination: data.destination,
           weather: data.weather,
@@ -220,6 +227,7 @@ function AssistantPage() {
           capacityMode: data.capacityMode,
           shoppingReserveKg: data.shoppingReserveKg,
           packingLimitKg: data.packingLimitKg,
+          weightExcessKg,
           forecast: data.forecast,
         },
       });
@@ -266,7 +274,8 @@ function AssistantPage() {
       (acc, it) => acc + it.weight * (it.quantity ?? 1),
       0,
     );
-    updateSuggestionInStore(msgId, { ...suggestion, totalWeight: total });
+    const weightExcessKg = computeWeightExcessKg(total, suggestion.suitcaseCapacityKg);
+    updateSuggestionInStore(msgId, { ...suggestion, totalWeight: total, weightExcessKg });
   };
 
   const editingMsg = messages.find((m) => m.id === editingMsgId);
@@ -541,6 +550,17 @@ function AssistantPage() {
                 <div className="min-w-0 space-y-3 sm:space-y-4">
                   {/* HEADER summary */}
                   <Card className="min-w-0 overflow-hidden border-primary/20 bg-gradient-to-br from-primary/10 via-primary/5 to-background p-4 sm:p-5">
+                    {msg.suggestion.weightExcessKg && msg.suggestion.suitcaseCapacityKg ? (
+                      <Alert variant="destructive" className="mb-4 border-destructive/40 bg-destructive/5">
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertTitle>Excedés el peso de la valija</AlertTitle>
+                        <AlertDescription>
+                          La lista suma {msg.suggestion.totalWeight.toFixed(2)} kg y tu valija admite{" "}
+                          {msg.suggestion.suitcaseCapacityKg} kg ({msg.suggestion.weightExcessKg.toFixed(2)} kg de
+                          más). Necesitás más capacidad en la valija; no redujimos prendas ni ítems automáticamente.
+                        </AlertDescription>
+                      </Alert>
+                    ) : null}
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                       <div className="min-w-0 flex-1">
                         <div className="text-xs uppercase tracking-wider text-primary/80 font-semibold">Lista sugerida</div>
@@ -562,7 +582,15 @@ function AssistantPage() {
                       </div>
                       <div className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-background/60 px-3 py-2 sm:block sm:border-0 sm:bg-transparent sm:p-0 sm:text-right">
                         <div className="text-xs uppercase tracking-wider text-muted-foreground font-semibold sm:mb-0">Peso total</div>
-                        <div className="text-2xl font-bold text-primary sm:text-3xl">{msg.suggestion.totalWeight.toFixed(2)}<span className="ml-1 text-sm font-medium text-muted-foreground sm:text-base">kg</span></div>
+                        <div className={`text-2xl font-bold sm:text-3xl ${msg.suggestion.weightExcessKg ? "text-destructive" : "text-primary"}`}>
+                          {msg.suggestion.totalWeight.toFixed(2)}
+                          <span className="ml-1 text-sm font-medium text-muted-foreground sm:text-base">kg</span>
+                          {msg.suggestion.suitcaseCapacityKg ? (
+                            <span className="block text-xs font-normal text-muted-foreground sm:text-sm">
+                              de {msg.suggestion.suitcaseCapacityKg} kg
+                            </span>
+                          ) : null}
+                        </div>
                       </div>
                     </div>
 

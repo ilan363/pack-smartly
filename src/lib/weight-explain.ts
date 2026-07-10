@@ -121,6 +121,31 @@ const CATEGORY_HINTS: Record<string, string> = {
   Otros: "Estimación según tamaño y material del objeto.",
 };
 
+const CATEGORY_DEFAULT_KG: Record<string, number> = {
+  Remeras: 0.18,
+  Pantalones: 0.55,
+  Abrigos: 0.75,
+  Zapatillas: 0.8,
+  Accesorios: 0.25,
+  Higiene: 0.45,
+  Electrónica: 0.5,
+  Otros: 0.2,
+};
+
+/** Estimated kg per unit from item name and category (same logic as the AI packer). */
+export function estimateUnitWeightKg(name: string, category: string): number {
+  const blob = normalizeText(`${category} ${name}`);
+  const known = KNOWN_ITEMS.find((item) => item.match.test(blob));
+  if (known) return known.typicalWeight;
+  return CATEGORY_DEFAULT_KG[category] ?? CATEGORY_DEFAULT_KG.Otros;
+}
+
+export function estimateLineWeightKg(name: string, category: string, quantity: number): number {
+  const qty = Math.max(1, quantity);
+  const perUnit = estimateUnitWeightKg(name, category);
+  return Math.round(perUnit * qty * 100) / 100;
+}
+
 export function getWeightExplanation(input: WeightExplainInput): string {
   const quantity = Math.max(1, input.quantity ?? 1);
   const perUnit = input.weight;

@@ -33,6 +33,8 @@ import { TripNotesField, formatTripNotesForPrompt } from "@/components/assistant
 import { WeightExplainButton } from "@/components/WeightExplainButton";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
+import { useI18n } from "@/hooks/use-i18n";
+import { ITEM_CATEGORY_IDS } from "@/lib/i18n/categories";
 
 export const Route = createFileRoute("/_layout/assistant")({
   component: AssistantPage,
@@ -41,17 +43,6 @@ export const Route = createFileRoute("/_layout/assistant")({
 type SuggestionItem = { category: string; name: string; weight: number; quantity?: number };
 type Suggestion = ChatSuggestion;
 type Message = ChatMessage;
-
-const CATEGORIES = [
-  "Remeras",
-  "Pantalones",
-  "Abrigos",
-  "Zapatillas",
-  "Accesorios",
-  "Higiene",
-  "Electrónica",
-  "Otros",
-];
 
 function buildSuitcaseFromSuggestion(
   suggestion: ChatSuggestion,
@@ -79,6 +70,7 @@ function buildSuitcaseFromSuggestion(
 }
 
 function AssistantPage() {
+  const { t, tc } = useI18n();
   const messages = useChatStore((s) => s.messages);
   const addMessage = useChatStore((s) => s.addMessage);
   const updateSuggestionInStore = useChatStore((s) => s.updateSuggestion);
@@ -135,47 +127,55 @@ function AssistantPage() {
     if (loading) return;
     const destination = form.destination.trim();
     if (!destination) {
-      toast.error("Indicá el destino");
+      toast.error(t("assistant.errDestination"));
       return;
     }
     if (!form.from || !form.to) {
-      toast.error("Indicá las fechas del viaje");
+      toast.error(t("assistant.errDates"));
       return;
     }
     const days = computeDays();
     if (days <= 0) {
-      toast.error("Las fechas no son válidas");
+      toast.error(t("assistant.errInvalidDates"));
       return;
     }
     if (!Number.isFinite(form.suitcaseCapacityKg) || form.suitcaseCapacityKg < 5) {
-      toast.error("Indicá la capacidad de la valija (mín. 5 kg)");
+      toast.error(t("assistant.errCapacity"));
       return;
     }
     if (form.sharedSuitcase) {
       if (!Number.isFinite(form.sharedPeople) || form.sharedPeople < 2) {
-        toast.error("Indicá al menos 2 personas para valija compartida");
+        toast.error(t("assistant.errSharedMin"));
         return;
       }
       if (form.sharedPeople > 8) {
-        toast.error("Máximo 8 personas por valija compartida");
+        toast.error(t("assistant.errSharedMax", { count: 8 }));
         return;
       }
     }
     const occasion = form.occasion.trim();
-    const notesBlock = formatTripNotesForPrompt(form.notes);
+    const notesBlock = formatTripNotesForPrompt(form.notes, t("assistant.notes"));
     const capacityLine =
       form.capacityMode === "reserve"
-        ? `Capacidad de valija: ${Math.round(form.suitcaseCapacityKg)} kg (dejar ${form.shoppingReserveKg} kg libres para compras)`
-        : `Capacidad de valija: ${Math.round(form.suitcaseCapacityKg)} kg (llenar la valija)`;
+        ? t("assistant.packingPreviewReserve", {
+            reserveKg: form.shoppingReserveKg,
+            packingLimitKg: packingPreview?.packingLimitKg ?? 0,
+          })
+        : t("assistant.packingPreviewFill", {
+            capacityKg: Math.round(form.suitcaseCapacityKg),
+            packingLimitKg: packingPreview?.packingLimitKg ?? 0,
+          });
     const userText = [
-      `Destino: ${destination}`,
-      `Desde: ${form.from}`,
-      `Hasta: ${form.to}`,
-      `Días: ${days}`,
+      `${t("assistant.destination")}: ${destination}`,
+      `${t("assistant.from")}: ${form.from}`,
+      `${t("assistant.to")}: ${form.to}`,
+      `${t(days === 1 ? "assistant.tripDaysOne" : "assistant.tripDaysMany", { count: days })}`,
       capacityLine,
-      `Valija compartida: ${form.sharedSuitcase ? "sí" : "no"}`,
-      form.sharedSuitcase ? `Personas en la valija: ${Math.round(form.sharedPeople)}` : null,
-      occasion ? `Ocasión: ${occasion}` : null,
+      `${t("assistant.sharedSuitcase")}: ${form.sharedSuitcase ? t("common.yes") : t("common.no")}`,
+      form.sharedSuitcase
+        ? `${t("assistant.peopleCount")}: ${Math.round(form.sharedPeople)}`
+        : null,
+      occasion ? `${t("assistant.occasion")}: ${occasion}` : null,
       notesBlock,
     ]
       .filter(Boolean)
@@ -210,12 +210,29 @@ function AssistantPage() {
         data.weightExcessKg ?? computeWeightExcessKg(totalWeight, data.suitcaseCapacityKg);
       const overCapacityNote =
         weightExcessKg && data.suitcaseCapacityKg
-          ? `\n\n⚠️ El peso total (${totalWeight.toFixed(2)} kg) supera la capacidad de tu valija (${data.suitcaseCapacityKg} kg) en ${weightExcessKg.toFixed(2)} kg. Necesitás una valija con más capacidad.`
+          ? `\n\n⚠️ ${t("assistant.overCapacityDetail", {
+              total: totalWeight.toFixed(2),
+              capacity: data.suitcaseCapacityKg,
+              excess: weightExcessKg.toFixed(2),
+            })}`
           : "";
       addMessage({
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: `Armé una valija para ${data.days} día${data.days === 1 ? "" : "s"} en ${data.destination} (${data.occasion}). Mirá el cronograma del clima abajo.${overCapacityNote}`,
+        content: data.occasion
+          ? `${t("assistant.summaryWithOccasion", {
+              daysLabel: t(data.days === 1 ? "assistant.tripDaysOne" : "assistant.tripDaysMany", {
+                count: data.days,
+              }),
+              destination: data.destination,
+              occasion: data.occasion,
+            })}${overCapacityNote}`
+          : `${t("assistant.summaryNoOccasion", {
+              daysLabel: t(data.days === 1 ? "assistant.tripDaysOne" : "assistant.tripDaysMany", {
+                count: data.days,
+              }),
+              destination: data.destination,
+            })}${overCapacityNote}`,
         suggestion: {
           destination: data.destination,
           weather: data.weather,
@@ -232,7 +249,7 @@ function AssistantPage() {
         },
       });
     } catch {
-      toast.error("No pude conectar con el asistente.");
+      toast.error(t("assistant.errConnect"));
     } finally {
       setLoading(false);
     }
@@ -241,13 +258,13 @@ function AssistantPage() {
   const saveAsChecklist = (msg: Message) => {
     if (!msg.suggestion) return;
     const s = msg.suggestion;
-    const suitcaseName = `Valija ${s.destination.split(",")[0]}`;
+    const suitcaseName = t("assistant.defaultTrip", { destination: s.destination.split(",")[0] });
     addChecklist({
       title: `${s.destination}${s.days ? ` · ${s.days}d` : ""}${s.occasion ? ` · ${s.occasion}` : ""}`,
       destination: s.destination,
       days: s.days ?? 1,
       weather: s.weather,
-      occasion: s.occasion ?? "Viaje",
+      occasion: s.occasion ?? t("common.trip"),
       items: s.items.map((it) => ({
         name: it.name,
         category: it.category,
@@ -262,9 +279,9 @@ function AssistantPage() {
       }),
     );
     setActive(suitcaseId);
-    toast.success("Lista guardada", {
-      description: "Aparece en el Dashboard y en Mis Valijas. Podés tachar ítems en Listas guardadas.",
-      action: { label: "Ver dashboard", onClick: () => navigate({ to: "/dashboard" }) },
+    toast.success(t("assistant.listSaved"), {
+      description: t("assistant.listSavedDesc"),
+      action: { label: t("assistant.viewDashboard"), onClick: () => navigate({ to: "/dashboard" }) },
     });
   };
 
@@ -284,7 +301,7 @@ function AssistantPage() {
   const openCreate = (msg: Message) => {
     if (!msg.suggestion) return;
     setCreateForm({
-      name: `Valija ${msg.suggestion.destination.split(",")[0]}`,
+      name: t("assistant.defaultTrip", { destination: msg.suggestion.destination.split(",")[0] }),
       type: (msg.suggestion.suitcaseCapacityKg ?? 23) <= 12 ? "cabina" : "bodega",
       maxWeight: msg.suggestion.suitcaseCapacityKg ?? 23,
     });
@@ -294,7 +311,7 @@ function AssistantPage() {
   const confirmCreate = () => {
     if (!createMsg?.suggestion) return;
     if (!createForm.name.trim() || createForm.maxWeight <= 0) {
-      toast.error("Completá nombre y peso máximo.");
+      toast.error(t("assistant.errNameMaxWeight"));
       return;
     }
     const id = addSuitcase(
@@ -307,7 +324,12 @@ function AssistantPage() {
     );
     setActive(id);
     setCreateMsgId(null);
-    toast.success(`Valija "${createForm.name}" creada con ${createMsg.suggestion.items.length} items`);
+    toast.success(
+      t("assistant.createSuitcaseSuccess", {
+        name: createForm.name,
+        count: createMsg.suggestion.items.length,
+      }),
+    );
     navigate({ to: "/suitcases" });
   };
 
@@ -315,12 +337,12 @@ function AssistantPage() {
     <div className="mx-auto w-full min-w-0 max-w-7xl overflow-x-hidden pb-6 md:pb-10">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3 sm:mb-6">
         <div className="min-w-0">
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Asistente IA</h1>
-          <p className="mt-1 text-sm text-muted-foreground sm:text-base">Arma tu valija automáticamente</p>
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{t("assistant.title")}</h1>
+          <p className="mt-1 text-sm text-muted-foreground sm:text-base">{t("assistant.subtitle")}</p>
         </div>
         <Button variant="outline" size="sm" onClick={() => resetChat()} className="shrink-0">
           <Plus className="h-4 w-4 mr-2" />
-          Nueva consulta
+          {t("assistant.newChat")}
         </Button>
       </div>
 
@@ -332,39 +354,39 @@ function AssistantPage() {
               <Sparkles className="h-4 w-4" />
             </div>
             <div>
-              <div className="font-semibold leading-tight">Nuevo viaje</div>
-              <div className="text-xs text-muted-foreground">Completá los datos y armo todo</div>
+              <div className="font-semibold leading-tight">{t("assistant.newTrip")}</div>
+              <div className="text-xs text-muted-foreground">{t("assistant.newTripHint")}</div>
             </div>
           </div>
 
           <div className="space-y-3">
             <div>
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Destino</label>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{t("assistant.destination")}</label>
               <div className="mt-1">
                 <DestinationCombobox
                   value={form.destination}
                   onChange={(destination) => setForm({ ...form, destination })}
                   disabled={loading}
-                  placeholder="Ej: Estados Unidos, Miami, Madrid…"
+                  placeholder={t("assistant.destinationPlaceholder")}
                 />
               </div>
             </div>
             <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2">
               <div className="min-w-0">
-                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Desde</label>
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{t("assistant.from")}</label>
                 <Input type="date" value={form.from} onChange={(e) => setForm({ ...form, from: e.target.value })} disabled={loading} className="mt-1" />
               </div>
               <div className="min-w-0">
-                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Hasta</label>
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{t("assistant.to")}</label>
                 <Input type="date" value={form.to} min={form.from || undefined} onChange={(e) => setForm({ ...form, to: e.target.value })} disabled={loading} className="mt-1" />
               </div>
             </div>
             <div>
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Ocasión</label>
-              <Input placeholder="Casamiento, trabajo, playa..." value={form.occasion} onChange={(e) => setForm({ ...form, occasion: e.target.value })} disabled={loading} className="mt-1" maxLength={120} />
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{t("assistant.occasion")}</label>
+              <Input placeholder={t("assistant.occasionPlaceholder")} value={form.occasion} onChange={(e) => setForm({ ...form, occasion: e.target.value })} disabled={loading} className="mt-1" maxLength={120} />
             </div>
             <div>
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Capacidad de la valija (kg)</label>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{t("assistant.capacity")} ({t("common.kg")})</label>
               <Input
                 type="number"
                 min={5}
@@ -383,13 +405,13 @@ function AssistantPage() {
                 className="mt-1"
               />
               <div className="text-xs text-muted-foreground mt-1">
-                Ej: cabina 10–12 kg · bodega 20–23 kg
+                {t("assistant.capacityExamples")}
               </div>
             </div>
 
             <div>
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                ¿Valija compartida?
+                {t("assistant.sharedSuitcase")}
               </label>
               <div className="mt-1.5 flex gap-2">
                 {([true, false] as const).map((option) => (
@@ -408,13 +430,13 @@ function AssistantPage() {
                       })
                     }
                   >
-                    {option ? "Sí" : "No"}
+                    {option ? t("common.yes") : t("common.no")}
                   </Button>
                 ))}
               </div>
               {form.sharedSuitcase && (
                 <div className="mt-2">
-                  <label className="text-xs text-muted-foreground">Cantidad de personas</label>
+                  <label className="text-xs text-muted-foreground">{t("assistant.peopleCount")}</label>
                   <Input
                     type="number"
                     min={2}
@@ -436,7 +458,7 @@ function AssistantPage() {
 
             <div>
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                ¿Cómo querés usar el espacio?
+                {t("assistant.spaceUsage")}
               </label>
               <RadioGroup
                 value={form.capacityMode}
@@ -456,18 +478,18 @@ function AssistantPage() {
                 <div className="flex items-start gap-2 rounded-lg border border-border p-3">
                   <RadioGroupItem value="fill" id="capacity-fill" className="mt-0.5" />
                   <Label htmlFor="capacity-fill" className="font-normal cursor-pointer leading-snug">
-                    <span className="font-medium text-foreground">Llenar la valija</span>
+                    <span className="font-medium text-foreground">{t("assistant.fillSuitcase")}</span>
                     <span className="block text-xs text-muted-foreground mt-0.5">
-                      La IA aprovecha casi todo el peso disponible
+                      {t("assistant.fillSuitcaseHint")}
                     </span>
                   </Label>
                 </div>
                 <div className="flex items-start gap-2 rounded-lg border border-border p-3">
                   <RadioGroupItem value="reserve" id="capacity-reserve" className="mt-0.5" />
                   <Label htmlFor="capacity-reserve" className="font-normal cursor-pointer leading-snug">
-                    <span className="font-medium text-foreground">Dejar espacio para compras</span>
+                    <span className="font-medium text-foreground">{t("assistant.reserveSpace")}</span>
                     <span className="block text-xs text-muted-foreground mt-0.5">
-                      Reservá kilos libres para traer cosas del destino
+                      {t("assistant.reserveSpaceHint")}
                     </span>
                   </Label>
                 </div>
@@ -475,7 +497,7 @@ function AssistantPage() {
               {form.capacityMode === "reserve" ? (
                 <div className="mt-3">
                   <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                    Espacio libre para compras (kg)
+                    {t("assistant.reserveKg")} ({t("common.kg")})
                   </label>
                   <Input
                     type="number"
@@ -497,18 +519,24 @@ function AssistantPage() {
               {packingPreview ? (
                 <div className="text-xs text-muted-foreground mt-2">
                   {form.capacityMode === "fill"
-                    ? `La IA armará hasta ~${packingPreview.packingLimitKg} kg de ${packingPreview.capacityKg} kg.`
-                    : `Quedan ~${packingPreview.reserveKg} kg libres; la IA armará hasta ~${packingPreview.packingLimitKg} kg.`}
+                    ? t("assistant.packingPreviewFill", {
+                        capacityKg: packingPreview.capacityKg,
+                        packingLimitKg: packingPreview.packingLimitKg,
+                      })
+                    : t("assistant.packingPreviewReserve", {
+                        reserveKg: packingPreview.reserveKg,
+                        packingLimitKg: packingPreview.packingLimitKg,
+                      })}
                 </div>
               ) : null}
             </div>
 
             <div>
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Notas (opcional)
+                {t("assistant.notes")}
               </label>
               <p className="text-[11px] text-muted-foreground mt-0.5 mb-1.5">
-                Agregá todo lo que quieras que la IA tenga en cuenta
+                {t("assistant.notesHint")}
               </p>
               <TripNotesField
                 notes={form.notes}
@@ -520,15 +548,17 @@ function AssistantPage() {
 
           <div className="mt-4 p-3 rounded-lg bg-muted/40 border border-border text-xs text-muted-foreground">
             {form.from && form.to && computeDays() > 0
-              ? `${computeDays()} día${computeDays() === 1 ? "" : "s"} de viaje`
-              : "Completá las fechas para calcular los días"}
+              ? t(computeDays() === 1 ? "assistant.tripDaysOne" : "assistant.tripDaysMany", {
+                  count: computeDays(),
+                })
+              : t("assistant.completeDates")}
           </div>
 
           <Button className="w-full mt-4 bg-primary hover:bg-primary/90" onClick={handleSend} disabled={loading} size="lg">
             {loading ? (
-              <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Armando...</>
+              <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {t("assistant.packing")}</>
             ) : (
-              <><Send className="h-4 w-4 mr-2" /> Armar valija</>
+              <><Send className="h-4 w-4 mr-2" /> {t("assistant.buildSuitcase")}</>
             )}
           </Button>
         </Card>
@@ -553,41 +583,51 @@ function AssistantPage() {
                     {msg.suggestion.weightExcessKg && msg.suggestion.suitcaseCapacityKg ? (
                       <Alert variant="destructive" className="mb-4 border-destructive/40 bg-destructive/5">
                         <AlertTriangle className="h-4 w-4" />
-                        <AlertTitle>Excedés el peso de la valija</AlertTitle>
+                        <AlertTitle>{t("assistant.weightExcessTitle")}</AlertTitle>
                         <AlertDescription>
-                          La lista suma {msg.suggestion.totalWeight.toFixed(2)} kg y tu valija admite{" "}
-                          {msg.suggestion.suitcaseCapacityKg} kg ({msg.suggestion.weightExcessKg.toFixed(2)} kg de
-                          más). Necesitás más capacidad en la valija; no redujimos prendas ni ítems automáticamente.
+                          {t("assistant.overCapacityDetail", {
+                            total: msg.suggestion.totalWeight.toFixed(2),
+                            capacity: msg.suggestion.suitcaseCapacityKg,
+                            excess: msg.suggestion.weightExcessKg.toFixed(2),
+                          })}
+                          {" "}
+                          {t("assistant.noAutoReduce")}
                         </AlertDescription>
                       </Alert>
                     ) : null}
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                       <div className="min-w-0 flex-1">
-                        <div className="text-xs uppercase tracking-wider text-primary/80 font-semibold">Lista sugerida</div>
+                        <div className="text-xs uppercase tracking-wider text-primary/80 font-semibold">{t("assistant.suggestedList")}</div>
                         <h2 className="mt-1 text-xl font-bold break-words sm:text-2xl">{msg.suggestion.destination}</h2>
                         <div className="mt-2 flex flex-wrap items-center gap-1.5 sm:gap-2">
-                          <Badge variant="secondary">{msg.suggestion.days} día{msg.suggestion.days === 1 ? "" : "s"}</Badge>
+                          <Badge variant="secondary">
+                            {t((msg.suggestion.days ?? 1) === 1 ? "assistant.tripDaysOne" : "assistant.tripDaysMany", {
+                              count: msg.suggestion.days ?? 1,
+                            })}
+                          </Badge>
                           <Badge variant="secondary">{msg.suggestion.occasion}</Badge>
                           {msg.suggestion.suitcaseCapacityKg ? (
-                            <Badge variant="secondary">{msg.suggestion.suitcaseCapacityKg} kg</Badge>
+                            <Badge variant="secondary">{msg.suggestion.suitcaseCapacityKg} {t("common.kg")}</Badge>
                           ) : null}
                           {msg.suggestion.capacityMode === "reserve" && msg.suggestion.shoppingReserveKg ? (
                             <Badge variant="secondary">
-                              {msg.suggestion.shoppingReserveKg} kg libres
+                              {msg.suggestion.shoppingReserveKg} {t("assistant.freeKg")}
                             </Badge>
                           ) : null}
-                          <Badge className="bg-primary/15 text-primary border-primary/20 hover:bg-primary/20">{msg.suggestion.items.length} items</Badge>
+                          <Badge className="bg-primary/15 text-primary border-primary/20 hover:bg-primary/20">
+                            {msg.suggestion.items.length} {t("common.items")}
+                          </Badge>
                         </div>
                         <p className="mt-2 text-sm text-muted-foreground sm:mt-3">{msg.suggestion.weather}</p>
                       </div>
                       <div className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-background/60 px-3 py-2 sm:block sm:border-0 sm:bg-transparent sm:p-0 sm:text-right">
-                        <div className="text-xs uppercase tracking-wider text-muted-foreground font-semibold sm:mb-0">Peso total</div>
+                        <div className="text-xs uppercase tracking-wider text-muted-foreground font-semibold sm:mb-0">{t("assistant.totalWeight")}</div>
                         <div className={`text-2xl font-bold sm:text-3xl ${msg.suggestion.weightExcessKg ? "text-destructive" : "text-primary"}`}>
                           {msg.suggestion.totalWeight.toFixed(2)}
-                          <span className="ml-1 text-sm font-medium text-muted-foreground sm:text-base">kg</span>
+                          <span className="ml-1 text-sm font-medium text-muted-foreground sm:text-base">{t("common.kg")}</span>
                           {msg.suggestion.suitcaseCapacityKg ? (
                             <span className="block text-xs font-normal text-muted-foreground sm:text-sm">
-                              de {msg.suggestion.suitcaseCapacityKg} kg
+                              {t("assistant.ofCapacity", { capacity: msg.suggestion.suitcaseCapacityKg })}
                             </span>
                           ) : null}
                         </div>
@@ -596,13 +636,13 @@ function AssistantPage() {
 
                     <div className="mt-4 flex flex-col gap-2 sm:mt-5 sm:flex-row sm:flex-wrap">
                       <Button onClick={() => openCreate(msg)} className="w-full sm:flex-1 sm:min-w-[180px]">
-                        Crear valija con esta lista
+                        {t("assistant.createSuitcase")}
                       </Button>
                       <Button variant="secondary" onClick={() => saveAsChecklist(msg)} className="w-full sm:w-auto">
-                        <BookmarkPlus className="h-4 w-4 mr-1" /> Guardar lista
+                        <BookmarkPlus className="h-4 w-4 mr-1" /> {t("assistant.saveList")}
                       </Button>
                       <Button variant="outline" onClick={() => setEditingMsgId(msg.id)} className="w-full sm:w-auto">
-                        Modificar
+                        {t("assistant.modify")}
                       </Button>
                     </div>
                   </Card>
@@ -617,10 +657,9 @@ function AssistantPage() {
                               <CloudSun className="h-4 w-4 sm:h-5 sm:w-5" />
                             </div>
                             <div className="min-w-0 text-left">
-                              <div className="font-bold text-sm sm:text-base">Clima del viaje</div>
+                              <div className="font-bold text-sm sm:text-base">{t("assistant.weatherTrip")}</div>
                               <div className="text-xs text-muted-foreground truncate">
-                                Pronóstico por fecha · {msg.suggestion.forecast.length} día
-                                {msg.suggestion.forecast.length === 1 ? "" : "s"}
+                                {t("assistant.weatherDays", { days: msg.suggestion.forecast.length })}
                               </div>
                             </div>
                           </div>
@@ -657,15 +696,17 @@ function AssistantPage() {
                             <Sparkles className="h-4 w-4 sm:h-5 sm:w-5" />
                           </div>
                           <div className="min-w-0 text-left">
-                            <div className="font-bold text-sm sm:text-base">Prendas recomendadas</div>
-                            <div className="text-xs text-muted-foreground truncate">{msg.suggestion.items.length} items agrupados por categoría</div>
+                            <div className="font-bold text-sm sm:text-base">{t("assistant.itemsRecommended")}</div>
+                            <div className="text-xs text-muted-foreground truncate">
+                              {t("assistant.itemsGroupedByCategory", { count: msg.suggestion.items.length })}
+                            </div>
                           </div>
                         </div>
                         <ChevronDown className="h-5 w-5 shrink-0 text-muted-foreground transition-transform group-data-[state=closed]:rotate-[-90deg]" />
                       </CollapsibleTrigger>
                       <CollapsibleContent>
                         <div className="grid grid-cols-1 gap-3 p-3 sm:gap-4 sm:p-4 md:grid-cols-2">
-                          {CATEGORIES.map((cat) => {
+                          {ITEM_CATEGORY_IDS.map((cat) => {
                             const items = msg.suggestion!.items.filter((it) => it.category === cat);
                             if (items.length === 0) return null;
                             const catWeight = items.reduce((a, it) => a + it.weight * (it.quantity ?? 1), 0);
@@ -673,10 +714,10 @@ function AssistantPage() {
                               <div key={cat} className="border border-border rounded-xl bg-muted/20 overflow-hidden">
                                 <div className="flex items-center justify-between px-3 py-2 bg-muted/40 border-b border-border">
                                   <div className="flex items-center gap-2">
-                                    <Badge variant="outline" className="text-[11px]">{cat}</Badge>
+                                    <Badge variant="outline" className="text-[11px]">{tc(cat)}</Badge>
                                     <span className="text-xs text-muted-foreground">{items.length}</span>
                                   </div>
-                                  <span className="text-xs font-semibold text-muted-foreground">{catWeight.toFixed(2)} kg</span>
+                                  <span className="text-xs font-semibold text-muted-foreground">{catWeight.toFixed(2)} {t("common.kg")}</span>
                                 </div>
                                 <ul className="divide-y divide-border">
                                   {items.map((it, i) => (
@@ -686,7 +727,7 @@ function AssistantPage() {
                                         {it.quantity && it.quantity > 1 ? <span className="text-muted-foreground"> × {it.quantity}</span> : null}
                                       </span>
                                       <span className="inline-flex shrink-0 items-center gap-0.5 text-xs text-muted-foreground">
-                                        {(it.weight * (it.quantity ?? 1)).toFixed(2)} kg
+                                        {(it.weight * (it.quantity ?? 1)).toFixed(2)} {t("common.kg")}
                                         <WeightExplainButton
                                           name={it.name}
                                           category={it.category}
@@ -716,7 +757,7 @@ function AssistantPage() {
               </div>
               <div className="px-4 py-3 rounded-2xl bg-muted/50 text-foreground border border-border rounded-tl-sm flex items-center gap-2 text-sm">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Armando tu valija...
+                {t("assistant.packing")}
               </div>
             </div>
           )}
@@ -727,9 +768,9 @@ function AssistantPage() {
       <Dialog open={!!editingMsgId} onOpenChange={(o) => !o && setEditingMsgId(null)}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
-            <DialogTitle>Modificar lista sugerida</DialogTitle>
+            <DialogTitle>{t("assistant.modifySuggestedTitle")}</DialogTitle>
             <DialogDescription>
-              Ajustá los items antes de crear la valija.
+              {t("assistant.modifySuggestedDesc")}
             </DialogDescription>
           </DialogHeader>
           {editingMsg?.suggestion && (
@@ -766,9 +807,9 @@ function AssistantPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {CATEGORIES.map((c) => (
+                      {ITEM_CATEGORY_IDS.map((c) => (
                         <SelectItem key={c} value={c}>
-                          {c}
+                          {tc(c)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -826,7 +867,7 @@ function AssistantPage() {
                 onClick={() => {
                   const items = [
                     ...editingMsg.suggestion!.items,
-                    { name: "Nuevo item", category: "Otros", quantity: 1, weight: 0.2 },
+                    { name: t("assistant.newItem"), category: ITEM_CATEGORY_IDS.at(-1) ?? "Otros", quantity: 1, weight: 0.2 },
                   ];
                   updateMessageSuggestion(editingMsg.id, {
                     ...editingMsg.suggestion!,
@@ -834,21 +875,21 @@ function AssistantPage() {
                   });
                 }}
               >
-                <Plus className="h-4 w-4 mr-2" /> Agregar item
+                <Plus className="h-4 w-4 mr-2" /> {t("assistant.addItem")}
               </Button>
             </div>
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditingMsgId(null)}>
-              Cerrar
+              {t("common.close")}
             </Button>
             <Button
               onClick={() => {
                 setEditingMsgId(null);
-                toast.success("Lista actualizada");
+                toast.success(t("assistant.listUpdated"));
               }}
             >
-              Guardar cambios
+              {t("common.save")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -858,15 +899,14 @@ function AssistantPage() {
       <Dialog open={!!createMsgId} onOpenChange={(o) => !o && setCreateMsgId(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Crear valija</DialogTitle>
+            <DialogTitle>{t("assistant.createSuitcaseTitle")}</DialogTitle>
             <DialogDescription>
-              Asigná un nombre, tipo y peso máximo. Los items sugeridos se cargarán
-              automáticamente.
+              {t("assistant.createSuitcaseDesc")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Nombre</label>
+              <label className="text-sm font-medium">{t("assistant.suitcaseName")}</label>
               <Input
                 value={createForm.name}
                 onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
@@ -874,7 +914,7 @@ function AssistantPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Tipo</label>
+                <label className="text-sm font-medium">{t("assistant.suitcaseType")}</label>
                 <Select
                   value={createForm.type}
                   onValueChange={(v: SuitcaseType) =>
@@ -889,13 +929,13 @@ function AssistantPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="cabina">Cabina</SelectItem>
-                    <SelectItem value="bodega">Bodega</SelectItem>
+                    <SelectItem value="cabina">{t("suitcaseType.cabin")}</SelectItem>
+                    <SelectItem value="bodega">{t("suitcaseType.hold")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Peso máx. (kg)</label>
+                <label className="text-sm font-medium">{t("assistant.maxWeight")} ({t("common.kg")})</label>
                 <Input
                   type="number"
                   step="0.5"
@@ -912,9 +952,9 @@ function AssistantPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateMsgId(null)}>
-              Cancelar
+              {t("common.cancel")}
             </Button>
-            <Button onClick={confirmCreate}>Crear y abrir</Button>
+            <Button onClick={confirmCreate}>{t("assistant.createAndOpen")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

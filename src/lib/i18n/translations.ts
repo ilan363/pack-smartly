@@ -1,4 +1,6 @@
 import type { Locale } from "./locale-store";
+import { interpolate } from "./format";
+import { pageTranslations } from "./translations-pages";
 
 export const LOCALE_OPTIONS = [
   { code: "es" as const, label: "Español", flag: "🇪🇸" },
@@ -76,6 +78,7 @@ const translations = {
     "auth.submitAdmin": "Entrar como admin",
     "auth.showPassword": "Mostrar contraseña",
     "auth.hidePassword": "Ocultar contraseña",
+    ...pageTranslations.es,
   },
   en: {
     "nav.signIn": "Sign in",
@@ -146,6 +149,7 @@ const translations = {
     "auth.submitAdmin": "Enter as admin",
     "auth.showPassword": "Show password",
     "auth.hidePassword": "Hide password",
+    ...pageTranslations.en,
   },
   pt: {
     "nav.signIn": "Entrar",
@@ -216,11 +220,21 @@ const translations = {
     "auth.submitAdmin": "Entrar como admin",
     "auth.showPassword": "Mostrar senha",
     "auth.hidePassword": "Ocultar senha",
+    ...pageTranslations.pt,
   },
 } as const;
 
 export type TranslationKey = keyof (typeof translations)["es"];
 
-export function translate(locale: Locale, key: TranslationKey): string {
-  return translations[locale][key] ?? translations.es[key] ?? key;
+export function translate(
+  locale: Locale,
+  key: TranslationKey,
+  vars?: Record<string, string | number>,
+): string {
+  const raw = translations[locale][key] ?? translations.es[key] ?? key;
+  return interpolate(raw, vars);
+}
+
+export function getChatWelcome(locale: Locale): string {
+  return translate(locale, "assistant.chatWelcome");
 }

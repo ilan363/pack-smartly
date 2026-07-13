@@ -9,8 +9,10 @@ import {
   type OAuthProviderId,
 } from "@/lib/oauth";
 import { toast } from "sonner";
+import { useI18n } from "@/hooks/use-i18n";
 
 export function OAuthButtons() {
+  const { t } = useI18n();
   const [loadingProvider, setLoadingProvider] = useState<OAuthProviderId | null>(null);
 
   const handleOAuth = async (providerId: OAuthProviderId) => {
@@ -24,7 +26,7 @@ export function OAuthButtons() {
       }
       // On success the browser redirects to the provider; keep loading state.
     } catch {
-      toast.error("No se pudo iniciar sesión. Intentá de nuevo.");
+      toast.error(t("auth.oauthFailed"));
       setLoadingProvider(null);
     }
   };
@@ -34,7 +36,7 @@ export function OAuthButtons() {
       <div className="relative">
         <Separator />
         <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-background px-3 text-xs text-muted-foreground">
-          O continúa con
+          {t("auth.oauthContinue")}
         </span>
       </div>
 

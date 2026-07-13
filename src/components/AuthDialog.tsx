@@ -116,7 +116,7 @@ export function AuthDialog({
   const handleLogin = () => {
     const res = login(email, password);
     if (res.ok) {
-      toast.success("Sesión iniciada", { description: email });
+      toast.success(t("auth.loginSuccess"), { description: email });
       resetForm();
       onOpenChange(false);
       onSuccess?.();
@@ -128,7 +128,7 @@ export function AuthDialog({
   const handleAdminLogin = () => {
     const res = loginAdmin(email, password);
     if (res.ok) {
-      toast.success("Acceso de administrador concedido");
+      toast.success(t("auth.adminSuccess"));
       resetForm();
       onOpenChange(false);
       onAdminSuccess?.();
@@ -139,13 +139,13 @@ export function AuthDialog({
 
   const handleRegister = () => {
     if (password !== confirmPassword) {
-      toast.error("Las contraseñas no coinciden");
+      toast.error(t("auth.passwordMismatch"));
       return;
     }
 
     const res = register(email, password);
     if (res.ok) {
-      toast.success("Cuenta creada", { description: email });
+      toast.success(t("auth.registerSuccess"), { description: email });
       resetForm();
       onOpenChange(false);
       onSuccess?.();
@@ -172,12 +172,12 @@ export function AuthDialog({
         >
         <DialogHeader>
           <DialogTitle>
-            {tab === "admin" ? "Panel de administración" : "Accedé a Travel Wolf"}
+            {tab === "admin" ? t("auth.dialogTitleAdmin") : t("auth.dialogTitle")}
           </DialogTitle>
           <DialogDescription>
             {tab === "admin"
-              ? "Acceso restringido. Solo el administrador autorizado puede ingresar."
-              : "Iniciá sesión o creá una cuenta para organizar tus viajes."}
+              ? t("auth.dialogDescAdmin")
+              : t("auth.dialogDesc")}
           </DialogDescription>
         </DialogHeader>
 
@@ -185,15 +185,15 @@ export function AuthDialog({
           <div className="space-y-3">
             <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-400">
               <ShieldCheck className="h-4 w-4 shrink-0" />
-              <span>Área exclusiva para administradores</span>
+              <span>{t("auth.adminOnlyArea")}</span>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Email de administrador</label>
+              <label className="text-sm font-medium">{t("auth.adminEmail")}</label>
               <Input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@ejemplo.com"
+                placeholder={t("auth.adminEmailPlaceholder")}
                 onKeyDown={(e) => e.key === "Enter" && handleAdminLogin()}
               />
             </div>
@@ -226,7 +226,7 @@ export function AuthDialog({
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="tu@email.com"
+                  placeholder={t("auth.emailPlaceholder")}
                   onKeyDown={(e) => e.key === "Enter" && handleLogin()}
                 />
               </div>
@@ -250,7 +250,7 @@ export function AuthDialog({
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="tu@email.com"
+                  placeholder={t("auth.emailPlaceholder")}
                 />
               </div>
               <PasswordField
@@ -262,7 +262,7 @@ export function AuthDialog({
                 onToggleShow={() => setShowPassword((prev) => !prev)}
                 showLabel={t("auth.showPassword")}
                 hideLabel={t("auth.hidePassword")}
-                placeholder="Mínimo 6 caracteres"
+                placeholder={t("auth.passwordPlaceholder")}
               />
               <PasswordField
                 id="register-confirm-password"
@@ -290,7 +290,7 @@ export function AuthDialog({
                 onClick={() => setTab("admin")}
               >
                 <ShieldCheck className="mr-2 h-4 w-4 shrink-0" />
-                Panel de administración
+                {t("auth.openAdminPanel")}
               </Button>
             </div>
           </>
@@ -299,11 +299,11 @@ export function AuthDialog({
         <DialogFooter className="mt-auto gap-2 pt-4 sm:gap-0">
           {tab === "admin" && (
             <Button type="button" variant="ghost" onClick={() => setTab("login")}>
-              Volver
+              {t("auth.backToLogin")}
             </Button>
           )}
           <Button type="button" variant="outline" onClick={() => handleClose(false)}>
-            Cancelar
+            {t("common.cancel")}
           </Button>
           <Button type="submit">
             {tab === "login" && t("auth.submitLogin")}

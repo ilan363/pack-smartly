@@ -1,10 +1,12 @@
 import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { BaggageClaim, Menu } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { Button } from "@/components/ui/button";
 import { AppSidebar, MobileAppSidebar, MobileBottomNav } from "@/components/AppSidebar";
 import { useI18n } from "@/hooks/use-i18n";
+import { useLocaleStore } from "@/lib/i18n/locale-store";
+import { useChatStore } from "@/lib/chat-store";
 
 export const Route = createFileRoute("/_layout")({
   component: AppLayout,
@@ -13,6 +15,12 @@ export const Route = createFileRoute("/_layout")({
 function AppLayout() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { t } = useI18n();
+  const locale = useLocaleStore((s) => s.locale);
+  const syncWelcomeLocale = useChatStore((s) => s.syncWelcomeLocale);
+
+  useEffect(() => {
+    syncWelcomeLocale();
+  }, [locale, syncWelcomeLocale]);
 
   return (
     <div className="flex h-svh overflow-hidden bg-background">

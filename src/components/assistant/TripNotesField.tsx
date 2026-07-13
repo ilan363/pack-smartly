@@ -1,6 +1,7 @@
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useI18n } from "@/hooks/use-i18n";
 
 const MAX_NOTES = 12;
 const MAX_NOTE_LENGTH = 120;
@@ -12,6 +13,8 @@ type Props = {
 };
 
 export function TripNotesField({ notes, onChange, disabled }: Props) {
+  const { t } = useI18n();
+
   const updateNote = (index: number, value: string) => {
     const next = [...notes];
     next[index] = value;
@@ -41,11 +44,11 @@ export function TripNotesField({ notes, onChange, disabled }: Props) {
             disabled={disabled}
             placeholder={
               index === 0
-                ? "Ej: anteojos de sol, mate, pijama…"
-                : "Otra cosa a tener en cuenta"
+                ? t("notes.placeholderFirst")
+                : t("notes.placeholderMore")
             }
             maxLength={MAX_NOTE_LENGTH}
-            aria-label={`Nota ${index + 1}`}
+            aria-label={t("notes.noteAria", { index: index + 1 })}
           />
           <Button
             type="button"
@@ -54,7 +57,7 @@ export function TripNotesField({ notes, onChange, disabled }: Props) {
             className="shrink-0 text-muted-foreground hover:text-red-500"
             onClick={() => removeNote(index)}
             disabled={disabled || (notes.length === 1 && !note.trim())}
-            aria-label={`Quitar nota ${index + 1}`}
+            aria-label={t("notes.removeNoteAria", { index: index + 1 })}
           >
             <Trash2 className="h-4 w-4" />
           </Button>
@@ -70,18 +73,20 @@ export function TripNotesField({ notes, onChange, disabled }: Props) {
         disabled={disabled || notes.length >= MAX_NOTES}
       >
         <Plus className="h-4 w-4 mr-2" />
-        Agregar nota
+        {t("notes.addNote")}
       </Button>
 
       {notes.length >= MAX_NOTES ? (
-        <p className="text-[11px] text-muted-foreground">Máximo {MAX_NOTES} notas.</p>
+        <p className="text-[11px] text-muted-foreground">
+          {t("notes.maxNotes", { count: MAX_NOTES })}
+        </p>
       ) : null}
     </div>
   );
 }
 
-export function formatTripNotesForPrompt(notes: string[]): string | null {
+export function formatTripNotesForPrompt(notes: string[], label = "Notes"): string | null {
   const active = notes.map((n) => n.trim()).filter(Boolean);
   if (active.length === 0) return null;
-  return `Notas:\n${active.map((n) => `- ${n}`).join("\n")}`;
+  return `${label}:\n${active.map((n) => `- ${n}`).join("\n")}`;
 }

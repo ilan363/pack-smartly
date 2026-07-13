@@ -1,4 +1,6 @@
 import { create } from "zustand";
+import { useLocaleStore } from "@/lib/i18n/locale-store";
+import { getChatWelcome } from "@/lib/i18n/translations";
 
 export type ChatSuggestionItem = {
   category: string;
@@ -47,18 +49,21 @@ type ChatState = {
   addMessage: (m: Omit<ChatMessage, "createdAt">) => void;
   updateSuggestion: (id: string, suggestion: ChatSuggestion) => void;
   reset: () => void;
+  syncWelcomeLocale: () => void;
 };
 
-export const INITIAL_CHAT: ChatMessage = {
-  id: "welcome",
-  role: "assistant",
-  content:
-    "¡Hola! Soy tu asistente de equipaje. Contame sobre tu próximo viaje (destino, clima, días, eventos) y te armo la valija ideal.",
-  createdAt: 0,
-};
+function buildInitialChat(): ChatMessage {
+  const locale = useLocaleStore.getState().locale;
+  return {
+    id: "welcome",
+    role: "assistant",
+    content: getChatWelcome(locale),
+    createdAt: 0,
+  };
+}
 
 export const useChatStore = create<ChatState>()((set) => ({
-  messages: [INITIAL_CHAT],
+  messages: [buildInitialChat()],
   addMessage: (m) =>
     set((s) => ({ messages: [...s.messages, { ...m, createdAt: Date.now() }] })),
   updateSuggestion: (id, suggestion) =>
@@ -67,5 +72,13 @@ export const useChatStore = create<ChatState>()((set) => ({
         msg.id === id ? { ...msg, suggestion } : msg,
       ),
     })),
-  reset: () => set({ messages: [INITIAL_CHAT] }),
+  reset: () => set({ messages: [buildInitialChat()] }),
+  syncWelcomeLocale: () =>
+    set((s) => ({
+      messages: s.messages.map((msg) =>
+        msg.id === "welcome"
+          ? { ...msg, content: getChatWelcome(useLocaleStore.getState().locale) }
+          : msg,
+      ),
+    })),
 }));

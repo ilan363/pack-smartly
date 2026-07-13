@@ -37,6 +37,9 @@ import {
 } from "@/lib/saved-lists";
 import { requestNotificationPermission } from "@/lib/packing-reminders";
 import { WeightExplainButton } from "@/components/WeightExplainButton";
+import { useI18n } from "@/hooks/use-i18n";
+import { formatAppDate } from "@/lib/i18n/format";
+import { ITEM_CATEGORY_IDS } from "@/lib/i18n/categories";
 
 export const Route = createFileRoute("/_layout/saved-suitcases")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -45,29 +48,11 @@ export const Route = createFileRoute("/_layout/saved-suitcases")({
   component: SavedSuitcasesPage,
 });
 
-const CATEGORIES = [
-  "Remeras",
-  "Pantalones",
-  "Abrigos",
-  "Zapatillas",
-  "Accesorios",
-  "Higiene",
-  "Electrónica",
-  "Otros",
-];
-
-function formatDateRange(from?: string, to?: string) {
+function formatDateRange(locale: ReturnType<typeof useI18n>["locale"], from?: string, to?: string) {
   if (!from || !to) return null;
-  const f = new Date(from + "T12:00:00").toLocaleDateString("es-AR", {
-    day: "numeric",
-    month: "short",
-  });
-  const t = new Date(to + "T12:00:00").toLocaleDateString("es-AR", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-  return `${f} → ${t}`;
+  const start = formatAppDate(locale, from, { day: "numeric", month: "short" });
+  const end = formatAppDate(locale, to, { day: "numeric", month: "short", year: "numeric" });
+  return `${start} → ${end}`;
 }
 
 function SavedListDetail({
@@ -81,8 +66,13 @@ function SavedListDetail({
   onUpdate: (list: SavedList) => void;
   onDelete: () => void;
 }) {
+  const { t, tc, locale } = useI18n();
   const [draft, setDraft] = useState(list);
-  const [newItem, setNewItem] = useState({ name: "", category: "Otros", weight: "" });
+  const [newItem, setNewItem] = useState<{ name: string; category: string; weight: string }>({
+    name: "",
+    category: ITEM_CATEGORY_IDS.at(-1) ?? "Otros",
+    weight: "",
+  });
   const [editingId, setEditingId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -137,8 +127,8 @@ function SavedListDetail({
         },
       ],
     });
-    setNewItem({ name: "", category: "Otros", weight: "" });
-    toast.success("Prenda agregada");
+    setNewItem({ name: "", category: ITEM_CATEGORY_IDS.at(-1) ?? "Otros", weight: "" });
+    toast.success(t("savedSuitcases.itemAdded"));
   };
 
   const grouped = useMemo(() => {
@@ -163,27 +153,27 @@ function SavedListDetail({
   const handleEnableNotifications = async () => {
     const perm = await requestNotificationPermission();
     if (perm === "granted") {
-      toast.success("Activaste recordatorios del navegador");
+      toast.success(t("savedSuitcases.notificationsEnabled"));
     } else {
-      toast.info("Permití notificaciones en tu navegador para recibir recordatorios");
+      toast.info(t("savedSuitcases.notificationsBlocked"));
     }
   };
 
   return (
     <div className="space-y-6 max-w-3xl">
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={onBack} aria-label="Volver">
+        <Button variant="ghost" size="icon" onClick={onBack} aria-label={t("savedSuitcases.back")}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div className="flex-1 min-w-0">
           <h1 className="text-2xl font-bold tracking-tight truncate">{draft.destination}</h1>
-          {formatDateRange(draft.dateFrom, draft.dateTo) && (
-            <p className="text-sm text-muted-foreground">{formatDateRange(draft.dateFrom, draft.dateTo)}</p>
+          {formatDateRange(locale, draft.dateFrom, draft.dateTo) && (
+            <p className="text-sm text-muted-foreground">{formatDateRange(locale, draft.dateFrom, draft.dateTo)}</p>
           )}
         </div>
         <Button variant="outline" size="sm" onClick={handleEnableNotifications}>
           <Bell className="h-4 w-4 mr-1" />
-          Recordatorios
+          {t("savedSuitcases.reminders")}
         </Button>
       </div>
 
@@ -191,13 +181,13 @@ function SavedListDetail({
         <CardContent className="p-6 space-y-4">
           <div className="flex justify-between items-end">
             <div>
-              <p className="text-2xl font-bold">{progress}% empacado</p>
+              <p className="text-2xl font-bold">{t("savedSuitcases.progressPacked", { progress })}</p>
               <p className="text-sm text-muted-foreground mt-1">
-                {packed.toFixed(1)} kg guardados · {pending} pendiente{pending !== 1 ? "s" : ""}
+                {t("savedSuitcases.progressPending", { packed: packed.toFixed(1), pending })}
               </p>
             </div>
             <span className="text-sm text-muted-foreground">
-              Peso lista: {draft.totalWeight} kg
+              {t("savedSuitcases.listWeight", { weight: draft.totalWeight })}
             </span>
           </div>
           <div className="h-2.5 w-full rounded-full bg-muted overflow-hidden">
@@ -208,7 +198,7 @@ function SavedListDetail({
           </div>
           {draft.weather && (
             <p className="text-sm text-muted-foreground border-t border-border pt-3">
-              <span className="font-medium text-foreground">Clima: </span>
+              <span className="font-medium text-foreground">{t("weather.title")}: </span>
               {draft.weather}
             </p>
           )}
@@ -219,22 +209,22 @@ function SavedListDetail({
         <CardHeader className="pb-3">
           <CardTitle className="text-lg flex items-center gap-2">
             <ClipboardList className="h-5 w-5" />
-            Checklist de equipaje
+            {t("savedSuitcases.checklistTitle")}
           </CardTitle>
           <p className="text-sm text-muted-foreground font-normal">
-            Marcá cada prenda al guardarla en la valija
+            {t("savedSuitcases.checklistHint")}
           </p>
         </CardHeader>
         <CardContent className="space-y-6 pb-6">
           {grouped.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-6">
-              La lista está vacía. Agregá prendas abajo.
+              {t("savedSuitcases.emptyItems")}
             </p>
           ) : (
             grouped.map(([category, items]) => (
               <div key={category}>
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
-                  {category}
+                  {tc(category)}
                 </h3>
                 <ul className="space-y-2">
                   {items.map((item) => (
@@ -277,7 +267,7 @@ function SavedListDetail({
                                 variant="secondary"
                                 onClick={() => setEditingId(null)}
                               >
-                                Listo
+                                {t("savedSuitcases.done")}
                               </Button>
                             </div>
                           </div>
@@ -288,7 +278,7 @@ function SavedListDetail({
                           >
                             <span className="font-medium text-sm">{item.name}</span>
                             <span className="ml-2 inline-flex items-center gap-0.5 text-xs text-muted-foreground">
-                              {item.weight} kg
+                              {item.weight} {t("common.kg")}
                               <WeightExplainButton
                                 name={item.name}
                                 category={item.category}
@@ -305,7 +295,7 @@ function SavedListDetail({
                           size="icon"
                           className="h-8 w-8"
                           onClick={() => setEditingId(item.id)}
-                          aria-label="Editar"
+                          aria-label={t("savedSuitcases.editAria")}
                         >
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
@@ -314,7 +304,7 @@ function SavedListDetail({
                           size="icon"
                           className="h-8 w-8 text-destructive hover:text-destructive"
                           onClick={() => removeItem(item.id)}
-                          aria-label="Eliminar"
+                          aria-label={t("savedSuitcases.deleteAria")}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
@@ -329,19 +319,19 @@ function SavedListDetail({
           <Separator />
 
           <div className="space-y-3">
-            <p className="text-sm font-medium">Agregar prenda</p>
+            <p className="text-sm font-medium">{t("savedSuitcases.addGarment")}</p>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="sm:col-span-2 space-y-2">
-                <Label htmlFor="new-name">Nombre</Label>
+                <Label htmlFor="new-name">{t("common.name")}</Label>
                 <Input
                   id="new-name"
-                  placeholder="Ej: Campera impermeable"
+                  placeholder={t("suitcases.placeholderItem")}
                   value={newItem.name}
                   onChange={(e) => setNewItem((p) => ({ ...p, name: e.target.value }))}
                 />
               </div>
               <div className="space-y-2">
-                <Label>Categoría</Label>
+                <Label>{t("common.category")}</Label>
                 <Select
                   value={newItem.category}
                   onValueChange={(v) => setNewItem((p) => ({ ...p, category: v }))}
@@ -350,16 +340,16 @@ function SavedListDetail({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {CATEGORIES.map((c) => (
+                    {ITEM_CATEGORY_IDS.map((c) => (
                       <SelectItem key={c} value={c}>
-                        {c}
+                        {tc(c)}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="new-weight">Peso (kg)</Label>
+                <Label htmlFor="new-weight">{t("common.weight")} ({t("common.kg")})</Label>
                 <Input
                   id="new-weight"
                   type="number"
@@ -372,7 +362,7 @@ function SavedListDetail({
             </div>
             <Button variant="secondary" onClick={addItem} className="w-full sm:w-auto">
               <Plus className="h-4 w-4 mr-2" />
-              Agregar a la lista
+              {t("savedSuitcases.addItem")}
             </Button>
           </div>
         </CardContent>
@@ -382,17 +372,18 @@ function SavedListDetail({
         variant="destructive"
         className="w-full sm:w-auto"
         onClick={() => {
-          if (confirm("¿Eliminar esta valija guardada?")) onDelete();
+          if (confirm(t("savedSuitcases.deleteConfirm"))) onDelete();
         }}
       >
         <Trash2 className="h-4 w-4 mr-2" />
-        Eliminar valija
+        {t("savedSuitcases.deleteList")}
       </Button>
     </div>
   );
 }
 
 function SavedSuitcasesPage() {
+  const { t, locale } = useI18n();
   const { id: selectedId } = Route.useSearch();
   const navigate = useNavigate();
   const [lists, setLists] = useState<SavedList[]>([]);
@@ -410,9 +401,11 @@ function SavedSuitcasesPage() {
   if (selectedId && !selected) {
     return (
       <div className="text-center py-16">
-        <p className="text-muted-foreground">No encontramos esa valija.</p>
+        <p className="text-muted-foreground">{t("savedSuitcases.notFound")}</p>
         <Button className="mt-4" variant="outline" asChild>
-          <Link to="/saved-suitcases">Volver</Link>
+          <Link to="/saved-suitcases" search={{ id: undefined }}>
+            {t("savedSuitcases.back")}
+          </Link>
         </Button>
       </div>
     );
@@ -422,12 +415,12 @@ function SavedSuitcasesPage() {
     return (
       <SavedListDetail
         list={selected}
-        onBack={() => navigate({ to: "/saved-suitcases", search: {} })}
+        onBack={() => navigate({ to: "/saved-suitcases", search: { id: undefined } })}
         onUpdate={refresh}
         onDelete={() => {
           deleteSavedList(selected.id);
-          toast.success("Valija eliminada");
-          navigate({ to: "/saved-suitcases", search: {} });
+          toast.success(t("savedSuitcases.deleted"));
+          navigate({ to: "/saved-suitcases", search: { id: undefined } });
           refresh();
         }}
       />
@@ -437,9 +430,9 @@ function SavedSuitcasesPage() {
   return (
     <div className="space-y-8 max-w-4xl mx-auto">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Valijas guardadas</h1>
+        <h1 className="text-3xl font-bold tracking-tight">{t("savedSuitcases.title")}</h1>
         <p className="text-muted-foreground mt-1">
-          Tus listas del asistente IA. Marcá cada ítem mientras empacás.
+          {t("savedSuitcases.subtitle")}
         </p>
       </div>
 
@@ -447,12 +440,12 @@ function SavedSuitcasesPage() {
         <Card className="border-dashed">
           <CardContent className="py-16 text-center">
             <ClipboardList className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <h2 className="font-semibold text-lg">Aún no guardaste ninguna lista</h2>
+            <h2 className="font-semibold text-lg">{t("savedSuitcases.empty")}</h2>
             <p className="text-sm text-muted-foreground mt-2 max-w-sm mx-auto">
-              Generá una lista en el Asistente IA y tocá «Guardar lista» para verla acá.
+              {t("savedSuitcases.assistantHint")}
             </p>
             <Button className="mt-6" asChild>
-              <Link to="/assistant">Ir al Asistente IA</Link>
+              <Link to="/assistant">{t("savedSuitcases.goAssistant")}</Link>
             </Button>
           </CardContent>
         </Card>
@@ -475,19 +468,23 @@ function SavedSuitcasesPage() {
                     </CardTitle>
                     {pending > 0 && (
                       <Badge variant="secondary" className="shrink-0">
-                        {pending} pend.
+                        {pending} {t("savedSuitcases.pendingShort")}
                       </Badge>
                     )}
                   </div>
-                  {formatDateRange(list.dateFrom, list.dateTo) && (
+                  {formatDateRange(locale, list.dateFrom, list.dateTo) && (
                     <p className="text-xs text-muted-foreground">
-                      {formatDateRange(list.dateFrom, list.dateTo)}
+                      {formatDateRange(locale, list.dateFrom, list.dateTo)}
                     </p>
                   )}
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground">
-                    {done}/{list.items.length} ítems marcados · {list.totalWeight} kg
+                    {t("savedSuitcases.itemsMarked", {
+                      done,
+                      total: list.items.length,
+                      weight: list.totalWeight,
+                    })}
                   </p>
                   <div className="h-1.5 w-full rounded-full bg-muted mt-3 overflow-hidden">
                     <div

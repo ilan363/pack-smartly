@@ -17,10 +17,12 @@ import { WaveChart } from "./WaveChart";
 import { HourlyForecastTable } from "./HourlyForecastTable";
 import { DailyForecastCards } from "./DailyForecastCards";
 import { WeatherIcon } from "./WeatherIcon";
+import { useI18n } from "@/hooks/use-i18n";
 
 type Props = { data: WeatherForecastResponse };
 
 export function WeatherDashboard({ data }: Props) {
+  const { t } = useI18n();
   const { spot, current, daily, hourly, provider, fetchedAt } = data;
   const currentCode = current.weatherCode ?? daily[0]?.weatherCode ?? 2;
   const { label: currentConditions, icon: currentIcon } = wmoToWeather(currentCode);
@@ -62,10 +64,10 @@ export function WeatherDashboard({ data }: Props) {
           </div>
 
           <div className="sm:ml-auto flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted-foreground">
-            <Stat icon={Wind} label="Viento" value={`${current.windSpeed} km/h`} />
-            <Stat icon={Droplets} label="Lluvia" value={`${current.precipitation} mm`} />
+            <Stat icon={Wind} label={t("weather.wind")} value={`${current.windSpeed} km/h`} />
+            <Stat icon={Droplets} label={t("weather.rain")} value={`${current.precipitation} mm`} />
             {current.waveHeight != null && (
-              <Stat icon={Waves} label="Olas" value={`${current.waveHeight} m`} />
+              <Stat icon={Waves} label={t("weather.waves")} value={`${current.waveHeight} m`} />
             )}
           </div>
         </div>
@@ -82,13 +84,13 @@ export function WeatherDashboard({ data }: Props) {
       <Card className="p-4 md:p-5 border-border/80">
         <div className="flex items-center justify-between gap-3 mb-4">
           <div>
-            <h3 className="font-semibold">Próximos días</h3>
+            <h3 className="font-semibold">{t("weather.nextDays")}</h3>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Temperaturas, lluvia y viento por fecha
+              {t("weather.tempRainWindByDate")}
             </p>
           </div>
           <span className="text-xs text-muted-foreground shrink-0">
-            {daily.length} día{daily.length === 1 ? "" : "s"}
+            {t("assistant.weatherDays", { days: daily.length })}
           </span>
         </div>
         <DailyForecastCards days={dailyCards} />
@@ -97,15 +99,15 @@ export function WeatherDashboard({ data }: Props) {
       {/* Detalle — colapsable */}
       <MetricsSection current={current} conditions={currentConditions} />
 
-      <ChartSection title="Viento y ráfagas (24 h)">
+      <ChartSection title={t("weather.windGusts24h")}>
         <WindChart hourly={hourly} />
       </ChartSection>
 
-      <ChartSection title="Olas (24 h)">
+      <ChartSection title={t("weather.waves24h")}>
         <WaveChart hourly={hourly} />
       </ChartSection>
 
-      <ChartSection title="Pronóstico horario">
+      <ChartSection title={t("weather.hourly")}>
         <HourlyForecastTable hourly={hourly} hours={24} />
       </ChartSection>
     </div>
@@ -137,6 +139,7 @@ function MetricsSection({
   current: WeatherForecastResponse["current"];
   conditions: string;
 }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
@@ -145,9 +148,9 @@ function MetricsSection({
           <button className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/40 transition-colors">
             <div className="flex items-center gap-2 text-left">
               <Gauge className="h-4 w-4 text-primary shrink-0" />
-              <span className="font-semibold text-sm">Más detalle ahora</span>
+              <span className="font-semibold text-sm">{t("weather.detailsNow")}</span>
               <span className="text-xs text-muted-foreground hidden sm:inline">
-                · {conditions} · ráfagas {current.windGust} km/h
+                · {t("weather.conditionsGusts", { conditions, gust: current.windGust })}
               </span>
             </div>
             <ChevronDown className={cn("h-4 w-4 transition-transform shrink-0", open && "rotate-180")} />
@@ -155,32 +158,32 @@ function MetricsSection({
         </CollapsibleTrigger>
         <CollapsibleContent>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 p-4 pt-0">
-            <MetricCard icon={Thermometer} label="Temperatura" value={current.temperature} unit="°C" tone="primary" />
-            <MetricCard icon={Wind} label="Viento" value={current.windSpeed} unit="km/h" tone="info" />
-            <MetricCard icon={Wind} label="Ráfagas" value={current.windGust} unit="km/h" tone="warning" />
+            <MetricCard icon={Thermometer} label={t("weather.temperature")} value={current.temperature} unit="°C" tone="primary" />
+            <MetricCard icon={Wind} label={t("weather.wind")} value={current.windSpeed} unit="km/h" tone="info" />
+            <MetricCard icon={Wind} label={t("weather.gusts")} value={current.windGust} unit="km/h" tone="warning" />
             <MetricCard
               icon={Navigation}
-              label="Dirección"
+              label={t("weather.direction")}
               value={degToCompass(current.windDirection)}
               hint={`${current.windDirection}°`}
             />
-            <MetricCard icon={Droplets} label="Precipitación" value={current.precipitation} unit="mm" tone="info" />
+            <MetricCard icon={Droplets} label={t("weather.precipitation")} value={current.precipitation} unit="mm" tone="info" />
             <MetricCard
               icon={Waves}
-              label="Altura ola"
+              label={t("weather.waveHeight")}
               value={current.waveHeight != null ? current.waveHeight : "—"}
               unit={current.waveHeight != null ? "m" : ""}
               tone="info"
             />
             <MetricCard
               icon={Timer}
-              label="Período ola"
+              label={t("weather.wavePeriod")}
               value={current.wavePeriod != null ? current.wavePeriod : "—"}
               unit={current.wavePeriod != null ? "s" : ""}
             />
             <MetricCard
               icon={Navigation}
-              label="Dirección ola"
+              label={t("weather.waveDirection")}
               value={current.waveDirection != null ? degToCompass(current.waveDirection) : "—"}
               hint={current.waveDirection != null ? `${current.waveDirection}°` : undefined}
             />

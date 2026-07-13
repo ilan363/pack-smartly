@@ -105,21 +105,21 @@ function DashboardPage() {
               <h3 className="text-xl font-bold">{upcomingDestination}</h3>
               <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
                 <Calendar className="h-4 w-4" />
-                <span>{suitcases.length} valija(s) preparada(s)</span>
+                <span>{suitcases.length} {t("dashboard.suitcasesPrepared")}</span>
               </div>
             </div>
           </div>
-          <Button onClick={() => goToSuitcases()}>Administrar Valijas</Button>
+          <Button onClick={() => goToSuitcases()}>{t("dashboard.manageSuitcases")}</Button>
         </div>
         <CardContent className="p-6">
           <div className="grid md:grid-cols-2 gap-6">
             <div className="space-y-4">
               <h4 className="font-semibold flex items-center gap-2">
-                <BaggageClaim className="h-4 w-4" /> Equipaje
+                <BaggageClaim className="h-4 w-4" /> {t("dashboard.luggage")}
               </h4>
               {suitcases.length === 0 && (
                 <div className="p-4 border border-dashed border-border rounded-lg text-sm text-muted-foreground">
-                  Aún no tenés valijas. Creá una desde "Mis Valijas".
+                  {t("dashboard.noSuitcasesYet")} {t("dashboard.noSuitcasesHint")}
                 </div>
               )}
               {suitcases.map((s) => {
@@ -143,7 +143,7 @@ function DashboardPage() {
                       <span className="font-medium">
                         {s.name}{" "}
                         <span className="text-muted-foreground text-xs capitalize">
-                          ({s.type})
+                          ({s.type === "cabina" ? t("suitcaseType.cabin") : t("suitcaseType.hold")})
                         </span>
                       </span>
                       <span className={`text-sm font-medium ${textColor}`}>
@@ -162,21 +162,20 @@ function DashboardPage() {
             </div>
 
             <div className="space-y-4">
-              <h4 className="font-semibold flex items-center gap-2">Recomendaciones IA</h4>
+              <h4 className="font-semibold flex items-center gap-2">{t("dashboard.aiRecommendations")}</h4>
               <div className="p-4 bg-muted/30 rounded-lg text-sm space-y-2 border border-border">
                 <p>
-                  🌤️ <strong>Clima esperado:</strong> Frío (2°C a -5°C). Posibles nevadas.
+                  🌤️ <strong>{t("weather.title")}:</strong> {t("dashboard.aiWeatherSample")}
                 </p>
                 <p>
-                  💡 <strong>Tip:</strong> Te falta empacar "Guantes impermeables" y tenés
-                  exceso de "Remeras de algodón".
+                  💡 <strong>{t("dashboard.tipLabel")}:</strong> {t("dashboard.aiTipSample")}
                 </p>
                 <Button
                   variant="link"
                   className="px-0 h-auto text-primary"
                   onClick={() => navigate({ to: "/assistant" })}
                 >
-                  Ver lista completa sugerida →
+                  {t("dashboard.viewFullList")} →
                 </Button>
               </div>
             </div>

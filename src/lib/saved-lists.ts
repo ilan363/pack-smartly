@@ -30,7 +30,7 @@ function readAll(): SavedList[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = storage.getItem(STORAGE_KEY);
-    if (!raw) return [];
+    if (typeof raw !== "string" || !raw) return [];
     const parsed = JSON.parse(raw) as unknown;
     return Array.isArray(parsed) ? (parsed as SavedList[]) : [];
   } catch {

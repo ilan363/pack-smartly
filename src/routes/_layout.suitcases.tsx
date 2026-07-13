@@ -34,21 +34,12 @@ import {
   estimateLineWeightKg,
   estimateUnitWeightKg,
 } from "@/lib/weight-explain";
+import { useI18n } from "@/hooks/use-i18n";
+import { ITEM_CATEGORY_IDS } from "@/lib/i18n/categories";
 
 export const Route = createFileRoute("/_layout/suitcases")({
   component: SuitcasesPage,
 });
-
-const CATEGORIES = [
-  "Remeras",
-  "Pantalones",
-  "Abrigos",
-  "Zapatillas",
-  "Accesorios",
-  "Higiene",
-  "Electrónica",
-  "Otros",
-];
 
 function EditItemForm({
   item,
@@ -57,6 +48,7 @@ function EditItemForm({
   item: Item;
   onChange: (item: Item) => void;
 }) {
+  const { t, tc } = useI18n();
   const unitWeight = estimateUnitWeightKg(item.name, item.category);
   const lineWeight = estimateLineWeightKg(item.name, item.category, item.quantity);
 
@@ -71,22 +63,22 @@ function EditItemForm({
   return (
     <div className="space-y-4">
       <div className="space-y-2">
-        <label className="text-sm font-medium">Nombre</label>
+        <label className="text-sm font-medium">{t("common.name")}</label>
         <Input
           value={item.name}
           onChange={(e) => patch({ name: e.target.value })}
         />
       </div>
       <div className="space-y-2">
-        <label className="text-sm font-medium">Categoría</label>
+        <label className="text-sm font-medium">{t("common.category")}</label>
         <Select value={item.category} onValueChange={(v) => patch({ category: v })}>
           <SelectTrigger>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {CATEGORIES.map((c) => (
+            {ITEM_CATEGORY_IDS.map((c) => (
               <SelectItem key={c} value={c}>
-                {c}
+                {tc(c)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -94,7 +86,7 @@ function EditItemForm({
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <label className="text-sm font-medium">Cantidad</label>
+          <label className="text-sm font-medium">{t("common.quantity")}</label>
           <Input
             type="number"
             min="1"
@@ -103,11 +95,11 @@ function EditItemForm({
           />
         </div>
         <div className="space-y-2">
-          <label className="text-sm font-medium">Peso total (kg)</label>
+          <label className="text-sm font-medium">{t("common.weightTotal")} ({t("common.kg")})</label>
           <div className="flex h-9 w-full items-center rounded-md border border-input bg-muted/40 px-3 text-sm">
-            {lineWeight.toFixed(2)} kg
+            {lineWeight.toFixed(2)} {t("common.kg")}
             {item.quantity > 1 && (
-              <span className="text-muted-foreground"> ({unitWeight.toFixed(2)} kg c/u)</span>
+              <span className="text-muted-foreground"> ({unitWeight.toFixed(2)} {t("common.kg")} {t("common.unitEach")})</span>
             )}
           </div>
         </div>
@@ -117,6 +109,7 @@ function EditItemForm({
 }
 
 function SuitcasesPage() {
+  const { t, tc } = useI18n();
   const suitcases = useSuitcasesStore((s) => s.suitcases);
   const activeId = useSuitcasesStore((s) => s.activeSuitcaseId);
   const setActive = useSuitcasesStore((s) => s.setActive);
@@ -180,7 +173,7 @@ function SuitcasesPage() {
 
   const handleAddItem = () => {
     if (!newItem.name.trim() || !newItem.category) {
-      toast.error("Completá nombre y categoría.");
+      toast.error(t("suitcases.errItem"));
       return;
     }
     const quantity = Math.max(1, newItem.quantity);
@@ -192,13 +185,13 @@ function SuitcasesPage() {
       weight: weightPerUnit,
     });
     setNewItem({ name: "", category: "", quantity: 1 });
-    toast.success(`"${newItem.name.trim()}" agregado a ${active.name}`);
+    toast.success(t("suitcases.itemAdded", { name: newItem.name.trim(), suitcase: active.name }));
   };
 
   const handleDeleteSuitcase = () => {
-    if (confirm(`¿Eliminar la valija "${active.name}"?`)) {
+    if (confirm(t("suitcases.confirmDelete", { name: active.name }))) {
       removeSuitcase(active.id);
-      toast.success("Valija eliminada");
+      toast.success(t("suitcases.deleted"));
     }
   };
 
@@ -223,17 +216,17 @@ function SuitcasesPage() {
               ))}
             </SelectContent>
           </Select>
-          <p className="text-muted-foreground text-sm">Viaje a {active.destination}</p>
+          <p className="text-muted-foreground text-sm">{t("suitcases.tripTo", { destination: active.destination })}</p>
         </div>
         <div className="flex gap-2 flex-wrap">
           <Button variant="outline" onClick={() => setSuitcaseDialog({ mode: "edit", id: active.id })}>
-            <Edit2 className="h-4 w-4 mr-2" /> Editar
+            <Edit2 className="h-4 w-4 mr-2" /> {t("suitcases.edit")}
           </Button>
           <Button variant="outline" onClick={handleDeleteSuitcase}>
-            <Trash2 className="h-4 w-4 mr-2" /> Eliminar
+            <Trash2 className="h-4 w-4 mr-2" /> {t("suitcases.delete")}
           </Button>
           <Button onClick={() => setSuitcaseDialog({ mode: "create" })}>
-            <Plus className="h-4 w-4 mr-2" /> Nueva Valija
+            <Plus className="h-4 w-4 mr-2" /> {t("suitcases.newSuitcase")}
           </Button>
         </div>
       </div>
@@ -249,8 +242,8 @@ function SuitcasesPage() {
           </div>
           <div className={`font-semibold ${statusText}`}>
             {percentage > 100
-              ? `Excedido por ${(currentWeight - active.maxWeight).toFixed(2)} kg`
-              : `${(active.maxWeight - currentWeight).toFixed(2)} kg libres`}
+              ? t("suitcases.exceededBy", { kg: (currentWeight - active.maxWeight).toFixed(2) })
+              : t("suitcases.freeKg", { kg: (active.maxWeight - currentWeight).toFixed(2) })}
           </div>
         </div>
         <div className="h-3 w-full rounded-full bg-muted overflow-hidden">
@@ -262,12 +255,12 @@ function SuitcasesPage() {
         {percentage > 100 ? (
           <div className="flex items-center gap-2 text-red-600 text-sm mt-3 bg-red-500/10 p-2 rounded-md">
             <AlertCircle className="h-4 w-4" />
-            Superaste el peso permitido. Revisá el costo estimado de exceso abajo.
+            {t("suitcases.overWeightHint")}
           </div>
         ) : percentage > 90 ? (
           <div className="flex items-center gap-2 text-red-500 text-sm mt-3 bg-red-500/10 p-2 rounded-md">
             <AlertCircle className="h-4 w-4" />
-            Atención: Estás muy cerca del límite de peso permitido.
+            {t("suitcases.nearLimitHint")}
           </div>
         ) : null}
       </Card>
@@ -278,18 +271,18 @@ function SuitcasesPage() {
 
       <div className="grid md:grid-cols-3 gap-8">
         <div className="md:col-span-2 space-y-4">
-          <h2 className="text-xl font-bold">Prendas y Objetos</h2>
+          <h2 className="text-xl font-bold">{t("suitcases.itemsTitle")}</h2>
 
           <Card>
             <CardContent className="p-0">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border bg-muted/30">
-                    <th className="text-left font-medium p-4">Item</th>
-                    <th className="text-left font-medium p-4">Categoría</th>
-                    <th className="text-right font-medium p-4">Cant.</th>
-                    <th className="text-right font-medium p-4">Peso total</th>
-                    <th className="text-right font-medium p-4">Acciones</th>
+                    <th className="text-left font-medium p-4">{t("suitcases.item")}</th>
+                    <th className="text-left font-medium p-4">{t("common.category")}</th>
+                    <th className="text-right font-medium p-4">{t("common.quantity")}</th>
+                    <th className="text-right font-medium p-4">{t("common.weightTotal")}</th>
+                    <th className="text-right font-medium p-4">{t("common.actions")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -301,17 +294,17 @@ function SuitcasesPage() {
                       <td className="p-4 font-medium">{item.name}</td>
                       <td className="p-4">
                         <Badge variant="secondary" className="font-normal">
-                          {item.category}
+                          {tc(item.category)}
                         </Badge>
                       </td>
                       <td className="p-4 text-right">{item.quantity}</td>
                       <td className="p-4 text-right">
                         <div className="inline-flex items-center justify-end gap-0.5">
                           <div className="text-muted-foreground">
-                            {(item.weight * item.quantity).toFixed(2)} kg
+                            {(item.weight * item.quantity).toFixed(2)} {t("common.kg")}
                             {item.quantity > 1 && (
                               <span className="block text-[11px] text-muted-foreground/80">
-                                ({item.weight.toFixed(2)} kg c/u)
+                                ({item.weight.toFixed(2)} {t("common.kg")} {t("common.unitEach")})
                               </span>
                             )}
                           </div>
@@ -339,7 +332,7 @@ function SuitcasesPage() {
                           className="h-8 w-8 text-muted-foreground hover:text-red-500"
                           onClick={() => {
                             removeItem(active.id, item.id);
-                            toast.success(`"${item.name}" eliminado`);
+                            toast.success(t("suitcases.itemRemoved", { name: item.name }));
                           }}
                         >
                           <Trash2 className="h-4 w-4" />
@@ -350,7 +343,7 @@ function SuitcasesPage() {
                   {active.items.length === 0 && (
                     <tr>
                       <td colSpan={5} className="p-8 text-center text-muted-foreground">
-                        No hay prendas en esta valija.
+                        {t("suitcases.emptyItems")}
                       </td>
                     </tr>
                   )}
@@ -361,29 +354,29 @@ function SuitcasesPage() {
         </div>
 
         <div className="space-y-4">
-          <h2 className="text-xl font-bold">Agregar Item</h2>
+          <h2 className="text-xl font-bold">{t("suitcases.addItem")}</h2>
           <Card className="p-4 space-y-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Nombre</label>
+              <label className="text-sm font-medium">{t("common.name")}</label>
               <Input
-                placeholder="Ej: Remera blanca"
+                placeholder={t("suitcases.placeholderItem")}
                 value={newItem.name}
                 onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Categoría</label>
+              <label className="text-sm font-medium">{t("common.category")}</label>
               <Select
                 value={newItem.category}
                 onValueChange={(v) => setNewItem({ ...newItem, category: v })}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar..." />
+                  <SelectValue placeholder={t("suitcases.chooseCategory")} />
                 </SelectTrigger>
                 <SelectContent>
-                  {CATEGORIES.map((c) => (
+                  {ITEM_CATEGORY_IDS.map((c) => (
                     <SelectItem key={c} value={c}>
-                      {c}
+                      {tc(c)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -391,7 +384,7 @@ function SuitcasesPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Cantidad</label>
+                <label className="text-sm font-medium">{t("common.quantity")}</label>
                 <Input
                   type="number"
                   min="1"
@@ -402,32 +395,32 @@ function SuitcasesPage() {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Peso total (kg)</label>
+                <label className="text-sm font-medium">{t("common.weightTotal")} ({t("common.kg")})</label>
                 <div
                   className="flex h-9 w-full items-center rounded-md border border-input bg-muted/40 px-3 text-sm"
                   aria-live="polite"
                 >
                   {newItem.category ? (
                     <span>
-                      {newItemEstimatedTotal.toFixed(2)} kg
+                      {newItemEstimatedTotal.toFixed(2)} {t("common.kg")}
                       {newItem.quantity > 1 && (
                         <span className="text-muted-foreground">
                           {" "}
-                          ({newItemUnitWeight.toFixed(2)} kg c/u)
+                          ({newItemUnitWeight.toFixed(2)} {t("common.kg")} {t("common.unitEach")})
                         </span>
                       )}
                     </span>
                   ) : (
-                    <span className="text-muted-foreground">Elegí una categoría</span>
+                    <span className="text-muted-foreground">{t("suitcases.chooseCategory")}</span>
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Se calcula solo según el tipo de prenda y la cantidad.
+                  {t("suitcases.weightAuto")}
                 </p>
               </div>
             </div>
             <Button className="w-full mt-2" onClick={handleAddItem}>
-              <Plus className="h-4 w-4 mr-2" /> Agregar a valija
+              <Plus className="h-4 w-4 mr-2" /> {t("suitcases.addToSuitcase")}
             </Button>
           </Card>
         </div>
@@ -437,8 +430,8 @@ function SuitcasesPage() {
       <Dialog open={!!editingItem} onOpenChange={(o) => !o && setEditingItem(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Editar item</DialogTitle>
-            <DialogDescription>Modificá los datos del objeto.</DialogDescription>
+            <DialogTitle>{t("common.edit")} {t("suitcases.item")}</DialogTitle>
+            <DialogDescription>{t("suitcases.editItemDesc")}</DialogDescription>
           </DialogHeader>
           {editingItem && (
             <EditItemForm
@@ -448,7 +441,7 @@ function SuitcasesPage() {
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditingItem(null)}>
-              Cancelar
+              {t("common.cancel")}
             </Button>
             <Button
               onClick={() => {
@@ -460,10 +453,10 @@ function SuitcasesPage() {
                   weight: editingItem.weight,
                 });
                 setEditingItem(null);
-                toast.success("Item actualizado");
+                toast.success(t("suitcases.itemUpdated"));
               }}
             >
-              Guardar
+              {t("common.save")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -476,11 +469,11 @@ function SuitcasesPage() {
         onCreate={(data) => {
           const id = addSuitcase(data);
           setActive(id);
-          toast.success(`Valija "${data.name}" creada`);
+          toast.success(t("suitcases.created", { name: data.name }));
         }}
         onUpdate={(id, data) => {
           updateSuitcase(id, data);
-          toast.success("Valija actualizada");
+          toast.success(t("suitcases.updated"));
         }}
         getInitial={(id) => {
           const s = suitcases.find((sc) => sc.id === id);
@@ -500,23 +493,24 @@ function EmptyState({
   dialog: { mode: "create" } | { mode: "edit"; id: string } | null;
   onClose: () => void;
 }) {
+  const { t } = useI18n();
   const addSuitcase = useSuitcasesStore((s) => s.addSuitcase);
   return (
     <div className="max-w-md mx-auto text-center py-20">
       <div className="mx-auto h-16 w-16 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mb-4">
         <Luggage className="h-8 w-8" />
       </div>
-      <h2 className="text-2xl font-bold">No tenés valijas todavía</h2>
-      <p className="text-muted-foreground mt-2">Creá tu primera valija para empezar a organizar tu equipaje.</p>
+      <h2 className="text-2xl font-bold">{t("suitcases.emptyTitle")}</h2>
+      <p className="text-muted-foreground mt-2">{t("suitcases.emptyDesc")}</p>
       <Button className="mt-6" onClick={onCreate}>
-        <Plus className="h-4 w-4 mr-2" /> Crear valija
+        <Plus className="h-4 w-4 mr-2" /> {t("suitcases.createSuitcase")}
       </Button>
       <SuitcaseDialog
         dialog={dialog}
         onClose={onClose}
         onCreate={(d) => {
           addSuitcase(d);
-          toast.success(`Valija "${d.name}" creada`);
+          toast.success(t("suitcases.created", { name: d.name }));
         }}
         onUpdate={() => {}}
         getInitial={() => undefined}
@@ -564,6 +558,7 @@ function SuitcaseDialog({
   onUpdate: (id: string, data: SuitcaseFormData) => void;
   getInitial: (id: string) => SuitcaseFormData | undefined;
 }) {
+  const { t } = useI18n();
   const initial =
     dialog?.mode === "edit" ? getInitial(dialog.id) : undefined;
 
@@ -597,7 +592,7 @@ function SuitcaseDialog({
 
   const submit = () => {
     if (!form.name.trim() || !form.destination.trim() || form.maxWeight <= 0) {
-      toast.error("Completá nombre, destino y peso máximo.");
+      toast.error(t("suitcases.errForm"));
       return;
     }
     if (dialog?.mode === "edit") {
@@ -619,25 +614,25 @@ function SuitcaseDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>
-            {dialog?.mode === "edit" ? "Editar valija" : "Nueva valija"}
+            {dialog?.mode === "edit" ? t("suitcases.editSuitcase") : t("suitcases.newSuitcaseDialog")}
           </DialogTitle>
           <DialogDescription>
-            Configurá el viaje y el límite de peso. Origen y fecha se usan para estimar exceso de equipaje.
+            {t("suitcases.dialogDesc")}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-2">
-            <label className="text-sm font-medium">Nombre</label>
+            <label className="text-sm font-medium">{t("common.name")}</label>
             <Input
-              placeholder="Valija de cabina"
+              placeholder={t("suitcases.placeholderName")}
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
             />
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium">Destino</label>
+            <label className="text-sm font-medium">{t("assistant.destination")}</label>
             <Input
-              placeholder="Bariloche o código BRC"
+              placeholder={t("suitcases.placeholderDestination")}
               value={form.destination}
               onChange={(e) => setForm({ ...form, destination: e.target.value })}
             />
@@ -645,9 +640,9 @@ function SuitcaseDialog({
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium" htmlFor="origin-iata">
-                Origen{" "}
+                {t("suitcases.originAirport")}{" "}
                 <span className="font-normal text-muted-foreground">
-                  (opcional — código IATA de 3 letras del aeropuerto de salida, ej: EZE, MIA, MAD)
+                  ({t("suitcases.originAirportHint")})
                 </span>
               </label>
               <IataAirportCombobox
@@ -657,7 +652,7 @@ function SuitcaseDialog({
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Fecha de ida</label>
+              <label className="text-sm font-medium">{t("suitcases.departureDate")}</label>
               <Input
                 type="date"
                 value={form.departureDate}
@@ -667,7 +662,7 @@ function SuitcaseDialog({
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Tipo</label>
+              <label className="text-sm font-medium">{t("suitcases.type")}</label>
               <Select
                 value={form.type}
                 onValueChange={(v: SuitcaseType) =>
@@ -678,13 +673,13 @@ function SuitcaseDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="cabina">Cabina</SelectItem>
-                  <SelectItem value="bodega">Bodega</SelectItem>
+                  <SelectItem value="cabina">{t("suitcaseType.cabin")}</SelectItem>
+                  <SelectItem value="bodega">{t("suitcaseType.hold")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Peso máx. (kg)</label>
+              <label className="text-sm font-medium">{t("suitcases.maxWeightKg")}</label>
               <Input
                 type="number"
                 step="0.5"
@@ -698,10 +693,10 @@ function SuitcaseDialog({
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
-            Cancelar
+            {t("common.cancel")}
           </Button>
           <Button onClick={submit}>
-            {dialog?.mode === "edit" ? "Guardar" : "Crear valija"}
+            {dialog?.mode === "edit" ? t("common.save") : t("suitcases.createSuitcase")}
           </Button>
         </DialogFooter>
       </DialogContent>

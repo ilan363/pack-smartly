@@ -19,12 +19,14 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { useChecklistsStore } from "@/lib/checklists-store";
 import { WeightExplainButton } from "@/components/WeightExplainButton";
+import { useI18n } from "@/hooks/use-i18n";
 
 export const Route = createFileRoute("/_layout/checklists")({
   component: ChecklistsPage,
 });
 
 function ChecklistsPage() {
+  const { t, tc } = useI18n();
   const checklists = useChecklistsStore((s) => s.checklists);
   const toggleItem = useChecklistsStore((s) => s.toggleItem);
   const removeChecklist = useChecklistsStore((s) => s.removeChecklist);
@@ -40,18 +42,18 @@ function ChecklistsPage() {
 
   useEffect(() => {
     if (reminders.length === 0) return;
-    const t = setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       reminders.forEach(({ c, pending }) => {
-        toast.warning(`Te faltan ${pending.length} items en "${c.title}"`, {
+        toast.warning(t("checklists.reminderTitle", { count: pending.length, title: c.title }), {
           description: pending
             .slice(0, 4)
             .map((p) => `• ${p.name}`)
-            .join("\n") + (pending.length > 4 ? `\n+${pending.length - 4} más` : ""),
+            .join("\n") + (pending.length > 4 ? `\n${t("checklists.reminderMore", { count: pending.length - 4 })}` : ""),
           duration: 6000,
         });
       });
     }, 600);
-    return () => clearTimeout(t);
+    return () => clearTimeout(timeoutId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -59,22 +61,22 @@ function ChecklistsPage() {
     <div className="max-w-5xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Listas guardadas</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{t("checklists.title")}</h1>
           <p className="text-muted-foreground mt-1">
-            Marcá lo que ya guardaste en la valija. Te avisamos si te falta algo.
+            {t("checklists.subtitle")}
           </p>
         </div>
         <Link to="/assistant">
-          <Button>Crear nueva lista</Button>
+          <Button>{t("checklists.createNew")}</Button>
         </Link>
       </div>
 
       {checklists.length === 0 ? (
         <Card className="p-12 text-center">
           <ListChecks className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
-          <p className="font-medium">Aún no guardaste ninguna lista.</p>
+          <p className="font-medium">{t("checklists.emptyTitle")}</p>
           <p className="text-sm text-muted-foreground mt-1">
-            Pedile al Asistente IA que arme tu valija y guardala desde ahí.
+            {t("checklists.emptyDesc")}
           </p>
         </Card>
       ) : (
@@ -90,7 +92,9 @@ function ChecklistsPage() {
                     <h2 className="font-bold text-lg truncate">{c.title}</h2>
                     <div className="flex flex-wrap gap-2 mt-2 text-xs text-muted-foreground">
                       <Badge variant="outline">{c.destination}</Badge>
-                      <Badge variant="outline">{c.days} días</Badge>
+                      <Badge variant="outline">
+                        {c.days} {c.days === 1 ? t("common.daysOne") : t("common.daysMany")}
+                      </Badge>
                       <Badge variant="outline">{c.occasion}</Badge>
                       <Badge variant="outline">{c.weather}</Badge>
                     </div>
@@ -108,7 +112,7 @@ function ChecklistsPage() {
                       size="icon"
                       onClick={() => {
                         removeChecklist(c.id);
-                        toast.success("Lista eliminada");
+                        toast.success(t("checklists.deleted"));
                       }}
                     >
                       <Trash2 className="h-4 w-4 text-red-500" />
@@ -119,7 +123,7 @@ function ChecklistsPage() {
                 {pending > 0 && (
                   <div className="px-5 py-2 bg-amber-500/10 border-b border-border flex items-center gap-2 text-sm text-amber-700 dark:text-amber-400">
                     <AlertCircle className="h-4 w-4" />
-                    Te faltan {pending} {pending === 1 ? "item" : "items"} por guardar.
+                    {t("checklists.pendingLine", { count: pending })}
                   </div>
                 )}
 
@@ -146,7 +150,7 @@ function ChecklistsPage() {
                         {it.quantity > 1 ? ` (x${it.quantity})` : ""}
                       </span>
                       <Badge variant="outline" className="text-[10px]">
-                        {it.category}
+                        {tc(it.category)}
                       </Badge>
                       <span className="inline-flex w-20 items-center justify-end gap-0.5 text-xs text-muted-foreground">
                         {(it.weight * it.quantity).toFixed(2)} kg
@@ -170,8 +174,18 @@ function ChecklistsPage() {
   );
 }
 
-function buildShareText(c: Checklist) {
-  const header = `🧳 Lista de equipaje: ${c.title}\n📍 ${c.destination} · ${c.days} días · ${c.occasion} · ${c.weather}\n\n`;
+function buildShareText(
+  c: Checklist,
+  t: ReturnType<typeof useI18n>["t"],
+  tc: ReturnType<typeof useI18n>["tc"],
+) {
+  const header = `🧳 ${t("checklists.shareHeader", { title: c.title })}\n📍 ${t("checklists.shareMeta", {
+    destination: c.destination,
+    days: c.days,
+    dayLabel: c.days === 1 ? t("common.daysOne") : t("common.daysMany"),
+    occasion: c.occasion,
+    weather: c.weather,
+  })}\n\n`;
   const byCat = c.items.reduce<Record<string, typeof c.items>>((acc, it) => {
     (acc[it.category] ||= []).push(it);
     return acc;
@@ -181,24 +195,25 @@ function buildShareText(c: Checklist) {
       const lines = items
         .map((i) => `  ${i.checked ? "✅" : "⬜"} ${i.name}${i.quantity > 1 ? ` (x${i.quantity})` : ""}`)
         .join("\n");
-      return `▸ ${cat}\n${lines}`;
+      return `▸ ${tc(cat)}\n${lines}`;
     })
     .join("\n\n");
   const total = c.items.reduce((s, i) => s + i.weight * i.quantity, 0);
-  return `${header}${body}\n\nPeso total: ${total.toFixed(2)} kg\n\nCompartido desde Travel Wolf 🐺`;
+  return `${header}${body}\n\n${t("checklists.totalWeight", { weight: total.toFixed(2) })}\n\n${t("checklists.sharedFrom")} 🐺`;
 }
 
 function ShareChecklistButton({ checklist }: { checklist: Checklist }) {
+  const { t, tc } = useI18n();
   const [open, setOpen] = useState(false);
   const [emails, setEmails] = useState("");
-  const text = buildShareText(checklist);
+  const text = buildShareText(checklist, t, tc);
 
-  const copy = async (value: string, label = "Copiado al portapapeles") => {
+  const copy = async (value: string, label = t("checklists.copied")) => {
     try {
       await navigator.clipboard.writeText(value);
       toast.success(label);
     } catch {
-      toast.error("No se pudo copiar");
+      toast.error(t("checklists.copyFailed"));
     }
   };
 
@@ -206,7 +221,7 @@ function ShareChecklistButton({ checklist }: { checklist: Checklist }) {
     if (typeof navigator !== "undefined" && "share" in navigator) {
       try {
         await (navigator as Navigator & { share: (d: ShareData) => Promise<void> }).share({
-          title: `Travel Wolf · ${checklist.title}`,
+          title: checklist.title,
           text,
         });
         return;
@@ -214,7 +229,7 @@ function ShareChecklistButton({ checklist }: { checklist: Checklist }) {
         // user cancelled or unsupported, fallback below
       }
     }
-    copy(text, "Lista copiada — pegala donde quieras compartirla");
+    copy(text, t("checklists.copiedShareFallback"));
   };
 
   const sendEmails = () => {
@@ -223,10 +238,10 @@ function ShareChecklistButton({ checklist }: { checklist: Checklist }) {
       .map((e) => e.trim())
       .filter(Boolean);
     if (list.length === 0) {
-      toast.error("Agregá al menos un email");
+      toast.error(t("checklists.emailRequired"));
       return;
     }
-    const subject = encodeURIComponent(`Lista de equipaje: ${checklist.title}`);
+    const subject = encodeURIComponent(t("checklists.emailSubject", { title: checklist.title }));
     const body = encodeURIComponent(text);
     window.location.href = `mailto:${list.join(",")}?subject=${subject}&body=${body}`;
     setOpen(false);
@@ -240,7 +255,7 @@ function ShareChecklistButton({ checklist }: { checklist: Checklist }) {
         variant="ghost"
         size="icon"
         onClick={() => setOpen(true)}
-        title="Compartir lista"
+        title={t("checklists.shareTitle")}
       >
         <Share2 className="h-4 w-4 text-primary" />
       </Button>
@@ -249,51 +264,50 @@ function ShareChecklistButton({ checklist }: { checklist: Checklist }) {
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Share2 className="h-5 w-5" /> Compartir lista
+              <Share2 className="h-5 w-5" /> {t("checklists.shareTitle")}
             </DialogTitle>
             <DialogDescription>
-              Enviá "{checklist.title}" a otros usuarios por email, WhatsApp o
-              copiando el contenido.
+              {t("checklists.shareDesc")}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-2">
               <Button variant="outline" onClick={nativeShare}>
-                <Share2 className="h-4 w-4 mr-2" /> Compartir…
+                <Share2 className="h-4 w-4 mr-2" /> {t("common.share")}
               </Button>
               <Button variant="outline" asChild>
                 <a href={whatsappUrl} target="_blank" rel="noreferrer">
-                  <MessageCircle className="h-4 w-4 mr-2" /> WhatsApp
+                  <MessageCircle className="h-4 w-4 mr-2" /> {t("checklists.whatsapp")}
                 </a>
               </Button>
               <Button variant="outline" onClick={() => copy(text)}>
-                <Copy className="h-4 w-4 mr-2" /> Copiar lista
+                <Copy className="h-4 w-4 mr-2" /> {t("checklists.copy")}
               </Button>
               <Button
                 variant="outline"
-                onClick={() => copy(window.location.href, "Link copiado")}
+                onClick={() => copy(window.location.href, t("checklists.copied"))}
               >
-                <LinkIcon className="h-4 w-4 mr-2" /> Copiar link
+                <LinkIcon className="h-4 w-4 mr-2" /> {t("checklists.link")}
               </Button>
             </div>
 
             <div className="space-y-2">
               <label className="text-sm font-medium flex items-center gap-2">
-                <Mail className="h-4 w-4" /> Enviar por email
+                <Mail className="h-4 w-4" /> {t("checklists.email")}
               </label>
               <Input
-                placeholder="amigo@mail.com, otro@mail.com"
+                placeholder={t("checklists.emailPlaceholder")}
                 value={emails}
                 onChange={(e) => setEmails(e.target.value)}
               />
               <p className="text-xs text-muted-foreground">
-                Separá varios destinatarios con coma.
+                {t("checklists.emailHint")}
               </p>
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Vista previa</label>
+              <label className="text-sm font-medium">{t("checklists.preview")}</label>
               <Textarea
                 readOnly
                 value={text}
@@ -304,10 +318,10 @@ function ShareChecklistButton({ checklist }: { checklist: Checklist }) {
 
           <DialogFooter>
             <Button variant="ghost" onClick={() => setOpen(false)}>
-              Cerrar
+              {t("common.close")}
             </Button>
             <Button onClick={sendEmails}>
-              <Mail className="h-4 w-4 mr-2" /> Enviar email
+              <Mail className="h-4 w-4 mr-2" /> {t("checklists.sendEmail")}
             </Button>
           </DialogFooter>
         </DialogContent>

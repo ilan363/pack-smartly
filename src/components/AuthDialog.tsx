@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { OAuthButtons } from "@/components/OAuthButtons";
 import { useAuthStore } from "@/lib/auth-store";
+import { useI18n } from "@/hooks/use-i18n";
 import { toast } from "sonner";
 
 type AuthTab = "login" | "register" | "admin";
@@ -24,6 +25,8 @@ type PasswordFieldProps = {
   onChange: (value: string) => void;
   showPassword: boolean;
   onToggleShow: () => void;
+  showLabel: string;
+  hideLabel: string;
   placeholder?: string;
   onKeyDown?: (event: KeyboardEvent<HTMLInputElement>) => void;
 };
@@ -35,6 +38,8 @@ function PasswordField({
   onChange,
   showPassword,
   onToggleShow,
+  showLabel,
+  hideLabel,
   placeholder,
   onKeyDown,
 }: PasswordFieldProps) {
@@ -48,7 +53,7 @@ function PasswordField({
           type="button"
           onClick={onToggleShow}
           className="text-muted-foreground transition-colors hover:text-foreground"
-          aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+          aria-label={showPassword ? hideLabel : showLabel}
         >
           {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
         </button>
@@ -83,6 +88,7 @@ export function AuthDialog({
   const login = useAuthStore((s) => s.login);
   const loginAdmin = useAuthStore((s) => s.loginAdmin);
   const register = useAuthStore((s) => s.register);
+  const { t } = useI18n();
   const [tab, setTab] = useState<AuthTab>(defaultTab);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -193,11 +199,13 @@ export function AuthDialog({
             </div>
             <PasswordField
               id="admin-password"
-              label="Contraseña"
+              label={t("auth.password")}
               value={password}
               onChange={setPassword}
               showPassword={showPassword}
               onToggleShow={() => setShowPassword((prev) => !prev)}
+              showLabel={t("auth.showPassword")}
+              hideLabel={t("auth.hidePassword")}
               onKeyDown={(e) => e.key === "Enter" && handleAdminLogin()}
             />
           </div>
@@ -207,13 +215,13 @@ export function AuthDialog({
             onValueChange={(value) => setTab(value as AuthTab)}
           >
             <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="login">Iniciar sesión</TabsTrigger>
-              <TabsTrigger value="register">Registrarse</TabsTrigger>
+              <TabsTrigger value="login">{t("auth.login")}</TabsTrigger>
+              <TabsTrigger value="register">{t("auth.register")}</TabsTrigger>
             </TabsList>
 
             <TabsContent value="login" className="space-y-3">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Email</label>
+                <label className="text-sm font-medium">{t("auth.email")}</label>
                 <Input
                   type="email"
                   value={email}
@@ -224,18 +232,20 @@ export function AuthDialog({
               </div>
               <PasswordField
                 id="login-password"
-                label="Contraseña"
+                label={t("auth.password")}
                 value={password}
                 onChange={setPassword}
                 showPassword={showPassword}
                 onToggleShow={() => setShowPassword((prev) => !prev)}
+                showLabel={t("auth.showPassword")}
+                hideLabel={t("auth.hidePassword")}
                 onKeyDown={(e) => e.key === "Enter" && handleLogin()}
               />
             </TabsContent>
 
             <TabsContent value="register" className="space-y-3">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Email</label>
+                <label className="text-sm font-medium">{t("auth.email")}</label>
                 <Input
                   type="email"
                   value={email}
@@ -245,20 +255,24 @@ export function AuthDialog({
               </div>
               <PasswordField
                 id="register-password"
-                label="Contraseña"
+                label={t("auth.password")}
                 value={password}
                 onChange={setPassword}
                 showPassword={showPassword}
                 onToggleShow={() => setShowPassword((prev) => !prev)}
+                showLabel={t("auth.showPassword")}
+                hideLabel={t("auth.hidePassword")}
                 placeholder="Mínimo 6 caracteres"
               />
               <PasswordField
                 id="register-confirm-password"
-                label="Confirmar contraseña"
+                label={t("auth.confirmPassword")}
                 value={confirmPassword}
                 onChange={setConfirmPassword}
                 showPassword={showConfirmPassword}
                 onToggleShow={() => setShowConfirmPassword((prev) => !prev)}
+                showLabel={t("auth.showPassword")}
+                hideLabel={t("auth.hidePassword")}
                 onKeyDown={(e) => e.key === "Enter" && handleRegister()}
               />
             </TabsContent>
@@ -292,9 +306,9 @@ export function AuthDialog({
             Cancelar
           </Button>
           <Button type="submit">
-            {tab === "login" && "Ingresar"}
-            {tab === "register" && "Crear cuenta"}
-            {tab === "admin" && "Ingresar como admin"}
+            {tab === "login" && t("auth.submitLogin")}
+            {tab === "register" && t("auth.submitRegister")}
+            {tab === "admin" && t("auth.submitAdmin")}
           </Button>
         </DialogFooter>
         </form>

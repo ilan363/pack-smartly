@@ -3,7 +3,9 @@ import { motion } from "framer-motion";
 import { ArrowRight, BaggageClaim, Bot, CheckCircle2, CloudLightning } from "lucide-react";
 import { useState } from "react";
 import { AuthDialog } from "@/components/AuthDialog";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { Button } from "@/components/ui/button";
+import { useI18n } from "@/hooks/use-i18n";
 
 export const Route = createFileRoute("/")({
   component: LandingPage,
@@ -11,6 +13,7 @@ export const Route = createFileRoute("/")({
 
 function Navbar() {
   const navigate = useNavigate();
+  const { t } = useI18n();
   const [authOpen, setAuthOpen] = useState(false);
   const [authTab, setAuthTab] = useState<"login" | "register" | "admin">("login");
 
@@ -29,12 +32,13 @@ function Navbar() {
             </div>
             <span className="text-lg font-bold tracking-tight">Travel Wolf</span>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <LanguageSwitcher />
             <Button
               variant="ghost"
               onClick={() => openAuth("login")}
             >
-              Ingresar
+              {t("nav.signIn")}
             </Button>
           </div>
         </div>
@@ -52,6 +56,8 @@ function Navbar() {
 }
 
 function LandingPage() {
+  const { t } = useI18n();
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -66,7 +72,7 @@ function LandingPage() {
             className="inline-flex items-center gap-2 rounded-full border border-border bg-muted/50 px-3 py-1 text-sm text-muted-foreground mb-8"
           >
             <span className="flex h-2 w-2 rounded-full bg-primary animate-pulse" />
-            Organización inteligente de equipaje
+            {t("landing.badge")}
           </motion.div>
           
           <motion.h1 
@@ -75,8 +81,8 @@ function LandingPage() {
             transition={{ duration: 0.5, delay: 0.1 }}
             className="max-w-4xl text-5xl font-extrabold tracking-tight sm:text-7xl mb-6 text-foreground"
           >
-            Viaja sin peso extra, <br className="hidden sm:block" />
-            <span className="text-muted-foreground">organiza con inteligencia.</span>
+            {t("landing.heroTitle1")} <br className="hidden sm:block" />
+            <span className="text-muted-foreground">{t("landing.heroTitle2")}</span>
           </motion.h1>
           
           <motion.p 
@@ -85,8 +91,7 @@ function LandingPage() {
             transition={{ duration: 0.5, delay: 0.2 }}
             className="max-w-2xl text-lg text-muted-foreground mb-10"
           >
-            Calcula el peso, optimiza el espacio y recibe recomendaciones impulsadas por IA 
-            según tu destino, clima y tipo de viaje.
+            {t("landing.heroSubtitle")}
           </motion.p>
           
           <motion.div 
@@ -97,7 +102,7 @@ function LandingPage() {
           >
             <Link to="/dashboard">
               <Button size="lg" className="rounded-full h-12 px-8 text-base group">
-                Organizar mi viaje
+                {t("landing.cta")}
                 <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
               </Button>
             </Link>
@@ -108,20 +113,20 @@ function LandingPage() {
         <section className="grid gap-8 md:grid-cols-3 mb-32">
           <FeatureCard 
             icon={<BaggageClaim className="h-6 w-6" />}
-            title="Gestión de Valijas"
-            description="Controla el peso y capacidad en tiempo real. Alertas visuales para evitar excesos antes de llegar al aeropuerto."
+            title={t("landing.feature1Title")}
+            description={t("landing.feature1Desc")}
             delay={0.4}
           />
           <FeatureCard 
             icon={<Bot className="h-6 w-6" />}
-            title="Asistente de IA"
-            description="Dile a dónde viajas y la IA creará tu lista ideal considerando el clima, días y eventos especiales."
+            title={t("landing.feature2Title")}
+            description={t("landing.feature2Desc")}
             delay={0.5}
           />
           <FeatureCard 
             icon={<CloudLightning className="h-6 w-6" />}
-            title="Rápido & Moderno"
-            description="Interfaz minimalista diseñada para que organizar tu equipaje sea rápido, claro y sin estrés."
+            title={t("landing.feature3Title")}
+            description={t("landing.feature3Desc")}
             delay={0.6}
           />
         </section>
@@ -144,13 +149,13 @@ function LandingPage() {
           </div>
           <div className="p-8 grid md:grid-cols-2 gap-8 items-center bg-background">
             <div>
-              <h3 className="text-2xl font-bold mb-4">Todo bajo control</h3>
+              <h3 className="text-2xl font-bold mb-4">{t("landing.previewTitle")}</h3>
               <ul className="space-y-4">
                 {[
-                  "Tarjetas visuales por valija",
-                  "Categorización de prendas",
-                  "Indicadores de capacidad",
-                  "Recomendaciones climáticas"
+                  t("landing.previewItem1"),
+                  t("landing.previewItem2"),
+                  t("landing.previewItem3"),
+                  t("landing.previewItem4"),
                 ].map((item, i) => (
                   <li key={i} className="flex items-center gap-3 text-muted-foreground">
                     <CheckCircle2 className="h-5 w-5 text-primary" />
@@ -162,12 +167,12 @@ function LandingPage() {
             <div className="rounded-xl border border-border bg-muted/20 p-6">
               <div className="flex justify-between items-end mb-4">
                 <div>
-                  <div className="font-semibold">Valija Principal</div>
-                  <div className="text-sm text-muted-foreground">Cabina (10kg max)</div>
+                  <div className="font-semibold">{t("landing.suitcaseName")}</div>
+                  <div className="text-sm text-muted-foreground">{t("landing.suitcaseMeta")}</div>
                 </div>
                 <div className="text-right">
                   <div className="text-lg font-bold">8.5 kg</div>
-                  <div className="text-sm text-green-600 font-medium">1.5 kg libres</div>
+                  <div className="text-sm text-green-600 font-medium">{t("landing.freeWeight")}</div>
                 </div>
               </div>
               <div className="h-3 w-full rounded-full bg-muted overflow-hidden mb-6">
@@ -175,15 +180,15 @@ function LandingPage() {
               </div>
               <div className="space-y-3">
                 <div className="flex justify-between text-sm">
-                  <span>Remeras (5)</span>
+                  <span>{t("landing.itemShirts")}</span>
                   <span className="text-muted-foreground">1.2 kg</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span>Pantalones (2)</span>
+                  <span>{t("landing.itemPants")}</span>
                   <span className="text-muted-foreground">1.8 kg</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span>Zapatillas (1)</span>
+                  <span>{t("landing.itemShoes")}</span>
                   <span className="text-muted-foreground">0.8 kg</span>
                 </div>
               </div>

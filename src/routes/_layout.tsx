@@ -1,8 +1,10 @@
 import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { BaggageClaim, Menu } from "lucide-react";
 import { useState } from "react";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { Button } from "@/components/ui/button";
 import { AppSidebar, MobileAppSidebar, MobileBottomNav } from "@/components/AppSidebar";
+import { useI18n } from "@/hooks/use-i18n";
 
 export const Route = createFileRoute("/_layout")({
   component: AppLayout,
@@ -10,6 +12,7 @@ export const Route = createFileRoute("/_layout")({
 
 function AppLayout() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { t } = useI18n();
 
   return (
     <div className="flex h-svh overflow-hidden bg-background">
@@ -22,16 +25,23 @@ function AppLayout() {
             <BaggageClaim className="h-5 w-5" />
             <span className="font-bold">Travel Wolf</span>
           </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            aria-label="Abrir menú de navegación"
-            onClick={() => setMobileMenuOpen(true)}
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
+          <div className="flex items-center gap-1">
+            <LanguageSwitcher />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label={t("nav.openMenu")}
+              onClick={() => setMobileMenuOpen(true)}
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
+          </div>
         </header>
+
+        <div className="hidden shrink-0 items-center justify-end border-b border-border bg-background px-6 py-3 md:flex">
+          <LanguageSwitcher />
+        </div>
 
         <main className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 pb-20 sm:p-6 md:p-8 md:pb-8">
           <Outlet />

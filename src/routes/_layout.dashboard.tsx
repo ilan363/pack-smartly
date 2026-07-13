@@ -6,6 +6,7 @@ import { useSuitcasesStore, totalWeight } from "@/lib/suitcases-store";
 import { AuthDialog } from "@/components/AuthDialog";
 import { useAuthStore } from "@/lib/auth-store";
 import { logoutWithOAuth } from "@/hooks/use-supabase-auth-sync";
+import { useI18n } from "@/hooks/use-i18n";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -15,6 +16,7 @@ export const Route = createFileRoute("/_layout/dashboard")({
 
 function DashboardPage() {
   const navigate = useNavigate();
+  const { t } = useI18n();
   const suitcases = useSuitcasesStore((s) => s.suitcases);
   const setActive = useSuitcasesStore((s) => s.setActive);
   const authedEmail = useAuthStore((s) => s.email);
@@ -25,7 +27,7 @@ function DashboardPage() {
     0,
   );
   const destinations = Array.from(new Set(suitcases.map((s) => s.destination))).filter(Boolean);
-  const upcomingDestination = destinations[0] ?? "Sin viaje próximo";
+  const upcomingDestination = destinations[0] ?? t("dashboard.noTrip");
 
   const goToSuitcases = (id?: string) => {
     if (id) setActive(id);
@@ -36,31 +38,33 @@ function DashboardPage() {
     <div className="space-y-8">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Bienvenido de nuevo</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{t("dashboard.welcome")}</h1>
           <p className="text-muted-foreground mt-1">
-            Aquí está el resumen de tus próximos viajes y equipajes.
+            {t("dashboard.subtitle")}
           </p>
         </div>
-        {authedEmail ? (
-          <div className="flex items-center gap-2 border border-border rounded-lg px-3 py-2 bg-card">
-            <ShieldCheck className="h-4 w-4 text-primary" />
-            <span className="text-sm font-medium">{authedEmail}</span>
-            <Button variant="ghost" size="sm" onClick={() => { void logoutWithOAuth(); toast.success("Sesión cerrada"); }}>
-              <LogOut className="h-4 w-4 mr-1" /> Salir
+        <div className="flex items-center gap-2">
+          {authedEmail ? (
+            <div className="flex items-center gap-2 border border-border rounded-lg px-3 py-2 bg-card">
+              <ShieldCheck className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium">{authedEmail}</span>
+              <Button variant="ghost" size="sm" onClick={() => { void logoutWithOAuth(); toast.success(t("nav.logoutSuccess")); }}>
+                <LogOut className="h-4 w-4 mr-1" /> {t("nav.signOut")}
+              </Button>
+            </div>
+          ) : (
+            <Button onClick={() => setLoginOpen(true)} variant="outline">
+              <LogIn className="h-4 w-4 mr-2" />
+              {t("nav.signInLong")}
             </Button>
-          </div>
-        ) : (
-          <Button onClick={() => setLoginOpen(true)} variant="outline">
-            <LogIn className="h-4 w-4 mr-2" />
-            Iniciar sesión
-          </Button>
-        )}
+          )}
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Próximos Viajes</CardTitle>
+            <CardTitle className="text-sm font-medium">{t("dashboard.upcomingTrips")}</CardTitle>
             <Plane className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -69,7 +73,7 @@ function DashboardPage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Valijas Activas</CardTitle>
+            <CardTitle className="text-sm font-medium">{t("dashboard.activeSuitcases")}</CardTitle>
             <BaggageClaim className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -78,7 +82,7 @@ function DashboardPage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Prendas Empacadas</CardTitle>
+            <CardTitle className="text-sm font-medium">{t("dashboard.packedItems")}</CardTitle>
             <span className="h-4 w-4 text-muted-foreground text-xs font-bold flex items-center justify-center">
               #
             </span>
@@ -89,7 +93,7 @@ function DashboardPage() {
         </Card>
       </div>
 
-      <h2 className="text-xl font-bold tracking-tight mt-8">Tu próximo viaje</h2>
+      <h2 className="text-xl font-bold tracking-tight mt-8">{t("dashboard.nextTrip")}</h2>
 
       <Card className="overflow-hidden">
         <div className="bg-primary/5 border-b border-border p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">

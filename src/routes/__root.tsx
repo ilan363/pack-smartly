@@ -13,6 +13,7 @@ import { useSupabaseAuthSync } from "@/hooks/use-supabase-auth-sync";
 import { Toaster } from "@/components/ui/sonner";
 import { clearLegacyAppStorage } from "@/lib/clear-legacy-storage";
 import { registerChunkLoadRecovery, isRecoverableLoadError, tryRecoverFromStaleChunks } from "@/lib/recoverable-errors";
+import { useLocaleStore } from "@/lib/i18n/locale-store";
 import appCss from "../styles.css?url";
 
 function NotFoundComponent() {
@@ -89,7 +90,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
+      { title: "Travel Wolf" },
       { name: "description", content: "Lovable Generated Project" },
       { name: "author", content: "Lovable" },
       { property: "og:title", content: "Lovable App" },
@@ -127,6 +128,7 @@ function RootShell({ children }: { children: React.ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const locale = useLocaleStore((s) => s.locale);
 
   useSupabaseAuthSync();
 
@@ -134,6 +136,10 @@ function RootComponent() {
     clearLegacyAppStorage();
     return registerChunkLoadRecovery();
   }, []);
+
+  useEffect(() => {
+    document.documentElement.lang = locale;
+  }, [locale]);
 
   return (
     <QueryClientProvider client={queryClient}>

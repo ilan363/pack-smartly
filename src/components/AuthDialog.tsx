@@ -88,7 +88,7 @@ export function AuthDialog({
   const login = useAuthStore((s) => s.login);
   const loginAdmin = useAuthStore((s) => s.loginAdmin);
   const register = useAuthStore((s) => s.register);
-  const { t } = useI18n();
+  const { t, tAuthError } = useI18n();
   const [tab, setTab] = useState<AuthTab>(defaultTab);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -121,7 +121,7 @@ export function AuthDialog({
       onOpenChange(false);
       onSuccess?.();
     } else {
-      toast.error(res.error);
+      toast.error(tAuthError(res.error));
     }
   };
 
@@ -133,7 +133,7 @@ export function AuthDialog({
       onOpenChange(false);
       onAdminSuccess?.();
     } else {
-      toast.error(res.error);
+      toast.error(tAuthError(res.error));
     }
   };
 
@@ -150,7 +150,7 @@ export function AuthDialog({
       onOpenChange(false);
       onSuccess?.();
     } else {
-      toast.error(res.error);
+      toast.error(tAuthError(res.error));
     }
   };
 

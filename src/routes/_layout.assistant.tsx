@@ -70,7 +70,7 @@ function buildSuitcaseFromSuggestion(
 }
 
 function AssistantPage() {
-  const { t, tc } = useI18n();
+  const { t, tc, ti, to, locale } = useI18n();
   const messages = useChatStore((s) => s.messages);
   const addMessage = useChatStore((s) => s.addMessage);
   const updateSuggestionInStore = useChatStore((s) => s.updateSuggestion);
@@ -200,6 +200,7 @@ function AssistantPage() {
           capacityMode: form.capacityMode,
           shoppingReserveKg:
             form.capacityMode === "reserve" ? form.shoppingReserveKg : undefined,
+          locale,
         },
       });
       const totalWeight = data.items.reduce(
@@ -605,7 +606,7 @@ function AssistantPage() {
                               count: msg.suggestion.days ?? 1,
                             })}
                           </Badge>
-                          <Badge variant="secondary">{msg.suggestion.occasion}</Badge>
+                          <Badge variant="secondary">{to(msg.suggestion.occasion ?? "")}</Badge>
                           {msg.suggestion.suitcaseCapacityKg ? (
                             <Badge variant="secondary">{msg.suggestion.suitcaseCapacityKg} {t("common.kg")}</Badge>
                           ) : null}
@@ -670,6 +671,7 @@ function AssistantPage() {
                             <DailyForecastCards
                               compact
                               layout="scroll"
+                              locale={locale}
                               days={msg.suggestion.forecast.map((f) => ({
                                 date: f.date ?? f.label,
                                 dayNumber: f.day,
@@ -723,7 +725,7 @@ function AssistantPage() {
                                   {items.map((it, i) => (
                                     <li key={i} className="flex justify-between items-center px-3 py-2 text-sm">
                                       <span className="truncate pr-2">
-                                        {it.name}
+                                        {ti(it.name)}
                                         {it.quantity && it.quantity > 1 ? <span className="text-muted-foreground"> × {it.quantity}</span> : null}
                                       </span>
                                       <span className="inline-flex shrink-0 items-center gap-0.5 text-xs text-muted-foreground">

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import type { OAuthProviderId } from "@/lib/oauth";
+import type { AuthErrorCode } from "@/lib/i18n/translations-dynamic";
 import { createSafeLocalStorage } from "@/lib/safe-storage";
 
 export const ADMIN_EMAIL = "i.manbrut@wolfsohn.edu.ar";
@@ -14,7 +15,7 @@ export type RegisteredUser = {
   lastLoginAt: number;
 };
 
-type AuthResult = { ok: true } | { ok: false; error: string };
+type AuthResult = { ok: true } | { ok: false; error: AuthErrorCode };
 
 type AuthState = {
   email: string | null;
@@ -83,15 +84,15 @@ export const useAuthStore = create<AuthState>()(
         const normalized = normalizeEmail(email);
 
         if (!normalized || !password) {
-          return { ok: false, error: "Completá email y contraseña" };
+          return { ok: false, error: "auth.err.missing_credentials" };
         }
 
         if (!isValidEmail(normalized)) {
-          return { ok: false, error: "Ingresá un email válido" };
+          return { ok: false, error: "auth.err.invalid_email" };
         }
 
         if (normalized === ADMIN_EMAIL) {
-          return { ok: false, error: "Usá el acceso de administrador" };
+          return { ok: false, error: "auth.err.use_admin_login" };
         }
 
         const user = get().users.find((u) => u.email === normalized);
@@ -105,13 +106,13 @@ export const useAuthStore = create<AuthState>()(
           return { ok: true };
         }
 
-        return { ok: false, error: "Credenciales inválidas" };
+        return { ok: false, error: "auth.err.invalid_credentials" };
       },
       loginAdmin: (email, password) => {
         const normalized = normalizeEmail(email);
 
         if (!normalized || !password) {
-          return { ok: false, error: "Completá email y contraseña" };
+          return { ok: false, error: "auth.err.missing_credentials" };
         }
 
         if (normalized === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
@@ -123,30 +124,30 @@ export const useAuthStore = create<AuthState>()(
           return { ok: true };
         }
 
-        return { ok: false, error: "Acceso denegado. Solo el administrador autorizado." };
+        return { ok: false, error: "auth.err.access_denied" };
       },
       register: (email, password) => {
         const normalized = normalizeEmail(email);
 
         if (!normalized || !password) {
-          return { ok: false, error: "Completá email y contraseña" };
+          return { ok: false, error: "auth.err.missing_credentials" };
         }
 
         if (!isValidEmail(normalized)) {
-          return { ok: false, error: "Ingresá un email válido" };
+          return { ok: false, error: "auth.err.invalid_email" };
         }
 
         if (password.length < 6) {
-          return { ok: false, error: "La contraseña debe tener al menos 6 caracteres" };
+          return { ok: false, error: "auth.err.password_too_short" };
         }
 
         if (normalized === ADMIN_EMAIL) {
-          return { ok: false, error: "Este email no puede registrarse" };
+          return { ok: false, error: "auth.err.email_cannot_register" };
         }
 
         const exists = get().users.some((u) => u.email === normalized);
         if (exists) {
-          return { ok: false, error: "Este email ya está registrado" };
+          return { ok: false, error: "auth.err.email_already_registered" };
         }
 
         set({
@@ -164,13 +165,13 @@ export const useAuthStore = create<AuthState>()(
         const normalized = normalizeEmail(email);
 
         if (!normalized || !isValidEmail(normalized)) {
-          return { ok: false, error: "No se pudo obtener un email válido del proveedor" };
+          return { ok: false, error: "auth.err.oauth_invalid_email" };
         }
 
         if (normalized === ADMIN_EMAIL) {
           return {
             ok: false,
-            error: "Para administrar, ingresá desde el panel de administración con tu contraseña.",
+            error: "auth.err.oauth_admin_password",
           };
         }
 

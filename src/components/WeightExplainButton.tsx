@@ -12,7 +12,7 @@ import {
 import { useI18n } from "@/hooks/use-i18n";
 
 export function WeightExplainButton(props: WeightExplainInput) {
-  const { t } = useI18n();
+  const { t, ti, locale } = useI18n();
 
   return (
     <Popover>
@@ -23,7 +23,7 @@ export function WeightExplainButton(props: WeightExplainInput) {
           size="icon"
           className="h-6 w-6 shrink-0 text-amber-600 hover:bg-amber-500/10 hover:text-amber-700"
           aria-label={t("weight.explainAriaItem", {
-            name: props.name,
+            name: ti(props.name),
             weight: props.weight.toFixed(2),
           })}
         >
@@ -32,7 +32,7 @@ export function WeightExplainButton(props: WeightExplainInput) {
       </PopoverTrigger>
       <PopoverContent className="w-72 text-sm leading-relaxed" side="top" align="end">
         <p className="mb-1 font-medium">{t("weight.explainTitle")}</p>
-        <p className="text-muted-foreground">{getWeightExplanation(props)}</p>
+        <p className="text-muted-foreground">{getWeightExplanation(props, locale)}</p>
       </PopoverContent>
     </Popover>
   );

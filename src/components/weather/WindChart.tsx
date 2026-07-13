@@ -9,20 +9,30 @@ import {
   CartesianGrid,
   Legend,
 } from "recharts";
+import type { Locale } from "@/lib/i18n/locale-store";
+import { dateLocaleFor } from "@/lib/i18n/format";
+import { useI18n } from "@/hooks/use-i18n";
 import type { WeatherHour } from "@/lib/weather/types";
 
-type Props = { hourly: WeatherHour[]; hours?: number };
+type Props = { hourly: WeatherHour[]; hours?: number; locale?: Locale };
 
-export function WindChart({ hourly, hours = 24 }: Props) {
+export function WindChart({ hourly, hours = 24, locale: localeProp }: Props) {
+  const { t, locale: hookLocale } = useI18n();
+  const locale = localeProp ?? hookLocale;
+  const dateLocale = dateLocaleFor(locale);
+
   const data = useMemo(
     () =>
       hourly.slice(0, hours).map((h) => ({
-        time: new Date(h.time).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }),
-        viento: h.windSpeed,
-        rafagas: h.windGust,
+        time: new Date(h.time).toLocaleTimeString(dateLocale, { hour: "2-digit", minute: "2-digit" }),
+        [t("weather.chart.wind")]: h.windSpeed,
+        [t("weather.chart.gusts")]: h.windGust,
       })),
-    [hourly, hours],
+    [hourly, hours, dateLocale, t],
   );
+
+  const windKey = t("weather.chart.wind");
+  const gustKey = t("weather.chart.gusts");
 
   return (
     <div className="h-56 w-full">
@@ -51,8 +61,8 @@ export function WindChart({ hourly, hours = 24 }: Props) {
             formatter={(v: number) => `${v} km/h`}
           />
           <Legend wrapperStyle={{ fontSize: 12 }} />
-          <Area type="monotone" dataKey="viento" stroke="hsl(217 91% 60%)" fill="url(#g-wind)" strokeWidth={2} />
-          <Area type="monotone" dataKey="rafagas" stroke="hsl(45 93% 58%)" fill="url(#g-gust)" strokeWidth={2} />
+          <Area type="monotone" dataKey={windKey} stroke="hsl(217 91% 60%)" fill="url(#g-wind)" strokeWidth={2} />
+          <Area type="monotone" dataKey={gustKey} stroke="hsl(45 93% 58%)" fill="url(#g-gust)" strokeWidth={2} />
         </AreaChart>
       </ResponsiveContainer>
     </div>

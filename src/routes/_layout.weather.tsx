@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card";
 import { WeatherDashboard } from "@/components/weather/WeatherDashboard";
 import { fetchWeather, searchWeatherPlaces } from "@/lib/weather/client";
 import type { GeocodePlace } from "@/lib/weather/geocode";
+import { isWeatherLookupError } from "@/lib/weather/errors";
 import { useI18n } from "@/hooks/use-i18n";
 
 export const Route = createFileRoute("/_layout/weather")({
@@ -24,7 +25,7 @@ const SUGGESTIONS = [
 ];
 
 function WeatherPage() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [query, setQuery] = useState("");
   const [active, setActive] = useState("");
   const [candidates, setCandidates] = useState<GeocodePlace[]>([]);
@@ -64,7 +65,7 @@ function WeatherPage() {
   };
 
   const { data, isFetching, error, refetch } = useQuery({
-    queryKey: ["weather", active, pickedPlace?.id ?? null],
+    queryKey: ["weather", active, pickedPlace?.id ?? null, locale],
     queryFn: ({ signal }) =>
       pickedPlace
         ? fetchWeather({
@@ -73,8 +74,9 @@ function WeatherPage() {
             lon: pickedPlace.longitude,
             days: 7,
             signal,
+            locale,
           })
-        : fetchWeather({ query: active, days: 7, signal }),
+        : fetchWeather({ query: active, days: 7, signal, locale }),
     enabled: !!active,
     staleTime: 1000 * 60 * 10,
     retry: 0,
@@ -174,7 +176,11 @@ function WeatherPage() {
           <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
           <div className="flex-1">
             <p className="font-semibold">{t("weather.errorTitle")}</p>
-            <p className="text-sm text-muted-foreground">{(error as Error).message}</p>
+            <p className="text-sm text-muted-foreground">
+              {isWeatherLookupError(error)
+                ? t(error.code, error.vars)
+                : (error as Error).message}
+            </p>
             <Button variant="outline" size="sm" className="mt-2" onClick={() => refetch()}>
               {t("weather.retry")}
             </Button>

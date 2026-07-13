@@ -22,18 +22,18 @@ import { useI18n } from "@/hooks/use-i18n";
 type Props = { data: WeatherForecastResponse };
 
 export function WeatherDashboard({ data }: Props) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { spot, current, daily, hourly, provider, fetchedAt } = data;
   const currentCode = current.weatherCode ?? daily[0]?.weatherCode ?? 2;
-  const { label: currentConditions, icon: currentIcon } = wmoToWeather(currentCode);
+  const { label: currentConditions, icon: currentIcon } = wmoToWeather(currentCode, locale);
 
   const dailyCards = daily.map((d) => {
-    const { icon } = wmoToWeather(d.weatherCode ?? 2);
+    const { icon, label } = wmoToWeather(d.weatherCode ?? 2, locale);
     return {
       date: d.date,
       tempMin: d.tempMin,
       tempMax: d.tempMax,
-      conditions: d.conditions ?? wmoToWeather(d.weatherCode ?? 2).label,
+      conditions: d.conditions ?? label,
       icon,
       precipitation: d.precipitation,
       windMax: d.windMax,
@@ -76,7 +76,7 @@ export function WeatherDashboard({ data }: Props) {
           <Badge variant="outline" className="text-[10px] font-normal capitalize">
             {provider}
           </Badge>
-          <span className="text-[11px] text-muted-foreground">{formatUpdatedAt(fetchedAt)}</span>
+          <span className="text-[11px] text-muted-foreground">{formatUpdatedAt(fetchedAt, locale)}</span>
         </div>
       </Card>
 
@@ -93,22 +93,22 @@ export function WeatherDashboard({ data }: Props) {
             {t("assistant.weatherDays", { days: daily.length })}
           </span>
         </div>
-        <DailyForecastCards days={dailyCards} />
+        <DailyForecastCards days={dailyCards} locale={locale} />
       </Card>
 
       {/* Detalle — colapsable */}
       <MetricsSection current={current} conditions={currentConditions} />
 
       <ChartSection title={t("weather.windGusts24h")}>
-        <WindChart hourly={hourly} />
+        <WindChart hourly={hourly} locale={locale} />
       </ChartSection>
 
       <ChartSection title={t("weather.waves24h")}>
-        <WaveChart hourly={hourly} />
+        <WaveChart hourly={hourly} locale={locale} />
       </ChartSection>
 
       <ChartSection title={t("weather.hourly")}>
-        <HourlyForecastTable hourly={hourly} hours={24} />
+        <HourlyForecastTable hourly={hourly} hours={24} locale={locale} />
       </ChartSection>
     </div>
   );

@@ -1,3 +1,4 @@
+import type { Locale } from "@/lib/i18n/locale-store";
 import type { WeatherForecastResponse } from "./types";
 import { getWeatherForecast } from "./service";
 import { searchPlaces } from "./geocode";
@@ -10,6 +11,7 @@ export async function fetchWeather(params: {
   startDate?: string;
   endDate?: string;
   signal?: AbortSignal;
+  locale?: Locale;
 }): Promise<WeatherForecastResponse> {
   return getWeatherForecast(params);
 }

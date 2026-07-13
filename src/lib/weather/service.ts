@@ -6,6 +6,7 @@ import type {
 } from "./types";
 import { wmoToWeather } from "./codes";
 import { resolvePlace, searchPlaces } from "./geocode";
+import { WeatherLookupError } from "./errors";
 
 export { resolvePlace, searchPlaces } from "./geocode";
 export type { GeocodePlace } from "./geocode";
@@ -30,6 +31,7 @@ async function fetchOpenMeteo(
   spot: WeatherSpot,
   days: number,
   range?: { startDate?: string; endDate?: string },
+  locale: import("@/lib/i18n/locale-store").Locale = "es",
 ): Promise<WeatherForecastResponse> {
   const fc = new URL("https://api.open-meteo.com/v1/forecast");
   fc.searchParams.set("latitude", String(spot.latitude));
@@ -85,7 +87,7 @@ async function fetchOpenMeteo(
 
   const daily: WeatherDaySummary[] = fJson.daily.time.map((d, i) => {
     const code = fJson.daily.weather_code?.[i];
-    const parsed = code != null ? wmoToWeather(code) : null;
+    const parsed = code != null ? wmoToWeather(code, locale) : null;
     return {
       date: d,
       tempMin: round(fJson.daily.temperature_2m_min[i]),
@@ -279,7 +281,9 @@ export async function getWeatherForecast(params: {
   startDate?: string;
   endDate?: string;
   signal?: AbortSignal;
+  locale?: import("@/lib/i18n/locale-store").Locale;
 }): Promise<WeatherForecastResponse> {
+  const locale = params.locale ?? "es";
   const days = Math.min(14, Math.max(1, params.days ?? 5));
   const cacheKey = `${params.query ?? ""}|${params.lat ?? ""}|${params.lon ?? ""}|${days}|${params.startDate ?? ""}|${params.endDate ?? ""}`;
   const cached = MEMO.get(cacheKey);
@@ -301,24 +305,28 @@ export async function getWeatherForecast(params: {
       const suggestions = await searchPlaces(params.query, 4);
       if (suggestions.length) {
         const names = suggestions.map((s) => s.name).join(" · ");
-        throw new Error(
-          `No encontré "${params.query}". Probá con el nombre de una ciudad, por ejemplo: ${names}`,
-        );
+        throw new WeatherLookupError("weather.err.notFound", {
+          query: params.query,
+          suggestions: names,
+        });
       }
-      throw new Error(
-        `No encontré "${params.query}". Escribí una ciudad (ej: Miami, Buenos Aires, Barcelona).`,
-      );
+      throw new WeatherLookupError("weather.err.notFoundGeneric", { query: params.query });
     }
     spot = geo;
   } else {
-    throw new Error("Indicá un destino o coordenadas");
+    throw new WeatherLookupError("weather.err.noDestination");
   }
 
   try {
-    const data = await fetchOpenMeteo(spot, days, {
-      startDate: params.startDate,
-      endDate: params.endDate,
-    });
+    const data = await fetchOpenMeteo(
+      spot,
+      days,
+      {
+        startDate: params.startDate,
+        endDate: params.endDate,
+      },
+      locale,
+    );
     MEMO.set(cacheKey, { at: now, data });
     return data;
   } catch (err) {

@@ -94,10 +94,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "Travel Wolf" },
-      { name: "description", content: "Lovable Generated Project" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { name: "description", content: "Organizá tu equipaje con IA: peso, clima y listas inteligentes para cada viaje." },
+      { name: "author", content: "Travel Wolf" },
+      { property: "og:title", content: "Travel Wolf — Equipaje inteligente" },
+      { property: "og:description", content: "Organizá tu equipaje con IA: peso, clima y listas inteligentes para cada viaje." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
@@ -142,6 +142,17 @@ function RootComponent() {
 
   useEffect(() => {
     document.documentElement.lang = locale;
+    const description = translate(locale, "meta.description");
+    document.title = "Travel Wolf";
+    document
+      .querySelector('meta[name="description"]')
+      ?.setAttribute("content", description);
+    document
+      .querySelector('meta[property="og:title"]')
+      ?.setAttribute("content", translate(locale, "meta.ogTitle"));
+    document
+      .querySelector('meta[property="og:description"]')
+      ?.setAttribute("content", description);
   }, [locale]);
 
   return (

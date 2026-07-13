@@ -48,7 +48,7 @@ function EditItemForm({
   item: Item;
   onChange: (item: Item) => void;
 }) {
-  const { t, tc } = useI18n();
+  const { t, tc, ti } = useI18n();
   const unitWeight = estimateUnitWeightKg(item.name, item.category);
   const lineWeight = estimateLineWeightKg(item.name, item.category, item.quantity);
 
@@ -109,7 +109,7 @@ function EditItemForm({
 }
 
 function SuitcasesPage() {
-  const { t, tc } = useI18n();
+  const { t, tc, ti } = useI18n();
   const suitcases = useSuitcasesStore((s) => s.suitcases);
   const activeId = useSuitcasesStore((s) => s.activeSuitcaseId);
   const setActive = useSuitcasesStore((s) => s.setActive);
@@ -291,7 +291,7 @@ function SuitcasesPage() {
                       key={item.id}
                       className="border-b border-border last:border-0 hover:bg-muted/10 transition-colors"
                     >
-                      <td className="p-4 font-medium">{item.name}</td>
+                      <td className="p-4 font-medium">{ti(item.name)}</td>
                       <td className="p-4">
                         <Badge variant="secondary" className="font-normal">
                           {tc(item.category)}
@@ -332,7 +332,7 @@ function SuitcasesPage() {
                           className="h-8 w-8 text-muted-foreground hover:text-red-500"
                           onClick={() => {
                             removeItem(active.id, item.id);
-                            toast.success(t("suitcases.itemRemoved", { name: item.name }));
+                            toast.success(t("suitcases.itemRemoved", { name: ti(item.name) }));
                           }}
                         >
                           <Trash2 className="h-4 w-4" />

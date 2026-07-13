@@ -66,7 +66,7 @@ function SavedListDetail({
   onUpdate: (list: SavedList) => void;
   onDelete: () => void;
 }) {
-  const { t, tc, locale } = useI18n();
+  const { t, tc, ti, locale } = useI18n();
   const [draft, setDraft] = useState(list);
   const [newItem, setNewItem] = useState<{ name: string; category: string; weight: string }>({
     name: "",
@@ -276,7 +276,7 @@ function SavedListDetail({
                             htmlFor={item.id}
                             className={`cursor-pointer block ${item.checked ? "line-through" : ""}`}
                           >
-                            <span className="font-medium text-sm">{item.name}</span>
+                            <span className="font-medium text-sm">{ti(item.name)}</span>
                             <span className="ml-2 inline-flex items-center gap-0.5 text-xs text-muted-foreground">
                               {item.weight} {t("common.kg")}
                               <WeightExplainButton

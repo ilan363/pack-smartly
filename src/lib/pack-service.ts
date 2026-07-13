@@ -1,6 +1,12 @@
 ﻿import { z } from "zod";
 
 import type { ForecastDay } from "@/lib/chat-store";
+import type { Locale } from "@/lib/i18n/locale-store";
+import { localizePackSuggestion } from "@/lib/i18n/pack-localize";
+import {
+  buildPackAiSystemPrompt,
+  buildPackAiUserPromptSuffix,
+} from "@/lib/i18n/pack-ai-prompts";
 import { estimateUnitWeightKg } from "@/lib/weight-explain";
 import { formatWeatherDate } from "@/lib/weather/codes";
 import { fetchTripForecast, summarizeForecast } from "@/lib/weather/trip-forecast";
@@ -339,6 +345,8 @@ export type TripInput = {
   capacityMode?: CapacityMode;
   /** Kg reservados para compras (solo si capacityMode === "reserve") */
   shoppingReserveKg?: number;
+  /** Idioma de salida para ítems, clima y mensajes */
+  locale?: Locale;
 };
 
 export function defaultShoppingReserveKg(capacityKg: number): number {
@@ -645,6 +653,7 @@ function buildForecast(
   warm: boolean,
   cold: boolean,
   dateFrom?: string,
+  locale: Locale = "es",
 ): ForecastDay[] {
   const promptCold = cold;
   const { zone, hemisphere } = detectClimate(destination);
@@ -723,7 +732,7 @@ function buildForecast(
     out.push({
       day: i + 1,
       date: iso,
-      label: formatWeatherDate(iso),
+      label: formatWeatherDate(iso, "short", locale),
       tempMin,
       tempMax: Math.max(tempMax, tempMin + 2),
       conditions: picked.c,
@@ -736,12 +745,14 @@ function buildForecast(
 async function enrichWithForecast(
   suggestion: PackSuggestion,
   context: ReturnType<typeof extractTripContext>,
+  locale: Locale = "es",
 ): Promise<PackSuggestion> {
   const real = await fetchTripForecast({
     destination: suggestion.destination,
     days: suggestion.days,
     dateFrom: context.dateFrom,
     dateTo: context.dateTo,
+    locale,
   });
   const forecast =
     real ??
@@ -751,11 +762,12 @@ async function enrichWithForecast(
       context.warm,
       context.cold,
       context.dateFrom,
+      locale,
     );
   const weather = real?.length
-    ? summarizeForecast(forecast, suggestion.days)
+    ? summarizeForecast(forecast, suggestion.days, locale)
     : suggestion.weather;
-  return { ...suggestion, forecast, weather };
+  return localizePackSuggestion({ ...suggestion, forecast, weather }, locale);
 }
 
 function normalizeCategory(category: string | undefined, name: string): Category {
@@ -1591,19 +1603,13 @@ function normalizeSuggestion(
   };
 }
 
-function buildCapacityPromptContext(packing?: PackingCapacity): string {
-  if (!packing) return "";
-  if (packing.capacityMode === "fill") {
-    return `, modo=llenar valija (usá hasta ~${packing.packingLimitKg} kg de ${packing.capacityKg} kg, priorizá aprovechar el espacio)`;
-  }
-  return `, modo=dejar espacio para compras (reservá ${packing.reserveKg} kg libres; armá la lista hasta ~${packing.packingLimitKg} kg, no llenes toda la valija)`;
-}
 
 export async function generatePackSuggestion(input: {
   prompt: string;
   suitcaseCapacityKg?: number;
   trip?: TripInput;
 }): Promise<{ suggestion: PackSuggestion; providerUsed: string }> {
+  const locale = input.trip?.locale ?? "es";
   const context = extractTripContext(input.prompt, input.trip);
   const capacity = clampCapacityKg(input.suitcaseCapacityKg);
   const packing = capacity
@@ -1633,29 +1639,8 @@ export async function generatePackSuggestion(input: {
       try {
         const { text } = await runGenerateText({
           model: attempt.model,
-          system: `Sos un asistente experto en equipaje. Respondé SOLO JSON válido, sin markdown.
-Formato exacto: {"destination":"Ciudad o país","days":3,"weather":"resumen breve","occasion":"motivo","items":[{"category":"Remeras|Pantalones|Abrigos|Zapatillas|Accesorios|Higiene|Electrónica|Otros","name":"item","quantity":1,"weight":0.2}]}.
-Reglas críticas:
-- USÁ EXACTAMENTE los días, destino y ocasión que indica el usuario (no inventes ni cambies).
-- Cantidades realistas con rotación de prendas (no 1 por día salvo viajes muy cortos):
-  · Remeras/tops: 3–4 (≤7 días), 5–6 (8–14 días), 6–8 (15–21 días). En playa/calor podés variar con más shorts, pero no bajes remeras por debajo de lo indicado.
-  · Pantalones: 1 (≤4 días), 2 (5–14 días), 3 (15–21 días). Se reusan entre lavados.
-  · Ropa interior: mitad del viaje + 1 repuesto si >6 días (ej. 11 días → 7, no 10). Con lavandería explícita, menos.
-  · Medias: un poco menos que ropa interior (ej. 11 días → 5–6).
-  · Shorts en playa: 2–3 máximo para viajes de 2 semanas.
-  · Calzado (quantity = pares): zapatillas de uso diario 1 par/persona (2 si viaje >14 días o trekking); sandalias en playa/calor; zapatos formales en eventos formales; botas en trekking. Valija compartida → multiplicá por cantidad de personas.
-  · Viajes largos (>21 días) o con lavandería: escalar lento (60 días ≈ 9 remeras, 4 pantalones, 7–8 ropa interior).
-- Si el usuario puso notas, incluí TODAS como ítems aparte (quantity 1). No omitas ninguna nota de la lista.
-- Si hay casamiento/boda incluí conjunto y zapatos formales; si es playa incluí traje de baño/protector; si no hay nieve no sugieras ropa de nieve.
-- Si el usuario indicó capacidad de valija en kg, armá la lista completa según días y destino; no recortes cantidades solo por peso (la app avisará si se excede). Modo "llenar" = aprovechar espacio; "remanente/compras" = dejar margen para compras.
-- Si la valija es compartida, multiplicá las prendas personales por la cantidad de personas indicada.
-- Límites máximos de cantidad (nunca superar): remeras ≈ ceil(días×0.8) (ej. 8 en 10 días), pantalones 4, camperas 2, zapatos 3 pares, toallas 2. No repitas la misma prenda en exceso.
-- Para calcetines usá siempre "Medias" (nunca "Medios").`,
-          prompt: `Solicitud del usuario: ${input.prompt}\nContexto detectado: destino=${context.destination}, días=${context.days}, ocasión=${context.occasion}${capacity ? `, capacidad=${capacity}kg${buildCapacityPromptContext(packing)}` : ""}, valija compartida=${context.sharedSuitcase ? `sí (${context.sharedPeople} personas)` : "no"}${
-            context.noteLines.length
-              ? `\nNotas del usuario (incluir TODAS en items, una por nota):\n${context.noteLines.map((n, i) => `${i + 1}. ${n}`).join("\n")}`
-              : ""
-          }`,
+          system: buildPackAiSystemPrompt(locale),
+          prompt: `${locale === "en" ? "User request" : locale === "pt" ? "Solicitação do usuário" : "Solicitud del usuario"}: ${input.prompt}\n${buildPackAiUserPromptSuffix(context, capacity, packing, locale)}`,
         });
         return {
           suggestion: await enrichWithForecast(
@@ -1667,6 +1652,7 @@ Reglas críticas:
               packing,
             ),
             context,
+            locale,
           ),
           providerUsed: attempt.provider,
         };
@@ -1684,6 +1670,7 @@ Reglas críticas:
     suggestion: await enrichWithForecast(
       normalizeSuggestion({}, input.prompt, capacity, input.trip, packing),
       context,
+      locale,
     ),
     providerUsed: "fallback-local",
   };

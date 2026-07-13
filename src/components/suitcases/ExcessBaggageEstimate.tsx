@@ -7,6 +7,7 @@ import {
   estimateExcessBaggageCost,
   formatMoney,
 } from "@/lib/amadeus/excess-baggage-estimate";
+import { useI18n } from "@/hooks/use-i18n";
 
 type Props = {
   suitcase: Suitcase;
@@ -14,6 +15,7 @@ type Props = {
 };
 
 export function ExcessBaggageEstimateCard({ suitcase, currentWeight }: Props) {
+  const { t } = useI18n();
   const excessKg = Math.max(0, currentWeight - suitcase.maxWeight);
   const enabled = excessKg > 0;
   const missingOrigin = !suitcase.originAirport?.trim();
@@ -52,17 +54,15 @@ export function ExcessBaggageEstimateCard({ suitcase, currentWeight }: Props) {
         <div className="flex-1 min-w-0 space-y-3">
           <div>
             <h3 className="font-semibold text-red-700 dark:text-red-400">
-              Exceso de equipaje
+              {t("excess.title")}
             </h3>
             <p className="text-sm text-muted-foreground mt-1">
-              Superás el límite en{" "}
-              <span className="font-medium text-foreground">{excessKg.toFixed(2)} kg</span>.
-              Estimación de lo que podrías pagar en el aeropuerto:
+              {t("excess.desc", { kg: excessKg.toFixed(2) })}
             </p>
             {missingOrigin && (
               <p className="text-xs text-muted-foreground mt-2 flex items-start gap-1.5">
                 <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-                Sin aeropuerto de origen cargado — usamos tarifas de referencia generales.
+                {t("excess.noOrigin")}
               </p>
             )}
           </div>
@@ -70,20 +70,20 @@ export function ExcessBaggageEstimateCard({ suitcase, currentWeight }: Props) {
           {isFetching && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Consultando tarifas de referencia (Amadeus)…
+              {t("excess.loading")}
             </div>
           )}
 
           {error && !isFetching && (
             <div className="flex items-center gap-2 text-sm text-red-600">
               <AlertCircle className="h-4 w-4 shrink-0" />
-              No pudimos calcular la tarifa.{" "}
+              {t("excess.error")}{" "}
               <button
                 type="button"
                 className="underline font-medium"
                 onClick={() => refetch()}
               >
-                Reintentar
+                {t("common.retry")}
               </button>
             </div>
           )}
@@ -95,13 +95,13 @@ export function ExcessBaggageEstimateCard({ suitcase, currentWeight }: Props) {
                   {formatMoney(data.estimatedCost, data.currency)}
                 </span>
                 <Badge variant={data.source === "amadeus" ? "default" : "secondary"}>
-                  {data.source === "amadeus" ? "Amadeus" : "Estimación local"}
+                  {data.source === "amadeus" ? "Amadeus" : t("excess.sourceLocal")}
                 </Badge>
               </div>
               <p className="text-sm text-muted-foreground">
-                ≈ {formatMoney(data.pricePerKg, data.currency)}/kg de exceso
+                {t("excess.perKg", { price: formatMoney(data.pricePerKg, data.currency) })}
                 {data.bagUnitPrice != null
-                  ? ` · valija extra ref. ${formatMoney(data.bagUnitPrice, data.currency)}`
+                  ? t("excess.extraBag", { price: formatMoney(data.bagUnitPrice, data.currency) })
                   : null}
               </p>
               {(data.routeLabel || data.airline) && (

@@ -1,4 +1,6 @@
 import type { ForecastDay } from "@/lib/chat-store";
+import type { Locale } from "@/lib/i18n/locale-store";
+import { translate } from "@/lib/i18n/translations";
 import { formatWeatherDate, wmoToWeather } from "@/lib/weather/codes";
 import { getWeatherForecast } from "@/lib/weather/service";
 
@@ -8,7 +10,7 @@ function endDateFromStart(dateFrom: string, days: number): string {
   return start.toISOString().slice(0, 10);
 }
 
-export function summarizeForecast(forecast: ForecastDay[], days: number): string {
+export function summarizeForecast(forecast: ForecastDay[], days: number, locale: Locale = "es"): string {
   if (!forecast.length) return "";
   const avgMax = forecast.reduce((s, f) => s + f.tempMax, 0) / forecast.length;
   const avgMin = forecast.reduce((s, f) => s + f.tempMin, 0) / forecast.length;
@@ -17,15 +19,29 @@ export function summarizeForecast(forecast: ForecastDay[], days: number): string
   const last = forecast[forecast.length - 1];
   const range =
     first.date && last.date
-      ? ` del ${formatWeatherDate(first.date, "long")} al ${formatWeatherDate(last.date, "long")}`
+      ? translate(locale, "weather.forecast.range", {
+          from: formatWeatherDate(first.date, "long", locale),
+          to: formatWeatherDate(last.date, "long", locale),
+        })
       : "";
 
-  let text = `Pronóstico${range}: ${Math.round(avgMin)}–${Math.round(avgMax)}°C de promedio`;
-  if (rainyDays > 0) {
-    text += `, con lluvia posible en ${rainyDays} día${rainyDays === 1 ? "" : "s"}`;
-  }
-  text += `.`;
-  return text;
+  const rain =
+    rainyDays > 0
+      ? translate(locale, "weather.forecast.rainDays", {
+          count: rainyDays,
+          daysLabel:
+            rainyDays === 1
+              ? translate(locale, "common.daysOne")
+              : translate(locale, "common.daysMany"),
+        })
+      : "";
+
+  return translate(locale, "weather.forecast.summary", {
+    range,
+    min: Math.round(avgMin),
+    max: Math.round(avgMax),
+    rain,
+  });
 }
 
 export async function fetchTripForecast(input: {
@@ -33,7 +49,9 @@ export async function fetchTripForecast(input: {
   days: number;
   dateFrom?: string;
   dateTo?: string;
+  locale?: Locale;
 }): Promise<ForecastDay[] | null> {
+  const locale = input.locale ?? "es";
   const days = Math.min(14, Math.max(1, input.days));
   const startDate = input.dateFrom;
   const endDate =
@@ -45,14 +63,15 @@ export async function fetchTripForecast(input: {
       days,
       startDate,
       endDate,
+      locale,
     });
 
     return data.daily.slice(0, days).map((d, i) => {
-      const { icon, label } = wmoToWeather(d.weatherCode ?? 2);
+      const { icon, label } = wmoToWeather(d.weatherCode ?? 2, locale);
       return {
         day: i + 1,
         date: d.date,
-        label: formatWeatherDate(d.date),
+        label: formatWeatherDate(d.date, "short", locale),
         tempMin: d.tempMin,
         tempMax: d.tempMax,
         conditions: d.conditions ?? label,

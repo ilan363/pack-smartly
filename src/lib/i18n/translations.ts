@@ -1,6 +1,7 @@
 import type { Locale } from "./locale-store";
 import { interpolate } from "./format";
 import { pageTranslations } from "./translations-pages";
+import { dynamicTranslations } from "./translations-dynamic";
 
 export const LOCALE_OPTIONS = [
   { code: "es" as const, label: "Español", flag: "🇪🇸" },
@@ -79,6 +80,7 @@ const translations = {
     "auth.showPassword": "Mostrar contraseña",
     "auth.hidePassword": "Ocultar contraseña",
     ...pageTranslations.es,
+    ...dynamicTranslations.es,
   },
   en: {
     "nav.signIn": "Sign in",
@@ -150,6 +152,7 @@ const translations = {
     "auth.showPassword": "Show password",
     "auth.hidePassword": "Hide password",
     ...pageTranslations.en,
+    ...dynamicTranslations.en,
   },
   pt: {
     "nav.signIn": "Entrar",
@@ -221,6 +224,7 @@ const translations = {
     "auth.showPassword": "Mostrar senha",
     "auth.hidePassword": "Ocultar senha",
     ...pageTranslations.pt,
+    ...dynamicTranslations.pt,
   },
 } as const;
 

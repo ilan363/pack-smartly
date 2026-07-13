@@ -10,24 +10,34 @@ import {
   CartesianGrid,
   Legend,
 } from "recharts";
+import type { Locale } from "@/lib/i18n/locale-store";
+import { dateLocaleFor } from "@/lib/i18n/format";
+import { useI18n } from "@/hooks/use-i18n";
 import type { WeatherHour } from "@/lib/weather/types";
 
-type Props = { hourly: WeatherHour[]; hours?: number };
+type Props = { hourly: WeatherHour[]; hours?: number; locale?: Locale };
 
-export function WaveChart({ hourly, hours = 24 }: Props) {
+export function WaveChart({ hourly, hours = 24, locale: localeProp }: Props) {
+  const { t, locale: hookLocale } = useI18n();
+  const locale = localeProp ?? hookLocale;
+  const dateLocale = dateLocaleFor(locale);
+
+  const heightKey = t("weather.chart.height");
+  const periodKey = t("weather.chart.period");
+
   const data = useMemo(() => {
     return hourly.slice(0, hours).map((h) => ({
-      time: new Date(h.time).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }),
-      altura: h.waveHeight ?? 0,
-      periodo: h.wavePeriod ?? 0,
+      time: new Date(h.time).toLocaleTimeString(dateLocale, { hour: "2-digit", minute: "2-digit" }),
+      [heightKey]: h.waveHeight ?? 0,
+      [periodKey]: h.wavePeriod ?? 0,
     }));
-  }, [hourly, hours]);
+  }, [hourly, hours, dateLocale, heightKey, periodKey]);
 
-  const hasWaves = data.some((d) => d.altura > 0 || d.periodo > 0);
+  const hasWaves = data.some((d) => (d[heightKey] as number) > 0 || (d[periodKey] as number) > 0);
   if (!hasWaves) {
     return (
       <div className="h-56 w-full flex items-center justify-center rounded-lg border border-dashed border-border text-sm text-muted-foreground">
-        Sin datos de olas para este punto (probablemente tierra adentro).
+        {t("weather.chart.noWaves")}
       </div>
     );
   }
@@ -49,8 +59,8 @@ export function WaveChart({ hourly, hours = 24 }: Props) {
             }}
           />
           <Legend wrapperStyle={{ fontSize: 12 }} />
-          <Bar yAxisId="left" dataKey="altura" name="Altura (m)" fill="hsl(199 89% 48%)" radius={[4, 4, 0, 0]} />
-          <Line yAxisId="right" type="monotone" dataKey="periodo" name="Período (s)" stroke="hsl(280 70% 60%)" strokeWidth={2} dot={false} />
+          <Bar yAxisId="left" dataKey={heightKey} name={heightKey} fill="hsl(199 89% 48%)" radius={[4, 4, 0, 0]} />
+          <Line yAxisId="right" type="monotone" dataKey={periodKey} name={periodKey} stroke="hsl(280 70% 60%)" strokeWidth={2} dot={false} />
         </ComposedChart>
       </ResponsiveContainer>
     </div>

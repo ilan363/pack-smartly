@@ -4,6 +4,7 @@ import { Loader2 } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase/client";
 import { parseOAuthCallbackError, resolveOAuthProviderFromUser } from "@/lib/oauth";
+import { useI18n } from "@/hooks/use-i18n";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/auth/callback")({
@@ -13,6 +14,7 @@ export const Route = createFileRoute("/auth/callback")({
 function AuthCallbackPage() {
   const navigate = useNavigate();
   const setOAuthSession = useAuthStore((s) => s.setOAuthSession);
+  const { t, tAuthError } = useI18n();
   const handled = useRef(false);
 
   useEffect(() => {
@@ -28,14 +30,14 @@ function AuthCallbackPage() {
       }
 
       if (!isSupabaseConfigured()) {
-        toast.error("OAuth no está configurado en esta aplicación");
+        toast.error(t("auth.oauth.not_configured"));
         navigate({ to: "/" });
         return;
       }
 
       const supabase = getSupabase();
       if (!supabase) {
-        toast.error("No se pudo completar el inicio de sesión");
+        toast.error(t("auth.oauth.failed"));
         navigate({ to: "/" });
         return;
       }
@@ -43,7 +45,7 @@ function AuthCallbackPage() {
       const { data, error } = await supabase.auth.getSession();
 
       if (error || !data.session?.user.email) {
-        toast.error("No se pudo completar el inicio de sesión");
+        toast.error(t("auth.oauth.failed"));
         navigate({ to: "/" });
         return;
       }
@@ -54,22 +56,22 @@ function AuthCallbackPage() {
 
       if (!result.ok) {
         await supabase.auth.signOut();
-        toast.error(result.error);
+        toast.error(tAuthError(result.error));
         navigate({ to: "/" });
         return;
       }
 
-      toast.success("Sesión iniciada", { description: email });
+      toast.success(t("auth.oauth.success"), { description: email });
       navigate({ to: "/dashboard" });
     };
 
     void completeAuth();
-  }, [navigate, setOAuthSession]);
+  }, [navigate, setOAuthSession, t, tAuthError]);
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background px-4">
       <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      <p className="text-sm text-muted-foreground">Completando inicio de sesión…</p>
+      <p className="text-sm text-muted-foreground">{t("auth.oauth.completing")}</p>
     </div>
   );
 }

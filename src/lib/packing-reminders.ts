@@ -4,6 +4,9 @@ import {
   uncheckedCount,
   type SavedList,
 } from "./saved-lists";
+import type { Locale } from "./i18n/locale-store";
+import { translate } from "./i18n/translations";
+import { translateItemName } from "./i18n/pack-items";
 
 const REMINDER_MS = 24 * 60 * 60 * 1000; // al día siguiente
 
@@ -59,26 +62,33 @@ export async function requestNotificationPermission(): Promise<NotificationPermi
   return Notification.requestPermission();
 }
 
-export function showBrowserNotification(reminder: PackingReminder) {
+export function showBrowserNotification(reminder: PackingReminder, locale: Locale = "es") {
   if (typeof window === "undefined" || !("Notification" in window)) return;
   if (Notification.permission !== "granted") return;
 
   const count = reminder.pendingItems.length;
-  const preview = reminder.pendingItems.slice(0, 3).join(", ");
-  const more = count > 3 ? ` y ${count - 3} más` : "";
+  const preview = reminder.pendingItems
+    .slice(0, 3)
+    .map((name) => translateItemName(name, locale))
+    .join(", ");
+  const more =
+    count > 3 ? translate(locale, "reminder.more", { count: count - 3 }) : "";
 
-  new Notification("PackAI — Te falta guardar en la valija", {
-    body: `En ${reminder.destination} aún tenés: ${preview}${more}`,
+  new Notification(translate(locale, "reminder.title"), {
+    body: translate(locale, "reminder.body", { destination: reminder.destination, preview, more }),
     icon: "/favicon.ico",
     tag: `pack-reminder-${reminder.listId}`,
   });
 }
 
-export function formatReminderMessage(reminder: PackingReminder): string {
-  const names = reminder.pendingItems.slice(0, 4).join(", ");
+export function formatReminderMessage(reminder: PackingReminder, locale: Locale = "es"): string {
+  const names = reminder.pendingItems
+    .slice(0, 4)
+    .map((name) => translateItemName(name, locale))
+    .join(", ");
   const extra =
     reminder.pendingItems.length > 4
-      ? ` (+${reminder.pendingItems.length - 4} más)`
+      ? translate(locale, "reminder.toastExtra", { count: reminder.pendingItems.length - 4 })
       : "";
-  return `Todavía no marcaste: ${names}${extra}`;
+  return translate(locale, "reminder.toastMessage", { names, extra });
 }

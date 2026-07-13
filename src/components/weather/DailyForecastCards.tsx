@@ -1,6 +1,8 @@
 import { Droplets, Wind } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { Locale } from "@/lib/i18n/locale-store";
 import { formatWeatherDate } from "@/lib/weather/codes";
+import { useI18n } from "@/hooks/use-i18n";
 import { WeatherIcon } from "./WeatherIcon";
 import type { WeatherIconKind } from "@/lib/weather/codes";
 
@@ -20,6 +22,7 @@ type Props = {
   compact?: boolean;
   layout?: "grid" | "scroll";
   className?: string;
+  locale?: Locale;
 };
 
 export function DailyForecastCards({
@@ -27,6 +30,7 @@ export function DailyForecastCards({
   compact,
   layout = "grid",
   className,
+  locale: localeProp,
 }: Props) {
   const cardClass = cn(
     "border border-border rounded-2xl bg-card/80",
@@ -43,7 +47,7 @@ export function DailyForecastCards({
               key={`${d.date}-${d.dayNumber ?? 0}`}
               className={cn(cardClass, "snap-start shrink-0", compact ? "min-w-[100px]" : "min-w-[116px]")}
             >
-              <ForecastCardContent d={d} compact={compact} />
+              <ForecastCardContent d={d} compact={compact} locale={localeProp} />
             </article>
           ))}
         </div>
@@ -63,7 +67,7 @@ export function DailyForecastCards({
     >
       {days.map((d) => (
         <article key={`${d.date}-${d.dayNumber ?? 0}`} className={cardClass}>
-          <ForecastCardContent d={d} compact={compact} />
+          <ForecastCardContent d={d} compact={compact} locale={localeProp} />
         </article>
       ))}
     </div>
@@ -73,19 +77,24 @@ export function DailyForecastCards({
 function ForecastCardContent({
   d,
   compact,
+  locale: localeProp,
 }: {
   d: DailyForecastCardData;
   compact?: boolean;
+  locale?: Locale;
 }) {
+  const { t, locale: hookLocale } = useI18n();
+  const locale = localeProp ?? hookLocale;
+
   return (
     <>
       {d.dayNumber != null && (
         <span className="text-[10px] font-semibold uppercase tracking-wider text-primary/80">
-          Día {d.dayNumber}
+          {t("weather.dayNumber", { day: d.dayNumber })}
         </span>
       )}
       <span className="text-[11px] font-medium text-muted-foreground capitalize mt-0.5 leading-tight">
-        {formatWeatherDate(d.date)}
+        {formatWeatherDate(d.date, "short", locale)}
       </span>
       <WeatherIcon icon={d.icon} size={compact ? "md" : "lg"} className="my-1.5 sm:my-2" />
       <div className="text-sm sm:text-base font-semibold tabular-nums leading-none">

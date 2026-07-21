@@ -9,6 +9,7 @@ import {
 } from "@tanstack/react-router";
 import { useEffect } from "react";
 
+import { useOAuthCallbackHandler } from "@/hooks/use-oauth-callback";
 import { useSupabaseAuthSync } from "@/hooks/use-supabase-auth-sync";
 import { Toaster } from "@/components/ui/sonner";
 import { clearLegacyAppStorage } from "@/lib/clear-legacy-storage";
@@ -134,6 +135,7 @@ function RootComponent() {
   const locale = useLocaleStore((s) => s.locale);
 
   useSupabaseAuthSync();
+  useOAuthCallbackHandler();
 
   useEffect(() => {
     clearLegacyAppStorage();

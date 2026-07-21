@@ -1,4 +1,4 @@
-import { cpSync, existsSync, readdirSync, rmSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const distRoot = "dist";
@@ -30,5 +30,14 @@ for (const entry of readdirSync(stagingDir)) {
 }
 
 rmSync(stagingDir, { recursive: true, force: true });
+
+// nginx (Nominalia) only serves real files — copy index.html for legacy /auth/callback links.
+const indexHtmlPath = join(distRoot, "index.html");
+if (existsSync(indexHtmlPath)) {
+  const indexHtml = readFileSync(indexHtmlPath, "utf8");
+  const callbackDir = join(distRoot, "auth", "callback");
+  mkdirSync(callbackDir, { recursive: true });
+  writeFileSync(join(callbackDir, "index.html"), indexHtml);
+}
 
 console.log("[flatten-dist] dist/ listo para subir (index.html + assets)");

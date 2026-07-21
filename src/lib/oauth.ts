@@ -13,7 +13,12 @@ export const OAUTH_PROVIDERS: {
 ];
 
 export function getOAuthRedirectUrl(): string {
-  return `${window.location.origin}/auth/callback`;
+  const origin = window.location.origin;
+  // Nominalia/nginx serves index.html only at "/". Vite/Vercel handle /auth/callback in dev.
+  if (import.meta.env.PROD) {
+    return `${origin}/`;
+  }
+  return `${origin}/auth/callback`;
 }
 
 export type OAuthSignInResult = { ok: true } | { ok: false; error: string };

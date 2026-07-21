@@ -3,7 +3,11 @@ import { useEffect, useRef } from "react";
 import { Loader2 } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase/client";
-import { parseOAuthCallbackError, resolveOAuthProviderFromUser } from "@/lib/oauth";
+import {
+  parseOAuthCallbackError,
+  resolveOAuthCallbackSession,
+  resolveOAuthProviderFromUser,
+} from "@/lib/oauth";
 import { useI18n } from "@/hooks/use-i18n";
 import { toast } from "sonner";
 
@@ -42,16 +46,16 @@ function AuthCallbackPage() {
         return;
       }
 
-      const { data, error } = await supabase.auth.getSession();
+      const sessionResult = await resolveOAuthCallbackSession(supabase);
 
-      if (error || !data.session?.user.email) {
-        toast.error(t("auth.oauth.failed"));
+      if (!sessionResult.ok) {
+        toast.error(sessionResult.error);
         navigate({ to: "/" });
         return;
       }
 
-      const email = data.session.user.email;
-      const provider = resolveOAuthProviderFromUser(data.session.user);
+      const email = sessionResult.session.user.email!;
+      const provider = resolveOAuthProviderFromUser(sessionResult.session.user);
       const result = setOAuthSession(email, provider);
 
       if (!result.ok) {

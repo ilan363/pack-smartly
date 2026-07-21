@@ -18,7 +18,8 @@ export function getSupabase(): SupabaseClient | null {
       {
         auth: {
           flowType: "pkce",
-          detectSessionInUrl: true,
+          // Exchange only in /auth/callback — auto-detect races with exchangeCodeForSession.
+          detectSessionInUrl: false,
           persistSession: true,
           autoRefreshToken: true,
         },

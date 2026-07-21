@@ -1,4 +1,4 @@
-import type { Provider } from "@supabase/supabase-js";
+import type { Provider, Session, SupabaseClient } from "@supabase/supabase-js";
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase/client";
 
 export type OAuthProviderId = "google" | "github";
@@ -84,6 +84,36 @@ export async function signOutOAuth(): Promise<void> {
   await supabase.auth.signOut();
 }
 
+export type OAuthCallbackSessionResult =
+  | { ok: true; session: Session }
+  | { ok: false; error: string };
+
+export async function resolveOAuthCallbackSession(
+  supabase: SupabaseClient,
+): Promise<OAuthCallbackSessionResult> {
+  const searchParams = new URLSearchParams(window.location.search);
+  const code = searchParams.get("code");
+
+  if (!code) {
+    return {
+      ok: false,
+      error:
+        "No llegó el código de OAuth. Verificá en Supabase → URL Configuration que esté http://localhost:8080/auth/callback (mismo puerto que la app).",
+    };
+  }
+
+  const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+  if (error) {
+    return { ok: false, error: mapOAuthError(error.message) };
+  }
+
+  if (!data.session?.user.email) {
+    return { ok: false, error: "No se obtuvo el correo de la cuenta de Google o GitHub." };
+  }
+
+  return { ok: true, session: data.session };
+}
+
 export function parseOAuthCallbackError(): string | null {
   const searchParams = new URLSearchParams(window.location.search);
   const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
@@ -135,6 +165,18 @@ function mapOAuthError(message: string): string {
 
   if (lower.includes("email") && lower.includes("already")) {
     return "Ya existe una cuenta con este correo. Iniciá sesión con tu contraseña o vinculá el proveedor desde tu perfil en Supabase.";
+  }
+
+  if (lower.includes("code verifier") || lower.includes("auth code")) {
+    return "La sesión OAuth expiró o el puerto cambió. Usá http://localhost:8080, cerrá otras pestañas de la app e intentá de nuevo.";
+  }
+
+  if (lower.includes("redirect") && lower.includes("not allowed")) {
+    return "URL de redirección no permitida. Agregá tu callback en Supabase → Authentication → URL Configuration.";
+  }
+
+  if (lower.includes("unable to exchange external code")) {
+    return "Google rechazó las credenciales. Revisá Client ID, Secret y la redirect URI en Google Cloud (https://tzyjfgnrjripcemrnjzm.supabase.co/auth/v1/callback).";
   }
 
   return message;

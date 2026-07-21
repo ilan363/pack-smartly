@@ -18,6 +18,26 @@ export function getOAuthRedirectUrl(): string {
 
 export type OAuthSignInResult = { ok: true } | { ok: false; error: string };
 
+async function validateSupabaseReachable(): Promise<string | null> {
+  const url = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, "");
+  if (!url) {
+    return "OAuth no está configurado. Agregá VITE_SUPABASE_URL y VITE_SUPABASE_PUBLISHABLE_KEY en tu archivo .env";
+  }
+
+  try {
+    const response = await fetch(`${url}/auth/v1/health`, {
+      method: "GET",
+      headers: { apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
+    });
+    if (response.status >= 500) {
+      return "No se pudo conectar con Supabase. Verificá VITE_SUPABASE_URL y que el proyecto esté activo en supabase.com.";
+    }
+    return null;
+  } catch {
+    return `No se puede acceder a Supabase (${new URL(url).hostname}). El proyecto puede haber sido eliminado o la URL en .env es incorrecta. Entrá a supabase.com → tu proyecto → Settings → API y copiá la Project URL actual.`;
+  }
+}
+
 export async function signInWithOAuthProvider(
   providerId: OAuthProviderId,
 ): Promise<OAuthSignInResult> {
@@ -27,6 +47,11 @@ export async function signInWithOAuthProvider(
       error:
         "OAuth no está configurado. Agregá VITE_SUPABASE_URL y VITE_SUPABASE_PUBLISHABLE_KEY en tu archivo .env",
     };
+  }
+
+  const reachabilityError = await validateSupabaseReachable();
+  if (reachabilityError) {
+    return { ok: false, error: reachabilityError };
   }
 
   const supabase = getSupabase();

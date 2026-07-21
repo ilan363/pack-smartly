@@ -238,6 +238,48 @@ export const pageTranslations = {
     "checklists.preview": "Vista previa",
     "checklists.sendEmail": "Enviar email",
 
+    "contact.title": "Contáctanos",
+    "contact.subtitle": "Preguntas frecuentes sobre Travel Wolf y cómo te ayudamos a preparar tu valija.",
+    "contact.faq.whatIs.q": "¿Qué es Travel Wolf?",
+    "contact.faq.whatIs.a":
+      "Travel Wolf es una aplicación que te ayuda a preparar tu valija de forma rápida e inteligente, generando una lista personalizada según las características de tu viaje.",
+    "contact.faq.howItWorks.q": "¿Cómo funciona la aplicación?",
+    "contact.faq.howItWorks.a":
+      "Solo ingresás información como el destino, la cantidad de días, el clima y el tipo de viaje. La inteligencia artificial analiza esos datos y genera una lista de equipaje recomendada.",
+    "contact.faq.destination.q": "¿La lista cambia según el destino?",
+    "contact.faq.destination.a":
+      "Sí. La aplicación adapta las recomendaciones teniendo en cuenta el clima, la duración del viaje y las actividades que vas a realizar.",
+    "contact.faq.clothingQty.q": "¿Cómo calcula la cantidad de ropa?",
+    "contact.faq.clothingQty.a":
+      "La aplicación utiliza un algoritmo que estima la cantidad necesaria de prendas según la duración del viaje y recomienda una cantidad adecuada para evitar llevar ropa de más o de menos.",
+    "contact.faq.weight.q": "¿Cómo calcula el peso de la valija?",
+    "contact.faq.weight.a":
+      "Cada prenda y objeto tiene asignado un peso aproximado. La aplicación suma todos los pesos para estimar el peso total del equipaje.",
+    "contact.faq.editList.q": "¿Puedo modificar la lista sugerida?",
+    "contact.faq.editList.a":
+      "Sí. Podés agregar, eliminar o cambiar cualquier elemento de la lista según tus preferencias.",
+    "contact.faq.tripTypes.q": "¿La aplicación sirve para cualquier tipo de viaje?",
+    "contact.faq.tripTypes.a":
+      "Sí. Está pensada para vacaciones, viajes de negocios, escapadas de fin de semana, mochileros y muchos otros tipos de viajes.",
+    "contact.faq.experience.q": "¿Necesito experiencia para usarla?",
+    "contact.faq.experience.a":
+      "No. La aplicación fue diseñada para ser simple e intuitiva, por lo que cualquier persona puede usarla.",
+    "contact.faq.aiControl.q": "¿La inteligencia artificial reemplaza mi decisión?",
+    "contact.faq.aiControl.a":
+      "No. La IA solo ofrece recomendaciones inteligentes; vos siempre tenés el control y podés modificar la lista.",
+    "contact.faq.advantages.q": "¿Qué ventajas tiene Travel Wolf?",
+    "contact.faq.advantages.a":
+      "• Ahorra tiempo al preparar la valija.\n• Evita olvidos importantes.\n• Reduce el exceso de equipaje.\n• Estima el peso total antes de viajar.\n• Personaliza cada lista según el usuario y el destino.",
+    "contact.faq.mobile.q": "¿Puedo usar la aplicación desde el celular?",
+    "contact.faq.mobile.a":
+      "Sí. Travel Wolf está diseñada para funcionar tanto en computadoras como en dispositivos móviles.",
+    "contact.faq.whyChoose.q": "¿Por qué elegir Travel Wolf?",
+    "contact.faq.whyChoose.a":
+      "Porque combina inteligencia artificial, una interfaz sencilla y un sistema de recomendaciones personalizadas para ayudarte a viajar con mayor tranquilidad y sin preocupaciones por el equipaje.",
+    "contact.authorHeading": "Datos de contacto",
+    "contact.authorLabel": "Autor:",
+    "contact.phoneLabel": "Contacto:",
+
     "weather.title": "Clima",
     "weather.subtitle": "Consultá el pronóstico antes de armar tu valija.",
     "weather.placeholder": "Buscar ciudad o aeropuerto",
@@ -574,6 +616,48 @@ export const pageTranslations = {
     "checklists.preview": "Preview",
     "checklists.sendEmail": "Send email",
 
+    "contact.title": "Contact us",
+    "contact.subtitle": "Frequently asked questions about Travel Wolf and how we help you pack.",
+    "contact.faq.whatIs.q": "What is Travel Wolf?",
+    "contact.faq.whatIs.a":
+      "Travel Wolf is an app that helps you pack quickly and smartly by generating a personalized list based on your trip details.",
+    "contact.faq.howItWorks.q": "How does the app work?",
+    "contact.faq.howItWorks.a":
+      "You enter information such as destination, number of days, weather, and trip type. Artificial intelligence analyzes that data and generates a recommended packing list.",
+    "contact.faq.destination.q": "Does the list change by destination?",
+    "contact.faq.destination.a":
+      "Yes. The app adapts recommendations based on climate, trip length, and the activities you plan to do.",
+    "contact.faq.clothingQty.q": "How does it calculate clothing quantities?",
+    "contact.faq.clothingQty.a":
+      "The app uses an algorithm that estimates the necessary amount of clothing based on trip duration and recommends a suitable quantity to avoid packing too much or too little.",
+    "contact.faq.weight.q": "How does it calculate suitcase weight?",
+    "contact.faq.weight.a":
+      "Each garment and item has an approximate weight assigned. The app adds them up to estimate total luggage weight.",
+    "contact.faq.editList.q": "Can I modify the suggested list?",
+    "contact.faq.editList.a":
+      "Yes. You can add, remove, or change any item on the list according to your preferences.",
+    "contact.faq.tripTypes.q": "Does the app work for any type of trip?",
+    "contact.faq.tripTypes.a":
+      "Yes. It is designed for vacations, business trips, weekend getaways, backpacking, and many other types of travel.",
+    "contact.faq.experience.q": "Do I need experience to use it?",
+    "contact.faq.experience.a":
+      "No. The app was designed to be simple and intuitive, so anyone can use it.",
+    "contact.faq.aiControl.q": "Does artificial intelligence replace my decisions?",
+    "contact.faq.aiControl.a":
+      "No. AI only offers smart recommendations; you always stay in control and can edit the list.",
+    "contact.faq.advantages.q": "What are the advantages of Travel Wolf?",
+    "contact.faq.advantages.a":
+      "• Saves time when packing.\n• Helps avoid forgetting important items.\n• Reduces excess luggage.\n• Estimates total weight before you travel.\n• Personalizes each list by user and destination.",
+    "contact.faq.mobile.q": "Can I use the app on my phone?",
+    "contact.faq.mobile.a":
+      "Yes. Travel Wolf is designed to work on both computers and mobile devices.",
+    "contact.faq.whyChoose.q": "Why choose Travel Wolf?",
+    "contact.faq.whyChoose.a":
+      "Because it combines artificial intelligence, a simple interface, and personalized recommendations to help you travel with more peace of mind and less worry about luggage.",
+    "contact.authorHeading": "Contact details",
+    "contact.authorLabel": "Author:",
+    "contact.phoneLabel": "Phone:",
+
     "weather.title": "Weather",
     "weather.subtitle": "Check the forecast before packing.",
     "weather.placeholder": "Search city or airport",
@@ -909,6 +993,48 @@ export const pageTranslations = {
     "checklists.emailHint": "Separe destinatários com vírgula.",
     "checklists.preview": "Prévia",
     "checklists.sendEmail": "Enviar email",
+
+    "contact.title": "Contate-nos",
+    "contact.subtitle": "Perguntas frequentes sobre o Travel Wolf e como ajudamos você a preparar a mala.",
+    "contact.faq.whatIs.q": "O que é o Travel Wolf?",
+    "contact.faq.whatIs.a":
+      "Travel Wolf é um aplicativo que ajuda você a preparar a mala de forma rápida e inteligente, gerando uma lista personalizada conforme as características da sua viagem.",
+    "contact.faq.howItWorks.q": "Como funciona o aplicativo?",
+    "contact.faq.howItWorks.a":
+      "Você informa dados como destino, quantidade de dias, clima e tipo de viagem. A inteligência artificial analisa essas informações e gera uma lista de bagagem recomendada.",
+    "contact.faq.destination.q": "A lista muda conforme o destino?",
+    "contact.faq.destination.a":
+      "Sim. O aplicativo adapta as recomendações considerando o clima, a duração da viagem e as atividades que você vai realizar.",
+    "contact.faq.clothingQty.q": "Como calcula a quantidade de roupas?",
+    "contact.faq.clothingQty.a":
+      "O aplicativo utiliza um algoritmo que estima a quantidade necessária de peças conforme a duração da viagem e recomenda uma quantidade adequada para evitar levar roupa demais ou de menos.",
+    "contact.faq.weight.q": "Como calcula o peso da mala?",
+    "contact.faq.weight.a":
+      "Cada peça e objeto tem um peso aproximado atribuído. O aplicativo soma todos os pesos para estimar o peso total da bagagem.",
+    "contact.faq.editList.q": "Posso modificar a lista sugerida?",
+    "contact.faq.editList.a":
+      "Sim. Você pode adicionar, remover ou alterar qualquer item da lista conforme suas preferências.",
+    "contact.faq.tripTypes.q": "O aplicativo serve para qualquer tipo de viagem?",
+    "contact.faq.tripTypes.a":
+      "Sim. Foi pensado para férias, viagens de negócios, escapadas de fim de semana, mochileiros e muitos outros tipos de viagem.",
+    "contact.faq.experience.q": "Preciso de experiência para usá-lo?",
+    "contact.faq.experience.a":
+      "Não. O aplicativo foi projetado para ser simples e intuitivo, então qualquer pessoa pode usá-lo.",
+    "contact.faq.aiControl.q": "A inteligência artificial substitui minha decisão?",
+    "contact.faq.aiControl.a":
+      "Não. A IA apenas oferece recomendações inteligentes; você sempre tem o controle e pode modificar a lista.",
+    "contact.faq.advantages.q": "Quais vantagens o Travel Wolf oferece?",
+    "contact.faq.advantages.a":
+      "• Economiza tempo ao preparar a mala.\n• Evita esquecimentos importantes.\n• Reduz excesso de bagagem.\n• Estima o peso total antes de viajar.\n• Personaliza cada lista conforme o usuário e o destino.",
+    "contact.faq.mobile.q": "Posso usar o aplicativo no celular?",
+    "contact.faq.mobile.a":
+      "Sim. O Travel Wolf foi projetado para funcionar tanto em computadores quanto em dispositivos móveis.",
+    "contact.faq.whyChoose.q": "Por que escolher o Travel Wolf?",
+    "contact.faq.whyChoose.a":
+      "Porque combina inteligência artificial, uma interface simples e um sistema de recomendações personalizadas para ajudá-lo a viajar com mais tranquilidade e sem preocupações com a bagagem.",
+    "contact.authorHeading": "Dados de contato",
+    "contact.authorLabel": "Autor:",
+    "contact.phoneLabel": "Contato:",
 
     "weather.title": "Clima",
     "weather.subtitle": "Consulte a previsão antes de arrumar a mala.",

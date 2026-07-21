@@ -16,6 +16,7 @@ import { Route as LayoutWeatherRouteImport } from './routes/_layout.weather'
 import { Route as LayoutSuitcasesRouteImport } from './routes/_layout.suitcases'
 import { Route as LayoutSavedSuitcasesRouteImport } from './routes/_layout.saved-suitcases'
 import { Route as LayoutDashboardRouteImport } from './routes/_layout.dashboard'
+import { Route as LayoutContactRouteImport } from './routes/_layout.contact'
 import { Route as LayoutChecklistsRouteImport } from './routes/_layout.checklists'
 import { Route as LayoutAssistantRouteImport } from './routes/_layout.assistant'
 import { Route as LayoutAdminRouteImport } from './routes/_layout.admin'
@@ -54,6 +55,11 @@ const LayoutDashboardRoute = LayoutDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LayoutContactRoute = LayoutContactRouteImport.update({
+  id: '/contact',
+  path: '/contact',
+  getParentRoute: () => LayoutRoute,
+} as any)
 const LayoutChecklistsRoute = LayoutChecklistsRouteImport.update({
   id: '/checklists',
   path: '/checklists',
@@ -75,6 +81,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof LayoutAdminRoute
   '/assistant': typeof LayoutAssistantRoute
   '/checklists': typeof LayoutChecklistsRoute
+  '/contact': typeof LayoutContactRoute
   '/dashboard': typeof LayoutDashboardRoute
   '/saved-suitcases': typeof LayoutSavedSuitcasesRoute
   '/suitcases': typeof LayoutSuitcasesRoute
@@ -86,6 +93,7 @@ export interface FileRoutesByTo {
   '/admin': typeof LayoutAdminRoute
   '/assistant': typeof LayoutAssistantRoute
   '/checklists': typeof LayoutChecklistsRoute
+  '/contact': typeof LayoutContactRoute
   '/dashboard': typeof LayoutDashboardRoute
   '/saved-suitcases': typeof LayoutSavedSuitcasesRoute
   '/suitcases': typeof LayoutSuitcasesRoute
@@ -99,6 +107,7 @@ export interface FileRoutesById {
   '/_layout/admin': typeof LayoutAdminRoute
   '/_layout/assistant': typeof LayoutAssistantRoute
   '/_layout/checklists': typeof LayoutChecklistsRoute
+  '/_layout/contact': typeof LayoutContactRoute
   '/_layout/dashboard': typeof LayoutDashboardRoute
   '/_layout/saved-suitcases': typeof LayoutSavedSuitcasesRoute
   '/_layout/suitcases': typeof LayoutSuitcasesRoute
@@ -112,6 +121,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/assistant'
     | '/checklists'
+    | '/contact'
     | '/dashboard'
     | '/saved-suitcases'
     | '/suitcases'
@@ -123,6 +133,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/assistant'
     | '/checklists'
+    | '/contact'
     | '/dashboard'
     | '/saved-suitcases'
     | '/suitcases'
@@ -135,6 +146,7 @@ export interface FileRouteTypes {
     | '/_layout/admin'
     | '/_layout/assistant'
     | '/_layout/checklists'
+    | '/_layout/contact'
     | '/_layout/dashboard'
     | '/_layout/saved-suitcases'
     | '/_layout/suitcases'
@@ -199,6 +211,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutDashboardRouteImport
       parentRoute: typeof LayoutRoute
     }
+    '/_layout/contact': {
+      id: '/_layout/contact'
+      path: '/contact'
+      fullPath: '/contact'
+      preLoaderRoute: typeof LayoutContactRouteImport
+      parentRoute: typeof LayoutRoute
+    }
     '/_layout/checklists': {
       id: '/_layout/checklists'
       path: '/checklists'
@@ -227,6 +246,7 @@ interface LayoutRouteChildren {
   LayoutAdminRoute: typeof LayoutAdminRoute
   LayoutAssistantRoute: typeof LayoutAssistantRoute
   LayoutChecklistsRoute: typeof LayoutChecklistsRoute
+  LayoutContactRoute: typeof LayoutContactRoute
   LayoutDashboardRoute: typeof LayoutDashboardRoute
   LayoutSavedSuitcasesRoute: typeof LayoutSavedSuitcasesRoute
   LayoutSuitcasesRoute: typeof LayoutSuitcasesRoute
@@ -237,6 +257,7 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutAdminRoute: LayoutAdminRoute,
   LayoutAssistantRoute: LayoutAssistantRoute,
   LayoutChecklistsRoute: LayoutChecklistsRoute,
+  LayoutContactRoute: LayoutContactRoute,
   LayoutDashboardRoute: LayoutDashboardRoute,
   LayoutSavedSuitcasesRoute: LayoutSavedSuitcasesRoute,
   LayoutSuitcasesRoute: LayoutSuitcasesRoute,

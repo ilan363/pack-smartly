@@ -6,6 +6,7 @@ import {
   LogOut,
   ListChecks,
   CloudSun,
+  MessageCircle,
   ShieldCheck,
   RotateCcw,
   type LucideIcon,
@@ -29,6 +30,7 @@ const navigation: {
   { nameKey: "nav.assistant", shortNameKey: "nav.assistantShort", href: "/assistant", icon: Bot },
   { nameKey: "nav.weather", shortNameKey: "nav.weatherShort", href: "/weather", icon: CloudSun },
   { nameKey: "nav.checklists", shortNameKey: "nav.checklistsShort", href: "/checklists", icon: ListChecks },
+  { nameKey: "nav.contact", shortNameKey: "nav.contactShort", href: "/contact", icon: MessageCircle },
 ];
 
 function SidebarBrand() {

@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
-import { ShieldCheck, Users, Trash2, LogOut } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { ShieldCheck, Users, Trash2, LogOut, Loader2, RefreshCw } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +15,12 @@ import {
 } from "@/components/ui/table";
 import { ADMIN_EMAIL, useAuthStore } from "@/lib/auth-store";
 import { logoutWithOAuth } from "@/hooks/use-supabase-auth-sync";
+import {
+  isRegistryAvailable,
+  loadAllRegistryUsers,
+  removeUserFromRegistry,
+  syncLocalUsersToRegistry,
+} from "@/lib/user-registry";
 import { toast } from "sonner";
 import { useI18n } from "@/hooks/use-i18n";
 
@@ -23,11 +30,26 @@ export const Route = createFileRoute("/_layout/admin")({
 
 function AdminPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { t, dateLocale } = useI18n();
   const isAdmin = useAuthStore((s) => s.isAdmin);
   const email = useAuthStore((s) => s.email);
-  const users = useAuthStore((s) => s.users);
+  const localUsers = useAuthStore((s) => s.users);
   const removeUser = useAuthStore((s) => s.removeUser);
+
+  const registryEnabled = isRegistryAvailable();
+
+  const {
+    data: registryUsers = [],
+    isLoading,
+    isError,
+    refetch,
+    isFetching,
+  } = useQuery({
+    queryKey: ["admin-registry-users"],
+    queryFn: loadAllRegistryUsers,
+    enabled: isAdmin && registryEnabled,
+  });
 
   useEffect(() => {
     if (!isAdmin) {
@@ -36,9 +58,32 @@ function AdminPage() {
     }
   }, [isAdmin, navigate, t]);
 
+  useEffect(() => {
+    if (!isAdmin || !registryEnabled) return;
+    void syncLocalUsersToRegistry(localUsers).then(() => {
+      void queryClient.invalidateQueries({ queryKey: ["admin-registry-users"] });
+    });
+  }, [isAdmin, registryEnabled, localUsers, queryClient]);
+
   if (!isAdmin) return null;
 
-  const handleRemoveUser = (userEmail: string) => {
+  const displayedUsers = registryEnabled ? registryUsers : localUsers.map((user) => ({
+    email: user.email,
+    authMethod: user.oauthProvider ?? ("email" as const),
+    registeredAt: user.registeredAt,
+    lastLoginAt: user.lastLoginAt,
+  }));
+
+  const handleRemoveUser = async (userEmail: string) => {
+    if (registryEnabled) {
+      const removed = await removeUserFromRegistry(userEmail);
+      if (!removed) {
+        toast.error(t("admin.registryRemoveFailed"));
+        return;
+      }
+      await queryClient.invalidateQueries({ queryKey: ["admin-registry-users"] });
+    }
+
     removeUser(userEmail);
     toast.success(t("admin.userRemoved"), { description: userEmail });
   };
@@ -60,9 +105,7 @@ function AdminPage() {
             </Badge>
           </div>
           <h1 className="text-3xl font-bold tracking-tight">{t("admin.title")}</h1>
-          <p className="text-muted-foreground mt-1">
-            {t("admin.subtitle")}
-          </p>
+          <p className="text-muted-foreground mt-1">{t("admin.subtitle")}</p>
         </div>
         <div className="flex items-center gap-2 border border-border rounded-lg px-3 py-2 bg-card">
           <span className="text-sm font-medium">{email}</span>
@@ -72,6 +115,18 @@ function AdminPage() {
         </div>
       </div>
 
+      {!registryEnabled && (
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
+          {t("admin.registryNotConfigured")}
+        </div>
+      )}
+
+      {registryEnabled && isError && (
+        <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-300">
+          {t("admin.registryLoadFailed")}
+        </div>
+      )}
+
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -79,7 +134,9 @@ function AdminPage() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{t("admin.usersCount", { count: users.length })}</div>
+            <div className="text-2xl font-bold">
+              {isLoading ? "…" : t("admin.usersCount", { count: displayedUsers.length })}
+            </div>
           </CardContent>
         </Card>
         <Card>
@@ -94,14 +151,32 @@ function AdminPage() {
       </div>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between gap-4">
           <CardTitle>{t("admin.registeredUsers")}</CardTitle>
+          {registryEnabled && (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isFetching}
+              onClick={() => void refetch()}
+            >
+              {isFetching ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              <span className="ml-2">{t("admin.refreshUsers")}</span>
+            </Button>
+          )}
         </CardHeader>
         <CardContent>
-          {users.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4 text-center">
-              {t("admin.noUsers")}
-            </p>
+          {isLoading ? (
+            <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              {t("admin.loadingUsers")}
+            </div>
+          ) : displayedUsers.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4 text-center">{t("admin.noUsers")}</p>
           ) : (
             <Table>
               <TableHeader>
@@ -113,16 +188,16 @@ function AdminPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {users.map((user) => (
+                {displayedUsers.map((user) => (
                   <TableRow key={user.email}>
                     <TableCell className="font-medium">{user.email}</TableCell>
                     <TableCell>
                       <Badge variant="outline">
-                        {user.oauthProvider
-                          ? user.oauthProvider === "google"
-                            ? "Google"
-                            : "GitHub"
-                          : t("auth.email")}
+                        {user.authMethod === "google"
+                          ? "Google"
+                          : user.authMethod === "github"
+                            ? "GitHub"
+                            : t("auth.email")}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground">
@@ -136,7 +211,7 @@ function AdminPage() {
                         variant="ghost"
                         size="sm"
                         className="text-red-500 hover:text-red-600 hover:bg-red-500/10"
-                        onClick={() => handleRemoveUser(user.email)}
+                        onClick={() => void handleRemoveUser(user.email)}
                       >
                         <Trash2 className="h-4 w-4 mr-1" />
                         {t("admin.remove")}

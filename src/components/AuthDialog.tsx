@@ -13,10 +13,11 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { OAuthButtons } from "@/components/OAuthButtons";
 import { useAuthStore } from "@/lib/auth-store";
+import { syncWebEmailUser } from "@/lib/user-registry";
 import { useI18n } from "@/hooks/use-i18n";
 import { toast } from "sonner";
 
-type AuthTab = "login" | "register" | "admin";
+type AuthTab = "login" | "register" | "admin" | "forgot";
 
 type PasswordFieldProps = {
   id: string;
@@ -88,6 +89,7 @@ export function AuthDialog({
   const login = useAuthStore((s) => s.login);
   const loginAdmin = useAuthStore((s) => s.loginAdmin);
   const register = useAuthStore((s) => s.register);
+  const resetPassword = useAuthStore((s) => s.resetPassword);
   const { t, tAuthError } = useI18n();
   const [tab, setTab] = useState<AuthTab>(defaultTab);
   const [email, setEmail] = useState("");
@@ -95,6 +97,7 @@ export function AuthDialog({
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (open) setTab(defaultTab);
@@ -113,15 +116,25 @@ export function AuthDialog({
     onOpenChange(nextOpen);
   };
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     const res = login(email, password);
-    if (res.ok) {
+    if (!res.ok) {
+      toast.error(tAuthError(res.error));
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const synced = await syncWebEmailUser(email);
+      if (!synced) {
+        toast.warning(t("auth.registrySyncWarning"));
+      }
       toast.success(t("auth.loginSuccess"), { description: email });
       resetForm();
       onOpenChange(false);
       onSuccess?.();
-    } else {
-      toast.error(tAuthError(res.error));
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -137,29 +150,82 @@ export function AuthDialog({
     }
   };
 
-  const handleRegister = () => {
+  const handleRegister = async () => {
     if (password !== confirmPassword) {
       toast.error(t("auth.passwordMismatch"));
       return;
     }
 
     const res = register(email, password);
-    if (res.ok) {
+    if (!res.ok) {
+      toast.error(tAuthError(res.error));
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const synced = await syncWebEmailUser(email, password, { isRegistration: true });
+      if (!synced) {
+        toast.warning(t("auth.registrySyncWarning"));
+      }
       toast.success(t("auth.registerSuccess"), { description: email });
       resetForm();
       onOpenChange(false);
       onSuccess?.();
-    } else {
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (password !== confirmPassword) {
+      toast.error(t("auth.passwordMismatch"));
+      return;
+    }
+
+    const res = resetPassword(email, password);
+    if (!res.ok) {
       toast.error(tAuthError(res.error));
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const synced = await syncWebEmailUser(email, password, { isRegistration: true });
+      if (!synced) {
+        toast.warning(t("auth.registrySyncWarning"));
+      }
+      toast.success(t("auth.resetPasswordSuccess"), { description: email });
+      resetForm();
+      onOpenChange(false);
+      onSuccess?.();
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleSubmit = (e?: FormEvent) => {
     e?.preventDefault();
-    if (tab === "login") handleLogin();
+    if (submitting) return;
+    if (tab === "login") void handleLogin();
     else if (tab === "admin") handleAdminLogin();
-    else handleRegister();
+    else if (tab === "forgot") void handleResetPassword();
+    else void handleRegister();
   };
+
+  const dialogTitle =
+    tab === "admin"
+      ? t("auth.dialogTitleAdmin")
+      : tab === "forgot"
+        ? t("auth.dialogTitleForgot")
+        : t("auth.dialogTitle");
+
+  const dialogDescription =
+    tab === "admin"
+      ? t("auth.dialogDescAdmin")
+      : tab === "forgot"
+        ? t("auth.dialogDescForgot")
+        : t("auth.dialogDesc");
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -171,14 +237,8 @@ export function AuthDialog({
           onSubmit={(e) => handleSubmit(e)}
         >
         <DialogHeader>
-          <DialogTitle>
-            {tab === "admin" ? t("auth.dialogTitleAdmin") : t("auth.dialogTitle")}
-          </DialogTitle>
-          <DialogDescription>
-            {tab === "admin"
-              ? t("auth.dialogDescAdmin")
-              : t("auth.dialogDesc")}
-          </DialogDescription>
+          <DialogTitle>{dialogTitle}</DialogTitle>
+          <DialogDescription>{dialogDescription}</DialogDescription>
         </DialogHeader>
 
         {tab === "admin" ? (
@@ -207,6 +267,40 @@ export function AuthDialog({
               showLabel={t("auth.showPassword")}
               hideLabel={t("auth.hidePassword")}
               onKeyDown={(e) => e.key === "Enter" && handleAdminLogin()}
+            />
+          </div>
+        ) : tab === "forgot" ? (
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">{t("auth.email")}</label>
+              <Input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder={t("auth.emailPlaceholder")}
+              />
+            </div>
+            <PasswordField
+              id="forgot-password"
+              label={t("auth.newPassword")}
+              value={password}
+              onChange={setPassword}
+              showPassword={showPassword}
+              onToggleShow={() => setShowPassword((prev) => !prev)}
+              showLabel={t("auth.showPassword")}
+              hideLabel={t("auth.hidePassword")}
+              placeholder={t("auth.passwordPlaceholder")}
+            />
+            <PasswordField
+              id="forgot-confirm-password"
+              label={t("auth.confirmPassword")}
+              value={confirmPassword}
+              onChange={setConfirmPassword}
+              showPassword={showConfirmPassword}
+              onToggleShow={() => setShowConfirmPassword((prev) => !prev)}
+              showLabel={t("auth.showPassword")}
+              hideLabel={t("auth.hidePassword")}
+              onKeyDown={(e) => e.key === "Enter" && handleResetPassword()}
             />
           </div>
         ) : (
@@ -241,6 +335,15 @@ export function AuthDialog({
                 hideLabel={t("auth.hidePassword")}
                 onKeyDown={(e) => e.key === "Enter" && handleLogin()}
               />
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  className="text-xs text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
+                  onClick={() => setTab("forgot")}
+                >
+                  {t("auth.forgotPassword")}
+                </button>
+              </div>
             </TabsContent>
 
             <TabsContent value="register" className="space-y-3">
@@ -279,7 +382,7 @@ export function AuthDialog({
           </Tabs>
         )}
 
-        {tab !== "admin" && (
+        {tab !== "admin" && tab !== "forgot" && (
           <>
             <OAuthButtons />
             <div className="flex justify-center px-2">
@@ -297,7 +400,7 @@ export function AuthDialog({
         )}
 
         <DialogFooter className="mt-auto gap-2 pt-4 sm:gap-0">
-          {tab === "admin" && (
+          {(tab === "admin" || tab === "forgot") && (
             <Button type="button" variant="ghost" onClick={() => setTab("login")}>
               {t("auth.backToLogin")}
             </Button>
@@ -305,9 +408,11 @@ export function AuthDialog({
           <Button type="button" variant="outline" onClick={() => handleClose(false)}>
             {t("common.cancel")}
           </Button>
-          <Button type="submit">
-            {tab === "login" && t("auth.submitLogin")}
-            {tab === "register" && t("auth.submitRegister")}
+          <Button type="submit" disabled={submitting}>
+            {submitting && tab !== "admin" ? t("auth.syncingAccount") : null}
+            {!submitting && tab === "login" && t("auth.submitLogin")}
+            {!submitting && tab === "register" && t("auth.submitRegister")}
+            {!submitting && tab === "forgot" && t("auth.submitResetPassword")}
             {tab === "admin" && t("auth.submitAdmin")}
           </Button>
         </DialogFooter>

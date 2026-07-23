@@ -5,6 +5,9 @@ export const dynamicTranslations = {
     "auth.err.invalid_email": "Ingresá un email válido",
     "auth.err.use_admin_login": "Usá el acceso de administrador",
     "auth.err.invalid_credentials": "Credenciales inválidas",
+    "auth.err.user_not_found": "No hay cuenta con ese email. Registrate o usá Google/GitHub.",
+    "auth.err.wrong_password": "Contraseña incorrecta",
+    "auth.err.use_oauth_login": "Esta cuenta se creó con Google o GitHub. Usá el botón de abajo para entrar.",
     "auth.err.access_denied": "Acceso denegado. Solo el administrador autorizado.",
     "auth.err.password_too_short": "La contraseña debe tener al menos 6 caracteres",
     "auth.err.email_cannot_register": "Este email no puede registrarse",
@@ -126,6 +129,9 @@ export const dynamicTranslations = {
     "auth.err.invalid_email": "Enter a valid email",
     "auth.err.use_admin_login": "Use the administrator login",
     "auth.err.invalid_credentials": "Invalid credentials",
+    "auth.err.user_not_found": "No account with that email. Sign up or use Google/GitHub.",
+    "auth.err.wrong_password": "Incorrect password",
+    "auth.err.use_oauth_login": "This account was created with Google or GitHub. Use the button below to sign in.",
     "auth.err.access_denied": "Access denied. Only the authorized administrator.",
     "auth.err.password_too_short": "Password must be at least 6 characters",
     "auth.err.email_cannot_register": "This email cannot be registered",
@@ -247,6 +253,9 @@ export const dynamicTranslations = {
     "auth.err.invalid_email": "Digite um email válido",
     "auth.err.use_admin_login": "Use o acesso de administrador",
     "auth.err.invalid_credentials": "Credenciais inválidas",
+    "auth.err.user_not_found": "Não há conta com esse email. Registre-se ou use Google/GitHub.",
+    "auth.err.wrong_password": "Senha incorreta",
+    "auth.err.use_oauth_login": "Esta conta foi criada com Google ou GitHub. Use o botão abaixo para entrar.",
     "auth.err.access_denied": "Acesso negado. Apenas o administrador autorizado.",
     "auth.err.password_too_short": "A senha deve ter pelo menos 6 caracteres",
     "auth.err.email_cannot_register": "Este email não pode ser registrado",
@@ -373,6 +382,9 @@ export type AuthErrorCode = Extract<
   | "auth.err.invalid_email"
   | "auth.err.use_admin_login"
   | "auth.err.invalid_credentials"
+  | "auth.err.user_not_found"
+  | "auth.err.wrong_password"
+  | "auth.err.use_oauth_login"
   | "auth.err.access_denied"
   | "auth.err.password_too_short"
   | "auth.err.email_cannot_register"

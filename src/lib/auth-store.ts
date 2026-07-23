@@ -3,6 +3,7 @@ import { createJSONStorage, persist } from "zustand/middleware";
 import type { OAuthProviderId } from "@/lib/oauth";
 import type { AuthErrorCode } from "@/lib/i18n/translations-dynamic";
 import { createSafeLocalStorage } from "@/lib/safe-storage";
+import { syncUserToRegistry } from "@/lib/user-registry";
 
 export const ADMIN_EMAIL = "i.manbrut@wolfsohn.edu.ar";
 const ADMIN_PASSWORD = "ilan20enero";
@@ -25,6 +26,7 @@ type AuthState = {
   login: (email: string, password: string) => AuthResult;
   loginAdmin: (email: string, password: string) => AuthResult;
   register: (email: string, password: string) => AuthResult;
+  resetPassword: (email: string, newPassword: string) => AuthResult;
   setOAuthSession: (email: string, provider: OAuthProviderId | null) => AuthResult;
   clearOAuthSession: () => void;
   removeUser: (email: string) => void;
@@ -38,6 +40,24 @@ function normalizeEmail(email: string) {
 
 function isValidEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function isOAuthOnlyUser(user: RegisteredUser) {
+  return Boolean(user.oauthProvider) && !user.password;
+}
+
+function findRegisteredUser(users: RegisteredUser[], email: string) {
+  const normalized = normalizeEmail(email);
+  return users.find((user) => user.email === normalized);
+}
+
+function trackUserLogin(email: string, authMethod: OAuthProviderId | "email") {
+  void (async () => {
+    const ok = await syncUserToRegistry(email, authMethod);
+    if (!ok) {
+      await syncUserToRegistry(email, authMethod);
+    }
+  })();
 }
 
 function upsertRegisteredUser(
@@ -95,18 +115,27 @@ export const useAuthStore = create<AuthState>()(
           return { ok: false, error: "auth.err.use_admin_login" };
         }
 
-        const user = get().users.find((u) => u.email === normalized);
-        if (user && user.password === password) {
-          set({
-            email: normalized,
-            isAdmin: false,
-            oauthProvider: null,
-            users: upsertRegisteredUser(get().users, normalized, { password }),
-          });
-          return { ok: true };
+        const user = findRegisteredUser(get().users, normalized);
+        if (!user) {
+          return { ok: false, error: "auth.err.user_not_found" };
         }
 
-        return { ok: false, error: "auth.err.invalid_credentials" };
+        if (isOAuthOnlyUser(user)) {
+          return { ok: false, error: "auth.err.use_oauth_login" };
+        }
+
+        if (user.password !== password) {
+          return { ok: false, error: "auth.err.wrong_password" };
+        }
+
+        set({
+          email: normalized,
+          isAdmin: false,
+          oauthProvider: null,
+          users: upsertRegisteredUser(get().users, normalized, { password }),
+        });
+        trackUserLogin(normalized, "email");
+        return { ok: true };
       },
       loginAdmin: (email, password) => {
         const normalized = normalizeEmail(email);
@@ -145,9 +174,23 @@ export const useAuthStore = create<AuthState>()(
           return { ok: false, error: "auth.err.email_cannot_register" };
         }
 
-        const exists = get().users.some((u) => u.email === normalized);
-        if (exists) {
+        const existing = findRegisteredUser(get().users, normalized);
+        if (existing?.password) {
           return { ok: false, error: "auth.err.email_already_registered" };
+        }
+
+        if (existing && isOAuthOnlyUser(existing)) {
+          set({
+            users: upsertRegisteredUser(get().users, normalized, {
+              password,
+              oauthProvider: existing.oauthProvider,
+            }),
+            email: normalized,
+            isAdmin: false,
+            oauthProvider: existing.oauthProvider,
+          });
+          trackUserLogin(normalized, existing.oauthProvider ?? "email");
+          return { ok: true };
         }
 
         set({
@@ -159,6 +202,43 @@ export const useAuthStore = create<AuthState>()(
           isAdmin: false,
           oauthProvider: null,
         });
+        trackUserLogin(normalized, "email");
+        return { ok: true };
+      },
+      resetPassword: (email, newPassword) => {
+        const normalized = normalizeEmail(email);
+
+        if (!normalized || !newPassword) {
+          return { ok: false, error: "auth.err.missing_credentials" };
+        }
+
+        if (!isValidEmail(normalized)) {
+          return { ok: false, error: "auth.err.invalid_email" };
+        }
+
+        if (newPassword.length < 6) {
+          return { ok: false, error: "auth.err.password_too_short" };
+        }
+
+        if (normalized === ADMIN_EMAIL) {
+          return { ok: false, error: "auth.err.use_admin_login" };
+        }
+
+        const existing = findRegisteredUser(get().users, normalized);
+        if (!existing) {
+          return { ok: false, error: "auth.err.user_not_found" };
+        }
+
+        set({
+          users: upsertRegisteredUser(get().users, normalized, {
+            password: newPassword,
+            oauthProvider: existing.oauthProvider,
+          }),
+          email: normalized,
+          isAdmin: false,
+          oauthProvider: null,
+        });
+        trackUserLogin(normalized, "email");
         return { ok: true };
       },
       setOAuthSession: (email, provider) => {
@@ -181,6 +261,7 @@ export const useAuthStore = create<AuthState>()(
           oauthProvider: provider,
           users: upsertRegisteredUser(get().users, normalized, { oauthProvider: provider }),
         });
+        trackUserLogin(normalized, provider ?? "email");
         return { ok: true };
       },
       clearOAuthSession: () => {

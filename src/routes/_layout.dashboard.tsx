@@ -1,6 +1,18 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plane, Calendar, MapPin, BaggageClaim, LogIn, LogOut, ShieldCheck } from "lucide-react";
+import {
+  Plane,
+  Calendar,
+  MapPin,
+  BaggageClaim,
+  LogIn,
+  LogOut,
+  ShieldCheck,
+  Sliders,
+  CloudSun,
+  Compass,
+  ChevronRight,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSuitcasesStore, totalWeight } from "@/lib/suitcases-store";
 import { AuthDialog } from "@/components/AuthDialog";
@@ -162,21 +174,35 @@ function DashboardPage() {
             </div>
 
             <div className="space-y-4">
-              <h4 className="font-semibold flex items-center gap-2">{t("dashboard.aiRecommendations")}</h4>
-              <div className="p-4 bg-muted/30 rounded-lg text-sm space-y-2 border border-border">
-                <p>
-                  🌤️ <strong>{t("weather.title")}:</strong> {t("dashboard.aiWeatherSample")}
-                </p>
-                <p>
-                  💡 <strong>{t("dashboard.tipLabel")}:</strong> {t("dashboard.aiTipSample")}
-                </p>
-                <Button
-                  variant="link"
-                  className="px-0 h-auto text-primary"
-                  onClick={() => navigate({ to: "/assistant" })}
-                >
-                  {t("dashboard.viewFullList")} →
-                </Button>
+              <h4 className="font-semibold flex items-center gap-2 text-foreground">
+                <Sliders className="h-4 w-4 text-primary" />
+                {t("dashboard.aiRecommendations")}
+              </h4>
+              <div className="p-4 bg-muted/40 rounded-md text-sm space-y-3 border border-border">
+                <div className="flex items-start gap-2.5">
+                  <CloudSun className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    <strong className="text-foreground font-semibold">{t("weather.title")}:</strong>{" "}
+                    {t("dashboard.aiWeatherSample")}
+                  </p>
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <Compass className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    <strong className="text-foreground font-semibold">{t("dashboard.tipLabel")}:</strong>{" "}
+                    {t("dashboard.aiTipSample")}
+                  </p>
+                </div>
+                <div className="pt-1">
+                  <Button
+                    variant="link"
+                    className="px-0 h-auto text-xs text-primary font-medium hover:underline inline-flex items-center gap-1"
+                    onClick={() => navigate({ to: "/assistant" })}
+                  >
+                    {t("dashboard.viewFullList")}
+                    <ChevronRight className="h-3 w-3" />
+                  </Button>
+                </div>
               </div>
             </div>
           </div>

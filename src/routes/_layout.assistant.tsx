@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useRef, useEffect } from "react";
-import { Bot, Send, User, Sparkles, Plus, Trash2, BookmarkPlus, Loader2, CloudSun, ChevronDown, AlertTriangle } from "lucide-react";
+import { Bot, Send, User, Sliders, Plus, Trash2, BookmarkPlus, Loader2, CloudSun, ChevronDown, AlertTriangle } from "lucide-react";
+import { RecommendationListSkeleton } from "@/components/ui/apple-skeleton";
 import { DailyForecastCards } from "@/components/weather/DailyForecastCards";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
@@ -211,7 +212,7 @@ function AssistantPage() {
         data.weightExcessKg ?? computeWeightExcessKg(totalWeight, data.suitcaseCapacityKg);
       const overCapacityNote =
         weightExcessKg && data.suitcaseCapacityKg
-          ? `\n\n⚠️ ${t("assistant.overCapacityDetail", {
+          ? `\n\n${t("assistant.overCapacityDetail", {
               total: totalWeight.toFixed(2),
               capacity: data.suitcaseCapacityKg,
               excess: weightExcessKg.toFixed(2),
@@ -351,8 +352,8 @@ function AssistantPage() {
         {/* LEFT: Form */}
         <Card className="min-w-0 border-border bg-background p-4 shadow-sm sm:p-5 lg:sticky lg:top-4">
           <div className="flex items-center gap-2 mb-4">
-            <div className="h-9 w-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-              <Sparkles className="h-4 w-4" />
+            <div className="h-8 w-8 rounded-md bg-primary/10 text-primary flex items-center justify-center">
+              <Sliders className="h-4 w-4" />
             </div>
             <div>
               <div className="font-semibold leading-tight">{t("assistant.newTrip")}</div>
@@ -572,7 +573,7 @@ function AssistantPage() {
                 <div className={`h-8 w-8 shrink-0 rounded-lg flex items-center justify-center ${msg.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted text-foreground border border-border"}`}>
                   {msg.role === "user" ? <User size={16} /> : <Bot size={16} />}
                 </div>
-                <div className={`min-w-0 max-w-[calc(100%-2.5rem)] px-3 py-2.5 sm:px-4 sm:py-3 rounded-2xl text-sm whitespace-pre-line break-words ${msg.role === "user" ? "bg-primary text-primary-foreground rounded-tr-sm" : "bg-muted/50 text-foreground border border-border rounded-tl-sm"}`}>
+                <div className={`min-w-0 max-w-[calc(100%-2.5rem)] px-3.5 py-2.5 sm:px-4 sm:py-3 rounded-lg text-sm whitespace-pre-line break-words ${msg.role === "user" ? "bg-primary text-primary-foreground rounded-tr-sm" : "bg-muted/50 text-foreground border border-border rounded-tl-sm"}`}>
                   {msg.content}
                 </div>
               </div>
@@ -580,7 +581,7 @@ function AssistantPage() {
               {msg.suggestion && (
                 <div className="min-w-0 space-y-3 sm:space-y-4">
                   {/* HEADER summary */}
-                  <Card className="min-w-0 overflow-hidden border-primary/20 bg-gradient-to-br from-primary/10 via-primary/5 to-background p-4 sm:p-5">
+                  <Card className="min-w-0 overflow-hidden border-border bg-card p-4 sm:p-5 shadow-sm">
                     {msg.suggestion.weightExcessKg && msg.suggestion.suitcaseCapacityKg ? (
                       <Alert variant="destructive" className="mb-4 border-destructive/40 bg-destructive/5">
                         <AlertTriangle className="h-4 w-4" />
@@ -694,8 +695,8 @@ function AssistantPage() {
                     <Collapsible defaultOpen>
                       <CollapsibleTrigger className="group flex w-full items-center justify-between gap-2 p-3 transition-colors hover:bg-muted/30 sm:p-4 border-b border-border">
                         <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-                          <div className="h-8 w-8 shrink-0 rounded-lg bg-primary/10 text-primary flex items-center justify-center sm:h-9 sm:w-9">
-                            <Sparkles className="h-4 w-4 sm:h-5 sm:w-5" />
+                          <div className="h-8 w-8 shrink-0 rounded-md bg-primary/10 text-primary flex items-center justify-center sm:h-8 sm:w-8">
+                            <Sliders className="h-4 w-4" />
                           </div>
                           <div className="min-w-0 text-left">
                             <div className="font-bold text-sm sm:text-base">{t("assistant.itemsRecommended")}</div>
@@ -713,7 +714,7 @@ function AssistantPage() {
                             if (items.length === 0) return null;
                             const catWeight = items.reduce((a, it) => a + it.weight * (it.quantity ?? 1), 0);
                             return (
-                              <div key={cat} className="border border-border rounded-xl bg-muted/20 overflow-hidden">
+                              <div key={cat} className="border border-border rounded-md bg-muted/20 overflow-hidden">
                                 <div className="flex items-center justify-between px-3 py-2 bg-muted/40 border-b border-border">
                                   <div className="flex items-center gap-2">
                                     <Badge variant="outline" className="text-[11px]">{tc(cat)}</Badge>
@@ -753,14 +754,17 @@ function AssistantPage() {
             </div>
           ))}
           {loading && (
-            <div className="flex gap-3">
-              <div className="h-8 w-8 shrink-0 rounded-lg flex items-center justify-center bg-muted text-foreground border border-border">
-                <Bot size={16} />
+            <div className="space-y-4">
+              <div className="flex gap-3">
+                <div className="h-8 w-8 rounded-md bg-muted flex items-center justify-center border border-border">
+                  <Bot size={16} />
+                </div>
+                <div className="px-3.5 py-2.5 rounded-lg bg-muted/50 text-foreground border border-border rounded-tl-sm flex items-center gap-2 text-sm">
+                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                  {t("assistant.packing")}
+                </div>
               </div>
-              <div className="px-4 py-3 rounded-2xl bg-muted/50 text-foreground border border-border rounded-tl-sm flex items-center gap-2 text-sm">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                {t("assistant.packing")}
-              </div>
+              <RecommendationListSkeleton />
             </div>
           )}
         </div>

@@ -28,10 +28,10 @@ function AppLayout() {
       <MobileAppSidebar open={mobileMenuOpen} onOpenChange={setMobileMenuOpen} />
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <header className="flex h-16 shrink-0 items-center justify-between border-b border-border bg-background px-4 md:hidden">
+        <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-background px-4 md:hidden">
           <div className="flex items-center gap-2">
-            <BaggageClaim className="h-5 w-5" />
-            <span className="font-bold">Travel Wolf</span>
+            <BaggageClaim className="h-4 w-4 text-primary" />
+            <span className="text-sm font-semibold tracking-tight text-foreground">Travel Wolf</span>
           </div>
           <div className="flex items-center gap-1">
             <LanguageSwitcher />
@@ -47,7 +47,7 @@ function AppLayout() {
           </div>
         </header>
 
-        <div className="hidden shrink-0 items-center justify-end border-b border-border bg-background px-6 py-3 md:flex">
+        <div className="hidden h-14 shrink-0 items-center justify-end border-b border-border bg-background px-6 md:flex">
           <LanguageSwitcher />
         </div>
 

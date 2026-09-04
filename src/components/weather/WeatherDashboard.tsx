@@ -43,7 +43,7 @@ export function WeatherDashboard({ data }: Props) {
   return (
     <div className="space-y-4">
       {/* Hero — condición actual */}
-      <Card className="p-5 md:p-6 border-border/80 bg-gradient-to-br from-sky-500/5 via-background to-background">
+      <Card className="p-5 md:p-6 border-border bg-card shadow-sm">
         <div className="flex flex-col sm:flex-row sm:items-center gap-5">
           <div className="flex items-center gap-4 min-w-0">
             <WeatherIcon icon={currentIcon} size="xl" />

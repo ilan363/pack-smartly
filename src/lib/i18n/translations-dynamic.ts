@@ -21,7 +21,7 @@ export const dynamicTranslations = {
     "auth.oauth.completing": "Completando inicio de sesión…",
 
     "meta.description": "Organizá tu equipaje con IA: peso, clima y listas inteligentes para cada viaje.",
-    "meta.ogTitle": "Travel Wolf — Equipaje inteligente",
+    "meta.ogTitle": "Travel Wolf: Equipaje inteligente",
 
     "weather.cond.clear": "Despejado",
     "weather.cond.mostlyClear": "Mayormente despejado",
@@ -107,7 +107,7 @@ export const dynamicTranslations = {
     "weight.explain.originSaved": "Este peso viene de una lista sugerida o guardada",
     "weight.explain.generic": "{origin} para \"{name}\" ({category}): {perUnit} kg c/u{total}. {hint} Cada prenda pesa distinto; usamos un promedio razonable para planificar la valija.",
 
-    "reminder.title": "PackAI — Te falta guardar en la valija",
+    "reminder.title": "Travel Wolf: Te falta guardar en la valija",
     "reminder.body": "En {destination} aún tenés: {preview}{more}",
     "reminder.more": " y {count} más",
     "reminder.toastTitle": "Valija: {destination}",
@@ -145,7 +145,7 @@ export const dynamicTranslations = {
     "auth.oauth.completing": "Completing sign-in…",
 
     "meta.description": "Pack smarter with AI: weight, weather, and smart lists for every trip.",
-    "meta.ogTitle": "Travel Wolf — Smart packing",
+    "meta.ogTitle": "Travel Wolf: Smart packing",
 
     "weather.cond.clear": "Clear",
     "weather.cond.mostlyClear": "Mostly clear",
@@ -231,7 +231,7 @@ export const dynamicTranslations = {
     "weight.explain.originSaved": "This weight comes from a suggested or saved list",
     "weight.explain.generic": "{origin} for \"{name}\" ({category}): {perUnit} kg each{total}. {hint} Each garment differs; we use a reasonable average to plan the suitcase.",
 
-    "reminder.title": "PackAI — Items still to pack",
+    "reminder.title": "Travel Wolf: Items still to pack",
     "reminder.body": "For {destination} you still have: {preview}{more}",
     "reminder.more": " and {count} more",
     "reminder.toastTitle": "Suitcase: {destination}",
@@ -269,7 +269,7 @@ export const dynamicTranslations = {
     "auth.oauth.completing": "Concluindo login…",
 
     "meta.description": "Organize sua bagagem com IA: peso, clima e listas inteligentes para cada viagem.",
-    "meta.ogTitle": "Travel Wolf — Bagagem inteligente",
+    "meta.ogTitle": "Travel Wolf: Bagagem inteligente",
 
     "weather.cond.clear": "Limpo",
     "weather.cond.mostlyClear": "Predominantemente limpo",
@@ -355,7 +355,7 @@ export const dynamicTranslations = {
     "weight.explain.originSaved": "Este peso vem de uma lista sugerida ou salva",
     "weight.explain.generic": "{origin} para \"{name}\" ({category}): {perUnit} kg c/u{total}. {hint} Cada peça pesa diferente; usamos uma média razoável para planejar a mala.",
 
-    "reminder.title": "PackAI — Falta guardar na mala",
+    "reminder.title": "Travel Wolf: Falta guardar na mala",
     "reminder.body": "Em {destination} ainda faltam: {preview}{more}",
     "reminder.more": " e mais {count}",
     "reminder.toastTitle": "Mala: {destination}",

@@ -35,11 +35,11 @@ const navigation: {
 
 function SidebarBrand() {
   return (
-    <div className="flex h-16 shrink-0 items-center gap-2 border-b border-border px-6">
-      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-        <BaggageClaim size={18} />
+    <div className="flex h-14 shrink-0 items-center gap-2.5 border-b border-border px-5">
+      <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
+        <BaggageClaim size={16} />
       </div>
-      <span className="text-lg font-bold">Travel Wolf</span>
+      <span className="text-sm font-semibold tracking-tight text-foreground">Travel Wolf</span>
     </div>
   );
 }

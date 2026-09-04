@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { MessageCircle } from "lucide-react";
+import { MessageCircle, Shield, FileText } from "lucide-react";
+import { useState } from "react";
 import {
   Accordion,
   AccordionContent,
@@ -7,6 +8,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Card } from "@/components/ui/card";
+import { LegalModal, type LegalModalType } from "@/components/legal/LegalModal";
 import { CONTACT_FAQ_ITEMS } from "@/lib/contact-faq";
 import { useI18n } from "@/hooks/use-i18n";
 
@@ -16,12 +18,13 @@ export const Route = createFileRoute("/_layout/contact")({
 
 function ContactPage() {
   const { t } = useI18n();
+  const [legalModalType, setLegalModalType] = useState<LegalModalType>(null);
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div className="space-y-2">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary/10 text-primary">
             <MessageCircle className="h-5 w-5" />
           </div>
           <div>
@@ -31,7 +34,7 @@ function ContactPage() {
         </div>
       </div>
 
-      <Card className="overflow-hidden border-border p-4 sm:p-6">
+      <Card className="overflow-hidden border-border p-4 sm:p-6 shadow-sm">
         <Accordion type="single" collapsible className="w-full">
           {CONTACT_FAQ_ITEMS.map((item) => (
             <AccordionItem key={item.id} value={item.id} className="border-border">
@@ -46,7 +49,7 @@ function ContactPage() {
         </Accordion>
 
         <div className="mt-6 border-t border-border pt-6">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             {t("contact.authorHeading")}
           </h2>
           <dl className="mt-4 space-y-3 text-sm">
@@ -88,7 +91,31 @@ function ContactPage() {
             </div>
           </dl>
         </div>
+
+        <div className="mt-6 border-t border-border pt-6 flex flex-wrap gap-4 text-xs text-muted-foreground">
+          <button
+            type="button"
+            onClick={() => setLegalModalType("terms")}
+            className="flex items-center gap-1.5 hover:text-foreground transition-colors"
+          >
+            <FileText className="h-3.5 w-3.5" />
+            Términos del Servicio
+          </button>
+          <button
+            type="button"
+            onClick={() => setLegalModalType("privacy")}
+            className="flex items-center gap-1.5 hover:text-foreground transition-colors"
+          >
+            <Shield className="h-3.5 w-3.5" />
+            Política de Privacidad
+          </button>
+        </div>
       </Card>
+
+      <LegalModal
+        openType={legalModalType}
+        onClose={() => setLegalModalType(null)}
+      />
     </div>
   );
 }

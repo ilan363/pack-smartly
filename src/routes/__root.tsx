@@ -97,11 +97,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { title: "Travel Wolf" },
       { name: "description", content: "Organizá tu equipaje con IA: peso, clima y listas inteligentes para cada viaje." },
       { name: "author", content: "Travel Wolf" },
-      { property: "og:title", content: "Travel Wolf — Equipaje inteligente" },
-      { property: "og:description", content: "Organizá tu equipaje con IA: peso, clima y listas inteligentes para cada viaje." },
+      { property: "og:title", content: "Travel Wolf: Equipaje inteligente" },
+      { property: "og:description", content: "Organizá tu equipaje con precisión: peso, clima y listas inteligentes para cada viaje." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:site", content: "@travel_wolf1" },
     ],
     links: [
       {

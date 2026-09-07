@@ -1,4 +1,3 @@
-@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&display=swap");
 @import "tailwindcss" source(none);
 @source "../src";
 @import "tw-animate-css";
@@ -7,11 +6,12 @@
 
 @theme inline {
   --font-sans: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --radius-sm: var(--radius-sm);
-  --radius-md: var(--radius-md);
-  --radius-lg: var(--radius-lg);
+
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
   --radius-full: 9999px;
-  
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -47,12 +47,10 @@
 }
 
 :root {
-  /* Dynamic Design Tokens - Precision Executive Slate Palette */
   --radius-sm: 6px;
   --radius-md: 8px;
   --radius-lg: 12px;
 
-  /* Surfaces & Canvas (Light Theme) */
   --background: #fafbfc;
   --foreground: #0f172a;
 
@@ -62,33 +60,26 @@
   --popover: #ffffff;
   --popover-foreground: #0f172a;
 
-  /* Primary Accent: Deep Executive Slate */
   --primary: #0f172a;
   --primary-foreground: #ffffff;
 
-  /* Secondary Neutral Surface */
   --secondary: #f1f5f9;
   --secondary-foreground: #0f172a;
 
-  /* Muted Text & Elements */
   --muted: #f8fafc;
   --muted-foreground: #475569;
 
-  /* Interactive Accent */
   --accent: #f1f5f9;
   --accent-foreground: #0f172a;
 
-  /* Destructive States */
   --destructive: #b91c1c;
   --destructive-foreground: #ffffff;
 
-  /* Hairline Borders & Inputs */
   --border: #e2e8f0;
   --border-subtle: #f1f5f9;
   --input: #e2e8f0;
   --ring: #0f172a;
 
-  /* Sidebar Tokens */
   --sidebar: #ffffff;
   --sidebar-foreground: #0f172a;
   --sidebar-primary: #0f172a;
@@ -98,14 +89,12 @@
   --sidebar-border: #e2e8f0;
   --sidebar-ring: #0f172a;
 
-  /* Elevation Shadows — Architectural & Subtle */
   --shadow-subtle: 0 1px 2px 0 rgba(15, 23, 42, 0.04);
   --shadow-medium: 0 4px 12px -2px rgba(15, 23, 42, 0.08);
   --shadow-overlay: 0 12px 32px -4px rgba(15, 23, 42, 0.12);
 }
 
 .dark {
-  /* Midnight Executive Slate / Obsidian Mode — Strictly NO Purple & NO Glow */
   --background: #090d16;
   --foreground: #f8fafc;
 
@@ -170,9 +159,15 @@
   }
 }
 
-/* Micro-interaction utility transitions */
 .transition-subtle {
-  transition-property: color, background-color, border-color, box-shadow, opacity, transform;
+  transition-property:
+    color,
+    background-color,
+    border-color,
+    box-shadow,
+    opacity,
+    transform;
+
   transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
   transition-duration: 150ms;
 }

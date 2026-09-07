@@ -1,16 +1,15 @@
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import {
-  BaggageClaim,
-  Home,
-  Bot,
-  LogOut,
-  ListChecks,
-  CloudSun,
-  MessageCircle,
-  ShieldCheck,
-  RotateCcw,
-  type LucideIcon,
-} from "lucide-react";
+  IconLuggage,
+  IconBot,
+  IconCloudSun,
+  IconListChecks,
+  IconMessageCircle,
+  IconShieldCheck,
+  IconRefreshCw,
+  IconLogOut,
+  IconBaggageClaim,
+} from "@/components/ui/icons";
 import { useAuthStore } from "@/lib/auth-store";
 import { logoutWithOAuth } from "@/hooks/use-supabase-auth-sync";
 import { resetAppState } from "@/lib/reset-app";
@@ -24,20 +23,20 @@ const navigation: {
   nameKey: TranslationKey;
   shortNameKey: TranslationKey;
   href: string;
-  icon: LucideIcon;
+  icon: React.ComponentType<{ className?: string }>;
 }[] = [
-  { nameKey: "nav.dashboard", shortNameKey: "nav.dashboardShort", href: "/dashboard", icon: Home },
-  { nameKey: "nav.assistant", shortNameKey: "nav.assistantShort", href: "/assistant", icon: Bot },
-  { nameKey: "nav.weather", shortNameKey: "nav.weatherShort", href: "/weather", icon: CloudSun },
-  { nameKey: "nav.checklists", shortNameKey: "nav.checklistsShort", href: "/checklists", icon: ListChecks },
-  { nameKey: "nav.contact", shortNameKey: "nav.contactShort", href: "/contact", icon: MessageCircle },
+  { nameKey: "nav.dashboard", shortNameKey: "nav.dashboardShort", href: "/dashboard", icon: IconLuggage },
+  { nameKey: "nav.assistant", shortNameKey: "nav.assistantShort", href: "/assistant", icon: IconBot },
+  { nameKey: "nav.weather", shortNameKey: "nav.weatherShort", href: "/weather", icon: IconCloudSun },
+  { nameKey: "nav.checklists", shortNameKey: "nav.checklistsShort", href: "/checklists", icon: IconListChecks },
+  { nameKey: "nav.contact", shortNameKey: "nav.contactShort", href: "/contact", icon: IconMessageCircle },
 ];
 
 function SidebarBrand() {
   return (
-    <div className="flex h-14 shrink-0 items-center gap-2.5 border-b border-border px-5">
-      <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
-        <BaggageClaim size={16} />
+    <div className="flex h-16 shrink-0 items-center gap-3 border-b border-border/70 px-6">
+      <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-subtle">
+        <IconBaggageClaim className="h-4 w-4" />
       </div>
       <span className="text-sm font-semibold tracking-tight text-foreground">Travel Wolf</span>
     </div>
@@ -61,7 +60,7 @@ function SidebarContent({ onNavigate }: SidebarContentProps) {
           nameKey: "nav.admin" as const,
           shortNameKey: "nav.adminShort" as const,
           href: "/admin",
-          icon: ShieldCheck,
+          icon: IconShieldCheck,
         },
       ]
     : navigation;
@@ -73,20 +72,21 @@ function SidebarContent({ onNavigate }: SidebarContentProps) {
 
   return (
     <>
-      <nav className="flex-1 space-y-1 overflow-y-auto px-4 py-6">
+      <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
         {items.map((item) => {
           const isActive = location.pathname.startsWith(item.href);
           const name = t(item.nameKey);
           return (
             <Link key={item.href} to={item.href} onClick={onNavigate}>
               <span
-                className={`flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors ${
+                className={cn(
+                  "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all duration-150 cursor-pointer select-none",
                   isActive
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                }`}
+                    ? "bg-primary text-primary-foreground shadow-subtle"
+                    : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                )}
               >
-                <item.icon className="h-4 w-4" />
+                <item.icon className="h-4 w-4 shrink-0" />
                 {name}
               </span>
             </Link>
@@ -94,7 +94,7 @@ function SidebarContent({ onNavigate }: SidebarContentProps) {
         })}
       </nav>
 
-      <div className="shrink-0 border-t border-border p-4">
+      <div className="shrink-0 border-t border-border/70 p-3 space-y-1">
         <button
           type="button"
           onClick={() =>
@@ -106,9 +106,9 @@ function SidebarContent({ onNavigate }: SidebarContentProps) {
               navigate({ to: "/dashboard" });
             })
           }
-          className="flex w-full cursor-pointer items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          className="flex w-full cursor-pointer items-center gap-3 rounded-md px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
         >
-          <RotateCcw className="h-4 w-4" />
+          <IconRefreshCw className="h-4 w-4" />
           {t("nav.resetAll")}
         </button>
         <button
@@ -120,9 +120,9 @@ function SidebarContent({ onNavigate }: SidebarContentProps) {
               navigate({ to: "/" });
             })
           }
-          className="mt-1 flex w-full cursor-pointer items-center gap-3 rounded-md px-3 py-2 text-sm text-red-500 transition-colors hover:bg-red-500/10"
+          className="flex w-full cursor-pointer items-center gap-3 rounded-md px-3 py-2 text-xs font-medium text-destructive transition-colors hover:bg-destructive/10"
         >
-          <LogOut className="h-4 w-4" />
+          <IconLogOut className="h-4 w-4" />
           {t("nav.signOut")}
         </button>
       </div>
@@ -132,7 +132,7 @@ function SidebarContent({ onNavigate }: SidebarContentProps) {
 
 export function AppSidebar() {
   return (
-    <aside className="hidden h-svh w-64 shrink-0 flex-col border-r border-border bg-card md:flex">
+    <aside className="hidden h-svh w-60 shrink-0 flex-col border-r border-border/70 bg-card md:flex">
       <SidebarBrand />
       <SidebarContent />
     </aside>
@@ -149,7 +149,7 @@ export function MobileAppSidebar({ open, onOpenChange }: MobileAppSidebarProps) 
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="left" className="flex w-[min(100vw-2rem,16rem)] flex-col p-0 sm:max-w-xs">
+      <SheetContent side="left" className="flex w-[min(100vw-2rem,16rem)] flex-col p-0 sm:max-w-xs border-r border-border">
         <SheetTitle className="sr-only">{t("nav.menuTitle")}</SheetTitle>
         <SidebarBrand />
         <SidebarContent onNavigate={() => onOpenChange(false)} />
@@ -170,17 +170,17 @@ export function MobileBottomNav() {
           nameKey: "nav.admin" as const,
           shortNameKey: "nav.adminShort" as const,
           href: "/admin",
-          icon: ShieldCheck,
+          icon: IconShieldCheck,
         },
       ]
     : navigation;
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/85 md:hidden"
       aria-label={t("nav.main")}
     >
-      <div className="mx-auto flex max-w-lg items-stretch justify-around px-1 pb-[env(safe-area-inset-bottom)]">
+      <div className="mx-auto flex max-w-lg items-stretch justify-around px-1 py-1.5 pb-[calc(0.375rem+env(safe-area-inset-bottom))]">
         {items.map((item) => {
           const isActive = location.pathname.startsWith(item.href);
           return (
@@ -188,11 +188,11 @@ export function MobileBottomNav() {
               key={item.href}
               to={item.href}
               className={cn(
-                "flex min-w-0 flex-1 flex-col items-center gap-0.5 px-1 py-2.5 text-[10px] font-medium transition-colors",
-                isActive ? "text-primary" : "text-muted-foreground",
+                "flex min-w-0 flex-1 flex-col items-center gap-1 px-1 py-1 text-[11px] font-medium transition-colors",
+                isActive ? "text-foreground font-semibold" : "text-muted-foreground hover:text-foreground",
               )}
             >
-              <item.icon className={cn("h-5 w-5 shrink-0", isActive && "stroke-[2.5px]")} />
+              <item.icon className={cn("h-5 w-5 shrink-0", isActive && "stroke-[2.25px]")} />
               <span className="truncate w-full text-center">{t(item.shortNameKey)}</span>
             </Link>
           );

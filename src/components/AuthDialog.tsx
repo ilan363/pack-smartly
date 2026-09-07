@@ -16,6 +16,7 @@ import { useAuthStore } from "@/lib/auth-store";
 import { syncWebEmailUser } from "@/lib/user-registry";
 import { useI18n } from "@/hooks/use-i18n";
 import { toast } from "sonner";
+import { IconEye, IconEyeOff, IconShieldCheck } from "@/components/ui/icons";
 
 type AuthTab = "login" | "register" | "admin" | "forgot";
 
@@ -53,10 +54,10 @@ function PasswordField({
         <button
           type="button"
           onClick={onToggleShow}
-          className="text-muted-foreground transition-colors hover:text-foreground"
+          className="text-muted-foreground transition-colors hover:text-foreground p-1"
           aria-label={showPassword ? hideLabel : showLabel}
         >
-          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          {showPassword ? <IconEyeOff className="h-4 w-4" /> : <IconEye className="h-4 w-4" />}
         </button>
       </div>
       <Input
@@ -244,7 +245,7 @@ export function AuthDialog({
         {tab === "admin" ? (
           <div className="space-y-3">
             <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-400">
-              <ShieldCheck className="h-4 w-4 shrink-0" />
+              <IconShieldCheck className="h-4 w-4 shrink-0" />
               <span>{t("auth.adminOnlyArea")}</span>
             </div>
             <div className="space-y-2">
@@ -392,7 +393,7 @@ export function AuthDialog({
                 className="w-full max-w-xs justify-center text-center text-muted-foreground hover:text-foreground"
                 onClick={() => setTab("admin")}
               >
-                <ShieldCheck className="mr-2 h-4 w-4 shrink-0" />
+                <IconShieldCheck className="mr-2 h-4 w-4 shrink-0" />
                 {t("auth.openAdminPanel")}
               </Button>
             </div>

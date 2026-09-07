@@ -1,4 +1,4 @@
-import { Droplets, Wind } from "lucide-react";
+import { IconDroplets, IconWind } from "@/components/ui/icons";
 import { cn } from "@/lib/utils";
 import type { Locale } from "@/lib/i18n/locale-store";
 import { formatWeatherDate } from "@/lib/weather/codes";
@@ -33,8 +33,8 @@ export function DailyForecastCards({
   locale: localeProp,
 }: Props) {
   const cardClass = cn(
-    "border border-border rounded-2xl bg-card/80",
-    "flex flex-col items-center text-center transition-colors hover:bg-muted/30",
+    "border border-border/70 rounded-lg bg-card shadow-subtle",
+    "flex flex-col items-center text-center transition-subtle hover:border-border",
     compact ? "p-2.5 sm:p-3" : "p-3 sm:p-3.5",
   );
 
@@ -111,13 +111,13 @@ function ForecastCardContent({
         <div className="mt-1.5 flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 text-[10px] text-muted-foreground w-full">
           {d.precipitation != null && d.precipitation > 0 && (
             <span className="inline-flex items-center gap-0.5">
-              <Droplets className="h-3 w-3 shrink-0" />
+              <IconDroplets className="h-3 w-3 shrink-0" />
               {d.precipitation.toFixed(1)} mm
             </span>
           )}
           {d.windMax != null && (
             <span className="inline-flex items-center gap-0.5">
-              <Wind className="h-3 w-3 shrink-0" />
+              <IconWind className="h-3 w-3 shrink-0" />
               {Math.round(d.windMax)} km/h
             </span>
           )}

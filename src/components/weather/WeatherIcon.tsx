@@ -1,11 +1,11 @@
 import {
-  Sun,
-  Cloud,
-  CloudRain,
-  CloudSnow,
-  CloudLightning,
-  CloudSun,
-} from "lucide-react";
+  IconSun,
+  IconCloud,
+  IconCloudRain,
+  IconSnowflake,
+  IconAlertTriangle,
+  IconCloudSun,
+} from "@/components/ui/icons";
 import { cn } from "@/lib/utils";
 import { iconTone, type WeatherIconKind } from "@/lib/weather/codes";
 
@@ -26,20 +26,20 @@ const SIZE = {
 export function WeatherIcon({ icon, className, size = "md" }: Props) {
   const Icon =
     icon === "sun"
-      ? Sun
+      ? IconSun
       : icon === "cloud"
-        ? Cloud
+        ? IconCloud
         : icon === "rain"
-          ? CloudRain
+          ? IconCloudRain
           : icon === "snow"
-            ? CloudSnow
+            ? IconSnowflake
             : icon === "storm"
-              ? CloudLightning
-              : CloudSun;
+              ? IconAlertTriangle
+              : IconCloudSun;
 
   return (
     <Icon
-      className={cn(SIZE[size], iconTone(icon), "stroke-[1.5]", className)}
+      className={cn(SIZE[size], iconTone(icon), className)}
       aria-hidden
     />
   );

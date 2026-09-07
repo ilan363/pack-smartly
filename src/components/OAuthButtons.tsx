@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Loader2 } from "lucide-react";
+import { IconLoader } from "@/components/ui/icons";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { OAuthProviderIcon } from "@/components/OAuthProviderIcons";
@@ -55,7 +55,7 @@ export function OAuthButtons() {
               onClick={() => handleOAuth(provider.id)}
             >
               {isLoading ? (
-                <Loader2 className="h-5 w-5 shrink-0 animate-spin text-muted-foreground" />
+                <IconLoader className="h-5 w-5 shrink-0 animate-spin text-muted-foreground" />
               ) : (
                 <OAuthProviderIcon provider={provider.id} className="h-5 w-5 shrink-0" />
               )}

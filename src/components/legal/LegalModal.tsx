@@ -5,7 +5,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Shield, FileText } from "lucide-react";
+import { IconShield, IconFileText } from "@/components/ui/icons";
 
 export type LegalModalType = "terms" | "privacy" | null;
 
@@ -43,7 +43,7 @@ export function LegalModal({ openType, onClose }: LegalModalProps) {
                   : "bg-secondary text-muted-foreground hover:text-foreground"
               }`}
             >
-              <FileText className="h-3.5 w-3.5" />
+              <IconFileText className="h-3.5 w-3.5" />
               Términos del Servicio
             </button>
             <button
@@ -55,7 +55,7 @@ export function LegalModal({ openType, onClose }: LegalModalProps) {
                   : "bg-secondary text-muted-foreground hover:text-foreground"
               }`}
             >
-              <Shield className="h-3.5 w-3.5" />
+              <IconShield className="h-3.5 w-3.5" />
               Política de Privacidad
             </button>
           </div>

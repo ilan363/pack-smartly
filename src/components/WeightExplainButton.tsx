@@ -1,4 +1,4 @@
-import { CircleAlert } from "lucide-react";
+import { IconAlertCircle } from "@/components/ui/icons";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -27,7 +27,7 @@ export function WeightExplainButton(props: WeightExplainInput) {
             weight: props.weight.toFixed(2),
           })}
         >
-          <CircleAlert className="h-3.5 w-3.5" />
+          <IconAlertCircle className="h-3.5 w-3.5" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-72 text-sm leading-relaxed" side="top" align="end">

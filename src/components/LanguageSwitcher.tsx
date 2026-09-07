@@ -1,4 +1,4 @@
-import { Check, Languages } from "lucide-react";
+import { IconCheck, IconLanguages } from "@/components/ui/icons";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -28,7 +28,7 @@ export function LanguageSwitcher({ className, align = "end" }: LanguageSwitcherP
           className={cn("gap-2", className)}
           aria-label={t("nav.language")}
         >
-          <Languages className="h-4 w-4" />
+          <IconLanguages className="h-4 w-4" />
           {t("nav.language")}
         </Button>
       </DropdownMenuTrigger>
@@ -43,7 +43,7 @@ export function LanguageSwitcher({ className, align = "end" }: LanguageSwitcherP
               {option.flag}
             </span>
             <span className="flex-1">{option.label}</span>
-            {locale === option.code ? <Check className="h-4 w-4 text-primary" /> : null}
+            {locale === option.code ? <IconCheck className="h-4 w-4 text-primary" /> : null}
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>

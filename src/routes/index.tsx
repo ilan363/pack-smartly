@@ -1,365 +1,149 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import {
   BaggageClaim,
-  Plane,
-  Shield,
-  FileText,
-  Sliders,
   CloudSun,
+  ListChecks,
+  Luggage,
   Scale,
-  Plus,
-  Minus,
-  Check,
-  AlertTriangle,
-  ChevronRight,
-  Sparkles,
+  UserRound,
+  type LucideIcon,
 } from "lucide-react";
 import { AuthDialog } from "@/components/AuthDialog";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { Button } from "@/components/ui/button";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+  type CarouselApi,
+} from "@/components/ui/carousel";
 import { LegalModal, type LegalModalType } from "@/components/legal/LegalModal";
 import { useI18n } from "@/hooks/use-i18n";
+import { useAuthStore } from "@/lib/auth-store";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/")({
   component: LandingPage,
 });
 
-interface AirlineSpec {
-  name: string;
-  cabinMaxKg: number;
-  cabinDimensions: string;
-  holdMaxKg: number;
-  holdDimensions: string;
-  excessFeePerKg: number;
-}
-
-const AIRLINES: AirlineSpec[] = [
+const HOW_IT_WORKS_STEPS: {
+  step: number;
+  title: string;
+  description: string;
+  icon: LucideIcon;
+}[] = [
   {
-    name: "Iberia",
-    cabinMaxKg: 10,
-    cabinDimensions: "56 x 40 x 25 cm",
-    holdMaxKg: 23,
-    holdDimensions: "158 cm lineales",
-    excessFeePerKg: 15,
+    step: 1,
+    title: "Entrá a Travel Wolf",
+    description: "Creá tu cuenta o iniciá sesión para guardar viajes, valijas y listas.",
+    icon: UserRound,
   },
   {
-    name: "Aerolíneas Argentinas",
-    cabinMaxKg: 8,
-    cabinDimensions: "55 x 35 x 25 cm",
-    holdMaxKg: 15,
-    holdDimensions: "158 cm lineales",
-    excessFeePerKg: 12,
+    step: 2,
+    title: "Armá tu valija",
+    description: "Sumá lo que vas a llevar y mirá el peso estimado mientras empacás.",
+    icon: Luggage,
   },
   {
-    name: "LATAM Airlines",
-    cabinMaxKg: 10,
-    cabinDimensions: "55 x 35 x 25 cm",
-    holdMaxKg: 23,
-    holdDimensions: "158 cm lineales",
-    excessFeePerKg: 18,
+    step: 3,
+    title: "Contrastá el límite",
+    description: "Compará tu equipaje con la franquicia de cabina o bodega de tu aerolínea.",
+    icon: Scale,
   },
   {
-    name: "Ryanair",
-    cabinMaxKg: 10,
-    cabinDimensions: "55 x 40 x 20 cm",
-    holdMaxKg: 20,
-    holdDimensions: "119 x 119 x 81 cm",
-    excessFeePerKg: 20,
+    step: 4,
+    title: "Mirá el clima",
+    description: "Revisá el pronóstico del destino para ajustar ropa y accesorios a tiempo.",
+    icon: CloudSun,
   },
   {
-    name: "Delta Air Lines",
-    cabinMaxKg: 10,
-    cabinDimensions: "56 x 35 x 23 cm",
-    holdMaxKg: 23,
-    holdDimensions: "157 cm lineales",
-    excessFeePerKg: 25,
+    step: 5,
+    title: "Cerrá con listas",
+    description: "Usá el asistente y las checklists para no olvidarte nada antes de viajar.",
+    icon: ListChecks,
   },
 ];
 
-interface DemoItem {
-  id: string;
-  name: string;
-  category: string;
-  weightKg: number;
-  qty: number;
-  maxQty: number;
-}
+function HowItWorksCarousel() {
+  const [api, setApi] = useState<CarouselApi>();
+  const [current, setCurrent] = useState(0);
 
-const INITIAL_DEMO_ITEMS: DemoItem[] = [
-  { id: "1", name: "Remeras y tops de algodón", category: "Ropa", weightKg: 0.2, qty: 4, maxQty: 8 },
-  { id: "2", name: "Pantalones y jeans", category: "Ropa", weightKg: 0.65, qty: 2, maxQty: 5 },
-  { id: "3", name: "Calzado deportivo", category: "Calzado", weightKg: 0.85, qty: 1, maxQty: 3 },
-  { id: "4", name: "Abrigo o campera liviana", category: "Ropa", weightKg: 1.2, qty: 1, maxQty: 2 },
-  { id: "5", name: "Neceser con líquidos normados", category: "Aseo", weightKg: 0.75, qty: 1, maxQty: 2 },
-  { id: "6", name: "Notebook y cargador USB-C", category: "Tecnología", weightKg: 1.8, qty: 1, maxQty: 2 },
-];
+  useEffect(() => {
+    if (!api) return;
 
-function InteractiveLuggageSimulator() {
-  const [selectedAirlineIndex, setSelectedAirlineIndex] = useState(0);
-  const [luggageType, setLuggageType] = useState<"cabin" | "hold">("cabin");
-  const [items, setItems] = useState<DemoItem[]>(INITIAL_DEMO_ITEMS);
+    const sync = () => setCurrent(api.selectedScrollSnap());
+    sync();
+    api.on("select", sync);
+    api.on("reInit", sync);
 
-  const airline = AIRLINES[selectedAirlineIndex];
-  const maxLimit = luggageType === "cabin" ? airline.cabinMaxKg : airline.holdMaxKg;
-  const dimensions = luggageType === "cabin" ? airline.cabinDimensions : airline.holdDimensions;
-
-  const currentWeight = useMemo(() => {
-    const raw = items.reduce((acc, it) => acc + it.weightKg * it.qty, 0);
-    return Math.round(raw * 100) / 100;
-  }, [items]);
-
-  const tareWeight = luggageType === "cabin" ? 2.2 : 3.8; // Estimated empty suitcase weight
-  const grossWeight = Math.round((currentWeight + tareWeight) * 100) / 100;
-  const remainingWeight = Math.max(0, Math.round((maxLimit - grossWeight) * 100) / 100);
-  const excessWeight = Math.max(0, Math.round((grossWeight - maxLimit) * 100) / 100);
-  const percentage = Math.min(100, Math.round((grossWeight / maxLimit) * 100));
-
-  const changeQty = (id: string, delta: number) => {
-    setItems((prev) =>
-      prev.map((it) => {
-        if (it.id !== id) return it;
-        const next = Math.max(0, Math.min(it.maxQty, it.qty + delta));
-        return { ...it, qty: next };
-      })
-    );
-  };
-
-  const statusColor =
-    excessWeight > 0
-      ? "text-red-600 dark:text-red-400"
-      : percentage > 85
-      ? "text-amber-600 dark:text-amber-400"
-      : "text-primary";
-
-  const progressBg =
-    excessWeight > 0
-      ? "bg-red-500"
-      : percentage > 85
-      ? "bg-amber-500"
-      : "bg-primary";
+    return () => {
+      api.off("select", sync);
+      api.off("reInit", sync);
+    };
+  }, [api]);
 
   return (
-    <div className="w-full max-w-5xl mx-auto rounded-lg border border-border bg-card shadow-sm overflow-hidden">
-      {/* Simulation Header */}
-      <div className="border-b border-border bg-muted/40 px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <Scale className="h-4 w-4 text-primary" />
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Simulador Técnico de Franquicia
-            </span>
-          </div>
-          <h3 className="text-lg font-semibold text-foreground mt-0.5">
-            Calibración de Equipaje en Tiempo Real
-          </h3>
-        </div>
-
-        {/* Segmented Control (Apple Style) */}
-        <div className="inline-flex rounded-md border border-border bg-background p-1 self-start md:self-auto">
-          <button
-            type="button"
-            onClick={() => setLuggageType("cabin")}
-            className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
-              luggageType === "cabin"
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            Equipaje de Mano ({airline.cabinMaxKg} kg)
-          </button>
-          <button
-            type="button"
-            onClick={() => setLuggageType("hold")}
-            className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
-              luggageType === "hold"
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            Equipaje en Bodega ({airline.holdMaxKg} kg)
-          </button>
-        </div>
+    <section className="py-16 sm:py-20">
+      <div className="mx-auto mb-10 max-w-2xl text-center">
+        <h2 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+          Cómo trabajar con Travel Wolf
+        </h2>
+        <p className="mt-3 text-sm leading-relaxed text-muted-foreground sm:text-base">
+          Cinco pasos simples: de la cuenta al aeropuerto, sin excedentes ni olvidos.
+        </p>
       </div>
 
-      {/* Simulator Body */}
-      <div className="p-6 md:p-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Left: Airline selection & Pack items list */}
-        <div className="lg:col-span-7 space-y-6">
-          <div>
-            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block mb-2">
-              Aerolínea Reguladora
-            </label>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {AIRLINES.map((a, i) => (
-                <button
-                  key={a.name}
-                  type="button"
-                  onClick={() => setSelectedAirlineIndex(i)}
-                  className={`p-2.5 text-left text-xs rounded-md border transition-colors ${
-                    i === selectedAirlineIndex
-                      ? "border-primary bg-primary text-primary-foreground font-medium"
-                      : "border-border bg-background hover:bg-muted text-foreground"
-                  }`}
-                >
-                  <div className="font-semibold truncate">{a.name}</div>
-                  <div
-                    className={`text-[11px] mt-0.5 ${
-                      i === selectedAirlineIndex
-                        ? "text-primary-foreground/80"
-                        : "text-muted-foreground"
-                    }`}
-                  >
-                    Límite: {luggageType === "cabin" ? a.cabinMaxKg : a.holdMaxKg} kg
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Artículos Empacados
-              </label>
-              <span className="text-xs text-muted-foreground">
-                Tolerancia de tara: {tareWeight} kg
-              </span>
-            </div>
-
-            <div className="space-y-2 border border-border rounded-md divide-y divide-border bg-background">
-              {items.map((item) => (
-                <div
-                  key={item.id}
-                  className="p-3 flex items-center justify-between gap-3 text-sm"
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="font-medium text-foreground truncate">{item.name}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {item.category} • {(item.weightKg * item.qty).toFixed(2)} kg
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      type="button"
-                      aria-label="Disminuir"
-                      onClick={() => changeQty(item.id, -1)}
-                      disabled={item.qty === 0}
-                      className="h-7 w-7 rounded border border-border flex items-center justify-center text-foreground hover:bg-muted disabled:opacity-40 disabled:pointer-events-none transition-colors"
-                    >
-                      <Minus className="h-3 w-3" />
-                    </button>
-                    <span className="w-5 text-center text-xs font-semibold tabular-nums">
-                      {item.qty}
-                    </span>
-                    <button
-                      type="button"
-                      aria-label="Aumentar"
-                      onClick={() => changeQty(item.id, 1)}
-                      disabled={item.qty >= item.maxQty}
-                      className="h-7 w-7 rounded border border-border flex items-center justify-center text-foreground hover:bg-muted disabled:opacity-40 disabled:pointer-events-none transition-colors"
-                    >
-                      <Plus className="h-3 w-3" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Right: Technical Gauge & Compliance Summary */}
-        <div className="lg:col-span-5 flex flex-col justify-between space-y-6">
-          <div className="rounded-md border border-border bg-muted/20 p-5 space-y-5">
-            <div className="flex justify-between items-start">
-              <div>
-                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Peso Bruto Estimado
-                </span>
-                <div className="flex items-baseline gap-1 mt-1">
-                  <span className={`text-4xl font-bold tabular-nums tracking-tight ${statusColor}`}>
-                    {grossWeight.toFixed(2)}
+      <Carousel
+        setApi={setApi}
+        opts={{ align: "start", loop: false }}
+        className="relative mx-auto w-full max-w-4xl px-10 sm:px-12"
+      >
+        <CarouselContent className="-ml-3 sm:-ml-4">
+          {HOW_IT_WORKS_STEPS.map((item) => (
+            <CarouselItem key={item.step} className="basis-[85%] pl-3 sm:basis-1/2 sm:pl-4 lg:basis-1/3">
+              <article className="flex h-full flex-col rounded-lg border border-border bg-card p-5 sm:p-6">
+                <div className="mb-5 flex items-center justify-between">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    Paso {item.step}
                   </span>
-                  <span className="text-sm font-medium text-muted-foreground">/ {maxLimit}.0 kg</span>
+                  <div className="flex h-9 w-9 items-center justify-center rounded-md bg-secondary text-secondary-foreground">
+                    <item.icon className="h-4 w-4" />
+                  </div>
                 </div>
-              </div>
-              <div className="text-right">
-                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Estado IATA
-                </span>
-                <div className="mt-1">
-                  {excessWeight > 0 ? (
-                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 bg-red-500/10 px-2 py-0.5 rounded">
-                      Exceso de {excessWeight.toFixed(2)} kg
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded">
-                      Autorizado ({remainingWeight.toFixed(2)} kg libres)
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
+                <h3 className="text-base font-semibold tracking-tight text-foreground">
+                  {item.title}
+                </h3>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                  {item.description}
+                </p>
+              </article>
+            </CarouselItem>
+          ))}
+        </CarouselContent>
 
-            {/* Apple-style Linear Weight Bar */}
-            <div className="space-y-1.5">
-              <div className="h-2 w-full rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
-                <div
-                  className={`h-full transition-all duration-300 ${progressBg}`}
-                  style={{ width: `${percentage}%` }}
-                />
-              </div>
-              <div className="flex justify-between text-[11px] text-muted-foreground">
-                <span>0 kg</span>
-                <span>{maxLimit / 2} kg</span>
-                <span>{maxLimit} kg máx</span>
-              </div>
-            </div>
+        <CarouselPrevious className="left-0 border-border bg-card text-foreground hover:bg-secondary disabled:opacity-30" />
+        <CarouselNext className="right-0 border-border bg-card text-foreground hover:bg-secondary disabled:opacity-30" />
+      </Carousel>
 
-            {/* Specs Table */}
-            <div className="pt-2 border-t border-border space-y-2 text-xs">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Dimensiones autorizadas:</span>
-                <span className="font-medium text-foreground">{dimensions}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Peso neto prendas:</span>
-                <span className="font-medium text-foreground">{currentWeight.toFixed(2)} kg</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Valija vacía (tara):</span>
-                <span className="font-medium text-foreground">{tareWeight.toFixed(2)} kg</span>
-              </div>
-              {excessWeight > 0 && (
-                <div className="flex justify-between text-red-600 dark:text-red-400 font-semibold pt-1 border-t border-border">
-                  <span>Costo extra estimado en mostrador:</span>
-                  <span>~ ${(excessWeight * airline.excessFeePerKg).toFixed(0)} USD</span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="p-4 rounded-md border border-border bg-background space-y-2">
-            <div className="text-xs font-semibold uppercase tracking-wider text-foreground">
-              Comprobación Automática
-            </div>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              La simulación demuestra cómo Travel Wolf calcula volumetría y previene cargos por exceso
-              antes de llegar al mostrador de facturación del aeropuerto.
-            </p>
-            <div className="pt-1">
-              <Link to="/suitcases">
-                <Button size="sm" className="w-full h-8 text-xs font-medium">
-                  Crear mi valija real
-                  <ChevronRight className="ml-1 h-3 w-3" />
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </div>
+      <div className="mt-6 flex items-center justify-center gap-2" aria-label="Progreso de pasos">
+        {HOW_IT_WORKS_STEPS.map((item, index) => (
+          <button
+            key={item.step}
+            type="button"
+            aria-label={`Ir al paso ${item.step}`}
+            aria-current={index === current ? "true" : undefined}
+            onClick={() => api?.scrollTo(index)}
+            className={cn(
+              "h-1.5 rounded-full transition-all duration-300",
+              index === current ? "w-6 bg-primary" : "w-1.5 bg-border hover:bg-muted-foreground/40",
+            )}
+          />
+        ))}
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -424,58 +208,162 @@ function TechnicalSpecsMatrix() {
 
 function LandingNavbar({ onOpenAuth }: { onOpenAuth: (tab: "login" | "register") => void }) {
   const { t } = useI18n();
+  const isLoggedIn = Boolean(useAuthStore((s) => s.email));
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/80 bg-background/80 backdrop-blur-md">
+    <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/10 bg-[#0c2461]/55 backdrop-blur-md">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
         <div className="flex items-center gap-3">
-          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
+          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-white text-[#0c2461]">
             <BaggageClaim size={16} />
           </div>
-          <span className="text-sm font-semibold tracking-tight text-foreground">
+          <span className="text-sm font-semibold tracking-tight text-white">
             Travel Wolf
           </span>
         </div>
 
-        <div className="hidden md:flex items-center gap-6 text-xs font-medium text-muted-foreground">
-          <Link to="/dashboard" className="hover:text-foreground transition-colors">
-            Dashboard
-          </Link>
-          <Link to="/suitcases" className="hover:text-foreground transition-colors">
-            Valijas
-          </Link>
-          <Link to="/assistant" className="hover:text-foreground transition-colors">
-            Asistente
-          </Link>
-          <Link to="/weather" className="hover:text-foreground transition-colors">
-            Clima
-          </Link>
-          <Link to="/checklists" className="hover:text-foreground transition-colors">
-            Listas
-          </Link>
-          <Link to="/contact" className="hover:text-foreground transition-colors">
-            Contacto
-          </Link>
-        </div>
+        {isLoggedIn ? (
+          <div className="hidden md:flex items-center gap-6 text-xs font-medium text-white/70">
+            <Link to="/dashboard" className="hover:text-white transition-colors">
+              Dashboard
+            </Link>
+            <Link to="/suitcases" className="hover:text-white transition-colors">
+              Valijas
+            </Link>
+            <Link to="/assistant" className="hover:text-white transition-colors">
+              Asistente
+            </Link>
+            <Link to="/weather" className="hover:text-white transition-colors">
+              Clima
+            </Link>
+            <Link to="/checklists" className="hover:text-white transition-colors">
+              Listas
+            </Link>
+            <Link to="/contact" className="hover:text-white transition-colors">
+              Contacto
+            </Link>
+          </div>
+        ) : (
+          <div className="hidden md:block" />
+        )}
 
         <div className="flex items-center gap-3">
           <LanguageSwitcher />
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => onOpenAuth("login")}
-            className="h-8 text-xs font-medium"
-          >
-            {t("nav.signIn")}
-          </Button>
-          <Link to="/dashboard">
-            <Button size="sm" className="h-8 px-3.5 text-xs font-medium">
-              Comenzar
-            </Button>
-          </Link>
+          {isLoggedIn ? (
+            <Link to="/dashboard">
+              <Button size="sm" className="h-8 px-3.5 text-xs font-medium bg-white text-[#0c2461] hover:bg-white/90">
+                Comenzar
+              </Button>
+            </Link>
+          ) : (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onOpenAuth("login")}
+                className="h-8 text-xs font-medium text-white hover:bg-white/10 hover:text-white"
+              >
+                {t("nav.signIn")}
+              </Button>
+              <Button
+                size="sm"
+                className="h-8 px-3.5 text-xs font-medium bg-white text-[#0c2461] hover:bg-white/90"
+                onClick={() => onOpenAuth("register")}
+              >
+                Comenzar
+              </Button>
+            </>
+          )}
         </div>
       </div>
     </nav>
+  );
+}
+
+function CinematicHero({ onOpenAuth }: { onOpenAuth: (tab: "login" | "register") => void }) {
+  const isLoggedIn = Boolean(useAuthStore((s) => s.email));
+
+  return (
+    <section className="relative isolate min-h-[100svh] w-full overflow-hidden">
+      <div className="absolute inset-0 overflow-hidden" aria-hidden>
+        <img
+          src="/1024.jpg"
+          alt=""
+          className="hero-ken-burns h-full w-full object-cover object-center"
+        />
+      </div>
+
+      {/* Cinematic grade: navy wash + vignette + bottom fade into page */}
+      <div
+        className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(12,36,97,0.18)_0%,rgba(12,36,97,0.55)_55%,rgba(8,20,55,0.82)_100%)]"
+        aria-hidden
+      />
+      <div
+        className="absolute inset-0 bg-gradient-to-b from-[#0c2461]/70 via-[#0c2461]/35 to-[#0c2461]"
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-[#0c2461] to-transparent"
+        aria-hidden
+      />
+
+      <div className="relative z-10 mx-auto flex min-h-[100svh] max-w-5xl flex-col justify-end px-6 pb-20 pt-28 sm:justify-center sm:pb-24 sm:pt-20">
+        <div className="hero-copy-in max-w-3xl">
+          <p className="mb-6 text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+            Travel Wolf
+          </p>
+
+          <h1 className="text-3xl font-bold tracking-tight text-white/95 sm:text-5xl lg:text-[3.5rem] leading-[1.08] text-balance">
+            Equipaje calibrado al gramo.
+          </h1>
+
+          <p className="mt-5 max-w-xl text-base leading-relaxed text-white/80 sm:text-lg">
+            Calculá el peso por aerolínea y viajá sin sorpresas en el aeropuerto.
+          </p>
+
+          <div className="mt-9 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
+            {isLoggedIn ? (
+              <Link to="/dashboard">
+                <Button
+                  size="lg"
+                  className="h-11 w-full px-7 text-sm font-semibold bg-white text-[#0c2461] hover:bg-white/90 sm:w-auto"
+                >
+                  Organizar mi viaje
+                </Button>
+              </Link>
+            ) : (
+              <Button
+                size="lg"
+                className="h-11 px-7 text-sm font-semibold bg-white text-[#0c2461] hover:bg-white/90"
+                onClick={() => onOpenAuth("register")}
+              >
+                Organizar mi viaje
+              </Button>
+            )}
+            {isLoggedIn ? (
+              <Link to="/assistant">
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="h-11 w-full border-white/30 bg-white/5 px-7 text-sm font-medium text-white backdrop-blur-sm hover:bg-white/10 hover:text-white sm:w-auto"
+                >
+                  Ver asistente técnico
+                </Button>
+              </Link>
+            ) : (
+              <Button
+                variant="outline"
+                size="lg"
+                className="h-11 border-white/30 bg-white/5 px-7 text-sm font-medium text-white backdrop-blur-sm hover:bg-white/10 hover:text-white"
+                onClick={() => onOpenAuth("login")}
+              >
+                Ver asistente técnico
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -604,47 +492,11 @@ function LandingPage() {
     <div className="min-h-screen bg-background text-foreground flex flex-col justify-between">
       <LandingNavbar onOpenAuth={openAuth} />
 
-      <main className="mx-auto max-w-6xl px-6 pt-28 pb-16 flex-1 w-full">
-        {/* Apple Minimalist Hero */}
-        <section className="text-center max-w-3xl mx-auto mt-8 mb-16">
-          <div className="inline-flex items-center gap-2 rounded-full border border-border bg-muted/40 px-3 py-1 text-xs font-medium text-muted-foreground mb-6">
-            <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-            Sistema de Gestión de Equipaje y Control de Peso
-          </div>
+      <CinematicHero onOpenAuth={openAuth} />
 
-          <h1 className="text-4xl sm:text-6xl font-bold tracking-tight text-foreground leading-[1.1]">
-            Equipaje calibrado al gramo.
-            <br />
-            <span className="text-muted-foreground font-medium">
-              Viajes sin sorpresas en el aeropuerto.
-            </span>
-          </h1>
+      <main className="mx-auto max-w-6xl px-6 pb-16 flex-1 w-full">
+        <HowItWorksCarousel />
 
-          <p className="text-base sm:text-lg text-muted-foreground mt-6 leading-relaxed max-w-2xl mx-auto">
-            Calcula el peso reglamentario por aerolínea, anticipa las condiciones climáticas en tu destino
-            y optimiza cada artículo con exactitud matemática.
-          </p>
-
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-8">
-            <Link to="/dashboard">
-              <Button size="lg" className="h-10 px-6 text-sm font-medium">
-                Organizar mi viaje
-              </Button>
-            </Link>
-            <Link to="/assistant">
-              <Button variant="outline" size="lg" className="h-10 px-6 text-sm font-medium">
-                Ver asistente técnico
-              </Button>
-            </Link>
-          </div>
-        </section>
-
-        {/* Real Product Demo Section (Anti-Vibecoding #18) */}
-        <section className="mt-8">
-          <InteractiveLuggageSimulator />
-        </section>
-
-        {/* Architectural Tech Specs Section */}
         <TechnicalSpecsMatrix />
       </main>
 

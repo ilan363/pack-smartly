@@ -50,20 +50,23 @@ type SidebarContentProps = {
 function SidebarContent({ onNavigate }: SidebarContentProps) {
   const location = useLocation();
   const navigate = useNavigate();
+  const isLoggedIn = Boolean(useAuthStore((s) => s.email));
   const isAdmin = useAuthStore((s) => s.isAdmin);
   const { t } = useI18n();
 
-  const items = isAdmin
-    ? [
-        ...navigation,
-        {
-          nameKey: "nav.admin" as const,
-          shortNameKey: "nav.adminShort" as const,
-          href: "/admin",
-          icon: IconShieldCheck,
-        },
-      ]
-    : navigation;
+  const items = !isLoggedIn
+    ? []
+    : isAdmin
+      ? [
+          ...navigation,
+          {
+            nameKey: "nav.admin" as const,
+            shortNameKey: "nav.adminShort" as const,
+            href: "/admin",
+            icon: IconShieldCheck,
+          },
+        ]
+      : navigation;
 
   const closeAndRun = (action: () => void) => {
     action();
@@ -94,38 +97,40 @@ function SidebarContent({ onNavigate }: SidebarContentProps) {
         })}
       </nav>
 
-      <div className="shrink-0 border-t border-border/70 p-3 space-y-1">
-        <button
-          type="button"
-          onClick={() =>
-            closeAndRun(() => {
-              resetAppState();
-              toast.success(t("nav.resetSuccess"), {
-                description: t("nav.resetDescription"),
-              });
-              navigate({ to: "/dashboard" });
-            })
-          }
-          className="flex w-full cursor-pointer items-center gap-3 rounded-md px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-        >
-          <IconRefreshCw className="h-4 w-4" />
-          {t("nav.resetAll")}
-        </button>
-        <button
-          type="button"
-          onClick={() =>
-            closeAndRun(() => {
-              void logoutWithOAuth();
-              toast.success(t("nav.logoutSuccess"));
-              navigate({ to: "/" });
-            })
-          }
-          className="flex w-full cursor-pointer items-center gap-3 rounded-md px-3 py-2 text-xs font-medium text-destructive transition-colors hover:bg-destructive/10"
-        >
-          <IconLogOut className="h-4 w-4" />
-          {t("nav.signOut")}
-        </button>
-      </div>
+      {isLoggedIn ? (
+        <div className="shrink-0 border-t border-border/70 p-3 space-y-1">
+          <button
+            type="button"
+            onClick={() =>
+              closeAndRun(() => {
+                resetAppState();
+                toast.success(t("nav.resetSuccess"), {
+                  description: t("nav.resetDescription"),
+                });
+                navigate({ to: "/dashboard" });
+              })
+            }
+            className="flex w-full cursor-pointer items-center gap-3 rounded-md px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+          >
+            <IconRefreshCw className="h-4 w-4" />
+            {t("nav.resetAll")}
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              closeAndRun(() => {
+                void logoutWithOAuth();
+                toast.success(t("nav.logoutSuccess"));
+                navigate({ to: "/" });
+              })
+            }
+            className="flex w-full cursor-pointer items-center gap-3 rounded-md px-3 py-2 text-xs font-medium text-destructive transition-colors hover:bg-destructive/10"
+          >
+            <IconLogOut className="h-4 w-4" />
+            {t("nav.signOut")}
+          </button>
+        </div>
+      ) : null}
     </>
   );
 }
@@ -160,8 +165,11 @@ export function MobileAppSidebar({ open, onOpenChange }: MobileAppSidebarProps) 
 
 export function MobileBottomNav() {
   const location = useLocation();
+  const isLoggedIn = Boolean(useAuthStore((s) => s.email));
   const isAdmin = useAuthStore((s) => s.isAdmin);
   const { t } = useI18n();
+
+  if (!isLoggedIn) return null;
 
   const items = isAdmin
     ? [

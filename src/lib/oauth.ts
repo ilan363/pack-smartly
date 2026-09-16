@@ -12,12 +12,24 @@ export const OAUTH_PROVIDERS: {
   { id: "github", label: "GitHub", supabaseProvider: "github" },
 ];
 
+/** Hosts where the SPA only serves index.html at "/" (no deep-link rewrites). */
+const ROOT_ONLY_OAUTH_HOSTS = new Set(["travelwolf.online", "www.travelwolf.online"]);
+
+/**
+ * Where Supabase should send the browser after Google/GitHub auth.
+ * Must match exactly an entry in Supabase → Authentication → URL Configuration → Redirect URLs.
+ * If it does not match, Supabase silently falls back to the project Site URL
+ * (often https://travelwolf.online/), which looks like a successful login that "ends" there.
+ */
 export function getOAuthRedirectUrl(): string {
-  const origin = window.location.origin;
-  // Nominalia/nginx serves index.html only at "/". Vite/Vercel handle /auth/callback in dev.
-  if (import.meta.env.PROD) {
+  const { origin, hostname } = window.location;
+
+  // Nominalia/nginx on travelwolf only serves the app at "/".
+  if (ROOT_ONLY_OAUTH_HOSTS.has(hostname)) {
     return `${origin}/`;
   }
+
+  // Localhost, Vercel, and other hosts with SPA rewrites use the dedicated callback route.
   return `${origin}/auth/callback`;
 }
 
@@ -177,7 +189,7 @@ function mapOAuthError(message: string): string {
   }
 
   if (lower.includes("redirect") && lower.includes("not allowed")) {
-    return "URL de redirección no permitida. Agregá tu callback en Supabase → Authentication → URL Configuration.";
+    return "URL de redirección no permitida. Agregá la URL exacta (p. ej. https://tu-dominio/auth/callback) en Supabase → Authentication → URL Configuration → Redirect URLs. Si no está, Supabase cae en la Site URL (p. ej. travelwolf.online).";
   }
 
   if (lower.includes("unable to exchange external code")) {

@@ -19,7 +19,7 @@ let oauthCallbackHandled = false;
 
 /**
  * Completes Supabase OAuth when the provider redirects back with ?code= or ?error=.
- * Runs on any route so production can use "/" (nginx) instead of "/auth/callback".
+ * Runs on any route so travelwolf.online (nginx) can use "/" while Vercel/local use "/auth/callback".
  */
 export function useOAuthCallbackHandler() {
   const navigate = useNavigate();

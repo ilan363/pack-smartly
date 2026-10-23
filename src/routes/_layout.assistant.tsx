@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useRef, useEffect } from "react";
-import { Bot, Send, User, Sliders, Plus, Trash2, BookmarkPlus, Loader2, CloudSun, ChevronDown, AlertTriangle } from "lucide-react";
+import { Bot, Send, User, Sliders, Plus, Trash2, BookmarkPlus, Loader2, CloudSun, ChevronDown, AlertTriangle, Scale } from "lucide-react";
 import { RecommendationListSkeleton } from "@/components/ui/apple-skeleton";
 import { DailyForecastCards } from "@/components/weather/DailyForecastCards";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -36,6 +36,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { useI18n } from "@/hooks/use-i18n";
 import { ITEM_CATEGORY_IDS } from "@/lib/i18n/categories";
+import { planReduceSuitcaseWeight } from "@/lib/reduce-suitcase-weight";
+import type { Item } from "@/lib/suitcases-store";
 
 export const Route = createFileRoute("/_layout/assistant")({
   component: AssistantPage,
@@ -295,6 +297,54 @@ function AssistantPage() {
     );
     const weightExcessKg = computeWeightExcessKg(total, suggestion.suitcaseCapacityKg);
     updateSuggestionInStore(msgId, { ...suggestion, totalWeight: total, weightExcessKg });
+  };
+
+  const reduceSuggestionWeight = (msg: Message) => {
+    const suggestion = msg.suggestion;
+    const capacity = suggestion?.suitcaseCapacityKg;
+    if (!suggestion || !capacity) return;
+
+    const indexed: Item[] = suggestion.items.map((it, i) => ({
+      id: `sug-${i}`,
+      name: it.name,
+      category: it.category,
+      quantity: it.quantity ?? 1,
+      weight: it.weight,
+    }));
+    const plan = planReduceSuitcaseWeight(indexed, capacity);
+    const changeCount = plan.removeItemIds.length + plan.quantityUpdates.length;
+    if (changeCount === 0) {
+      toast.info(t("suitcases.reduceWeightNothing"));
+      return;
+    }
+
+    const removeSet = new Set(plan.removeItemIds);
+    const qtyMap = new Map(plan.quantityUpdates.map((u) => [u.itemId, u.quantity]));
+    const newItems = suggestion.items
+      .map((it, i) => ({ it, id: `sug-${i}` }))
+      .filter(({ id }) => !removeSet.has(id))
+      .map(({ it, id }) => ({
+        ...it,
+        quantity: qtyMap.get(id) ?? it.quantity ?? 1,
+      }));
+
+    updateMessageSuggestion(msg.id, { ...suggestion, items: newItems });
+
+    if (plan.stillOverKg > 0) {
+      toast.warning(
+        t("suitcases.reduceWeightPartial", {
+          kg: plan.savedKg.toFixed(2),
+          remaining: plan.stillOverKg.toFixed(2),
+        }),
+      );
+    } else {
+      toast.success(
+        t("suitcases.reduceWeightDone", {
+          count: changeCount,
+          kg: plan.savedKg.toFixed(2),
+        }),
+      );
+    }
   };
 
   const editingMsg = messages.find((m) => m.id === editingMsgId);
@@ -636,10 +686,31 @@ function AssistantPage() {
                       </div>
                     </div>
 
-                    <div className="mt-4 flex flex-col gap-2 sm:mt-5 sm:flex-row sm:flex-wrap">
-                      <Button onClick={() => openCreate(msg)} className="w-full sm:flex-1 sm:min-w-[180px]">
-                        {t("assistant.createSuitcase")}
-                      </Button>
+                    <div className="mt-4 flex flex-col gap-2 sm:mt-5 sm:flex-row sm:flex-wrap sm:items-center">
+                      {msg.suggestion.weightExcessKg ? (
+                        <>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => reduceSuggestionWeight(msg)}
+                            className="w-full sm:flex-1 sm:min-w-[160px]"
+                          >
+                            <Scale className="h-4 w-4 mr-2 shrink-0" />
+                            {t("suitcases.reduceWeight")}
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => openCreate(msg)}
+                            className="w-full sm:w-auto sm:shrink-0"
+                          >
+                            {t("assistant.createSuitcase")}
+                          </Button>
+                        </>
+                      ) : (
+                        <Button onClick={() => openCreate(msg)} className="w-full sm:flex-1 sm:min-w-[180px]">
+                          {t("assistant.createSuitcase")}
+                        </Button>
+                      )}
                       <Button variant="secondary" onClick={() => saveAsChecklist(msg)} className="w-full sm:w-auto">
                         <BookmarkPlus className="h-4 w-4 mr-1" /> {t("assistant.saveList")}
                       </Button>

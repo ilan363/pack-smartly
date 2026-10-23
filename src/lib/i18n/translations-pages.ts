@@ -156,7 +156,7 @@ export const pageTranslations = {
     "assistant.errNameMaxWeight": "Completá nombre y peso máximo.",
     "assistant.createSuitcaseSuccess": "Valija \"{name}\" creada con {count} items.",
     "assistant.buildSuitcase": "Armar valija",
-    "assistant.noAutoReduce": "Necesitás más capacidad en la valija; no redujimos prendas ni ítems automáticamente.",
+    "assistant.noAutoReduce": "Usá «Reducir peso» para sacar de la lista lo que podés llevar en mochila o bolso personal.",
     "assistant.ofCapacity": "de {capacity} kg",
     "assistant.itemsRecommended": "Prendas recomendadas",
     "assistant.itemsGroupedByCategory": "{count} items agrupados por categoría",
@@ -201,6 +201,13 @@ export const pageTranslations = {
     "suitcases.exceededBy": "Excedido por {kg} kg",
     "suitcases.freeKg": "{kg} kg libres",
     "suitcases.overWeightHint": "Superaste el peso permitido. Revisá el costo estimado de exceso abajo.",
+    "suitcases.reduceWeight": "Reducir peso",
+    "suitcases.reduceWeightDone":
+      "Sacamos {count} artículo(s) de la valija ({kg} kg). Llevalos en mochila o bolso personal.",
+    "suitcases.reduceWeightPartial":
+      "Ahorraste {kg} kg sacando lo prescindible, pero aún excedés {remaining} kg. Revisá cantidades a mano.",
+    "suitcases.reduceWeightNothing":
+      "No hay documentos, electrónica u otros artículos de mano para sacar. Editá la lista manualmente.",
     "suitcases.nearLimitHint": "Atención: Estás muy cerca del límite de peso permitido.",
     "suitcases.itemRemoved": "\"{name}\" eliminado",
     "suitcases.editItemDesc": "Modificá los datos del objeto.",
@@ -547,7 +554,7 @@ export const pageTranslations = {
     "assistant.errNameMaxWeight": "Complete name and maximum weight.",
     "assistant.createSuitcaseSuccess": "Suitcase \"{name}\" created with {count} items.",
     "assistant.buildSuitcase": "Build suitcase",
-    "assistant.noAutoReduce": "You need a larger suitcase capacity; we did not automatically remove clothing or items.",
+    "assistant.noAutoReduce": "Use «Reduce weight» to remove items you can carry in a backpack or personal bag.",
     "assistant.ofCapacity": "of {capacity} kg",
     "assistant.itemsRecommended": "Recommended items",
     "assistant.itemsGroupedByCategory": "{count} items grouped by category",
@@ -592,6 +599,13 @@ export const pageTranslations = {
     "suitcases.exceededBy": "Exceeded by {kg} kg",
     "suitcases.freeKg": "{kg} kg free",
     "suitcases.overWeightHint": "You exceeded the allowed weight. Check estimated excess cost below.",
+    "suitcases.reduceWeight": "Reduce weight",
+    "suitcases.reduceWeightDone":
+      "Removed {count} item(s) from the suitcase ({kg} kg). Carry them in a backpack or personal bag.",
+    "suitcases.reduceWeightPartial":
+      "You saved {kg} kg by moving non-essentials, but you're still {remaining} kg over. Adjust quantities manually.",
+    "suitcases.reduceWeightNothing":
+      "No documents, electronics, or carry-on items to remove. Edit the list manually.",
     "suitcases.nearLimitHint": "Warning: you're very close to the allowed weight limit.",
     "suitcases.itemRemoved": "\"{name}\" removed",
     "suitcases.editItemDesc": "Edit item details.",
@@ -938,7 +952,7 @@ export const pageTranslations = {
     "assistant.errNameMaxWeight": "Preencha nome e peso máximo.",
     "assistant.createSuitcaseSuccess": "Mala \"{name}\" criada com {count} itens.",
     "assistant.buildSuitcase": "Montar mala",
-    "assistant.noAutoReduce": "Você precisa de mais capacidade na mala; não reduzimos roupas nem itens automaticamente.",
+    "assistant.noAutoReduce": "Use «Reduzir peso» para tirar da lista o que pode ir na mochila ou bolsa pessoal.",
     "assistant.ofCapacity": "de {capacity} kg",
     "assistant.itemsRecommended": "Itens recomendados",
     "assistant.itemsGroupedByCategory": "{count} itens agrupados por categoria",
@@ -983,6 +997,13 @@ export const pageTranslations = {
     "suitcases.exceededBy": "Excedido em {kg} kg",
     "suitcases.freeKg": "{kg} kg livres",
     "suitcases.overWeightHint": "Você ultrapassou o peso permitido. Veja o custo estimado de excesso abaixo.",
+    "suitcases.reduceWeight": "Reduzir peso",
+    "suitcases.reduceWeightDone":
+      "Removemos {count} item(ns) da mala ({kg} kg). Leve-os na mochila ou bolsa pessoal.",
+    "suitcases.reduceWeightPartial":
+      "Você economizou {kg} kg, mas ainda excede {remaining} kg. Ajuste as quantidades manualmente.",
+    "suitcases.reduceWeightNothing":
+      "Não há documentos, eletrônicos ou itens de mão para remover. Edite a lista manualmente.",
     "suitcases.nearLimitHint": "Atenção: você está muito perto do limite de peso permitido.",
     "suitcases.itemRemoved": "\"{name}\" removido",
     "suitcases.editItemDesc": "Edite os dados do item.",

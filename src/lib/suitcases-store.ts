@@ -44,6 +44,7 @@ type Actions = {
   addItem: (suitcaseId: string, item: Omit<Item, "id">) => void;
   updateItem: (suitcaseId: string, itemId: string, patch: Partial<Omit<Item, "id">>) => void;
   removeItem: (suitcaseId: string, itemId: string) => void;
+  removeItems: (suitcaseId: string, itemIds: string[]) => void;
   createFromSuggestion: (input: {
     name: string;
     destination: string;
@@ -119,6 +120,16 @@ export const useSuitcasesStore = create<State & Actions>()(
             sc.id === suitcaseId ? { ...sc, items: sc.items.filter((it) => it.id !== itemId) } : sc,
           ),
         })),
+
+      removeItems: (suitcaseId, itemIds) => {
+        if (itemIds.length === 0) return;
+        const drop = new Set(itemIds);
+        set((s) => ({
+          suitcases: s.suitcases.map((sc) =>
+            sc.id === suitcaseId ? { ...sc, items: sc.items.filter((it) => !drop.has(it.id)) } : sc,
+          ),
+        }));
+      },
 
       createFromSuggestion: (input) => {
         return get().addSuitcase(input);

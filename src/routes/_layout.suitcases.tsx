@@ -3,7 +3,7 @@ import { useState, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Trash2, Edit2, AlertCircle, Luggage } from "lucide-react";
+import { Plus, Trash2, Edit2, AlertCircle, Luggage, Scale } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -36,6 +36,7 @@ import {
 } from "@/lib/weight-explain";
 import { useI18n } from "@/hooks/use-i18n";
 import { ITEM_CATEGORY_IDS } from "@/lib/i18n/categories";
+import { planReduceSuitcaseWeight } from "@/lib/reduce-suitcase-weight";
 
 export const Route = createFileRoute("/_layout/suitcases")({
   component: SuitcasesPage,
@@ -119,6 +120,7 @@ function SuitcasesPage() {
   const addItem = useSuitcasesStore((s) => s.addItem);
   const updateItem = useSuitcasesStore((s) => s.updateItem);
   const removeItem = useSuitcasesStore((s) => s.removeItem);
+  const removeItems = useSuitcasesStore((s) => s.removeItems);
 
   const active = useMemo(
     () => suitcases.find((s) => s.id === activeId) ?? suitcases[0],
@@ -195,6 +197,34 @@ function SuitcasesPage() {
     }
   };
 
+  const handleReduceWeight = () => {
+    const plan = planReduceSuitcaseWeight(active.items, active.maxWeight);
+    const changeCount = plan.removeItemIds.length + plan.quantityUpdates.length;
+    if (changeCount === 0) {
+      toast.info(t("suitcases.reduceWeightNothing"));
+      return;
+    }
+    removeItems(active.id, plan.removeItemIds);
+    for (const update of plan.quantityUpdates) {
+      updateItem(active.id, update.itemId, { quantity: update.quantity });
+    }
+    if (plan.stillOverKg > 0) {
+      toast.warning(
+        t("suitcases.reduceWeightPartial", {
+          kg: plan.savedKg.toFixed(2),
+          remaining: plan.stillOverKg.toFixed(2),
+        }),
+      );
+    } else {
+      toast.success(
+        t("suitcases.reduceWeightDone", {
+          count: changeCount,
+          kg: plan.savedKg.toFixed(2),
+        }),
+      );
+    }
+  };
+
   return (
     <div className="space-y-8 max-w-5xl mx-auto">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -253,9 +283,21 @@ function SuitcasesPage() {
           />
         </div>
         {percentage > 100 ? (
-          <div className="flex items-center gap-2 text-red-600 text-sm mt-3 bg-red-500/10 p-2 rounded-md">
-            <AlertCircle className="h-4 w-4" />
-            {t("suitcases.overWeightHint")}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-red-600 text-sm mt-3 bg-red-500/10 p-3 rounded-md">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              {t("suitcases.overWeightHint")}
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              className="shrink-0 border-red-200 dark:border-red-900"
+              onClick={handleReduceWeight}
+            >
+              <Scale className="h-4 w-4 mr-2" />
+              {t("suitcases.reduceWeight")}
+            </Button>
           </div>
         ) : percentage > 90 ? (
           <div className="flex items-center gap-2 text-red-500 text-sm mt-3 bg-red-500/10 p-2 rounded-md">

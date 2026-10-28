@@ -9,60 +9,30 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as LayoutRouteImport } from './routes/_layout'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
-import { Route as LayoutWeatherRouteImport } from './routes/_layout.weather'
-import { Route as LayoutSuitcasesRouteImport } from './routes/_layout.suitcases'
-import { Route as LayoutSavedSuitcasesRouteImport } from './routes/_layout.saved-suitcases'
-import { Route as LayoutDashboardRouteImport } from './routes/_layout.dashboard'
-import { Route as LayoutContactRouteImport } from './routes/_layout.contact'
-import { Route as LayoutChecklistsRouteImport } from './routes/_layout.checklists'
-import { Route as LayoutAssistantRouteImport } from './routes/_layout.assistant'
+import { Route as LayoutRouteImport } from './routes/_layout'
 import { Route as LayoutAdminRouteImport } from './routes/_layout.admin'
+import { Route as LayoutAssistantRouteImport } from './routes/_layout.assistant'
+import { Route as LayoutChecklistsRouteImport } from './routes/_layout.checklists'
+import { Route as LayoutContactRouteImport } from './routes/_layout.contact'
+import { Route as LayoutDashboardRouteImport } from './routes/_layout.dashboard'
+import { Route as LayoutSavedSuitcasesRouteImport } from './routes/_layout.saved-suitcases'
+import { Route as LayoutSuitcasesRouteImport } from './routes/_layout.suitcases'
+import { Route as LayoutWeatherRouteImport } from './routes/_layout.weather'
+import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 
-const LayoutRoute = LayoutRouteImport.update({
-  id: '/_layout',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthCallbackRoute = AuthCallbackRouteImport.update({
-  id: '/auth/callback',
-  path: '/auth/callback',
+const LayoutRoute = LayoutRouteImport.update({
+  id: '/_layout',
   getParentRoute: () => rootRouteImport,
 } as any)
-const LayoutWeatherRoute = LayoutWeatherRouteImport.update({
-  id: '/weather',
-  path: '/weather',
-  getParentRoute: () => LayoutRoute,
-} as any)
-const LayoutSuitcasesRoute = LayoutSuitcasesRouteImport.update({
-  id: '/suitcases',
-  path: '/suitcases',
-  getParentRoute: () => LayoutRoute,
-} as any)
-const LayoutSavedSuitcasesRoute = LayoutSavedSuitcasesRouteImport.update({
-  id: '/saved-suitcases',
-  path: '/saved-suitcases',
-  getParentRoute: () => LayoutRoute,
-} as any)
-const LayoutDashboardRoute = LayoutDashboardRouteImport.update({
-  id: '/dashboard',
-  path: '/dashboard',
-  getParentRoute: () => LayoutRoute,
-} as any)
-const LayoutContactRoute = LayoutContactRouteImport.update({
-  id: '/contact',
-  path: '/contact',
-  getParentRoute: () => LayoutRoute,
-} as any)
-const LayoutChecklistsRoute = LayoutChecklistsRouteImport.update({
-  id: '/checklists',
-  path: '/checklists',
+const LayoutAdminRoute = LayoutAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
   getParentRoute: () => LayoutRoute,
 } as any)
 const LayoutAssistantRoute = LayoutAssistantRouteImport.update({
@@ -70,10 +40,40 @@ const LayoutAssistantRoute = LayoutAssistantRouteImport.update({
   path: '/assistant',
   getParentRoute: () => LayoutRoute,
 } as any)
-const LayoutAdminRoute = LayoutAdminRouteImport.update({
-  id: '/admin',
-  path: '/admin',
+const LayoutChecklistsRoute = LayoutChecklistsRouteImport.update({
+  id: '/checklists',
+  path: '/checklists',
   getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutContactRoute = LayoutContactRouteImport.update({
+  id: '/contact',
+  path: '/contact',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutDashboardRoute = LayoutDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutSavedSuitcasesRoute = LayoutSavedSuitcasesRouteImport.update({
+  id: '/saved-suitcases',
+  path: '/saved-suitcases',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutSuitcasesRoute = LayoutSuitcasesRouteImport.update({
+  id: '/suitcases',
+  path: '/suitcases',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutWeatherRoute = LayoutWeatherRouteImport.update({
+  id: '/weather',
+  path: '/weather',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const AuthCallbackRoute = AuthCallbackRouteImport.update({
+  id: '/auth/callback',
+  path: '/auth/callback',
+  getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -162,13 +162,6 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/_layout': {
-      id: '/_layout'
-      path: ''
-      fullPath: '/'
-      preLoaderRoute: typeof LayoutRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/': {
       id: '/'
       path: '/'
@@ -176,53 +169,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/auth/callback': {
-      id: '/auth/callback'
-      path: '/auth/callback'
-      fullPath: '/auth/callback'
-      preLoaderRoute: typeof AuthCallbackRouteImport
+    '/_layout': {
+      id: '/_layout'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof LayoutRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_layout/weather': {
-      id: '/_layout/weather'
-      path: '/weather'
-      fullPath: '/weather'
-      preLoaderRoute: typeof LayoutWeatherRouteImport
-      parentRoute: typeof LayoutRoute
-    }
-    '/_layout/suitcases': {
-      id: '/_layout/suitcases'
-      path: '/suitcases'
-      fullPath: '/suitcases'
-      preLoaderRoute: typeof LayoutSuitcasesRouteImport
-      parentRoute: typeof LayoutRoute
-    }
-    '/_layout/saved-suitcases': {
-      id: '/_layout/saved-suitcases'
-      path: '/saved-suitcases'
-      fullPath: '/saved-suitcases'
-      preLoaderRoute: typeof LayoutSavedSuitcasesRouteImport
-      parentRoute: typeof LayoutRoute
-    }
-    '/_layout/dashboard': {
-      id: '/_layout/dashboard'
-      path: '/dashboard'
-      fullPath: '/dashboard'
-      preLoaderRoute: typeof LayoutDashboardRouteImport
-      parentRoute: typeof LayoutRoute
-    }
-    '/_layout/contact': {
-      id: '/_layout/contact'
-      path: '/contact'
-      fullPath: '/contact'
-      preLoaderRoute: typeof LayoutContactRouteImport
-      parentRoute: typeof LayoutRoute
-    }
-    '/_layout/checklists': {
-      id: '/_layout/checklists'
-      path: '/checklists'
-      fullPath: '/checklists'
-      preLoaderRoute: typeof LayoutChecklistsRouteImport
+    '/_layout/admin': {
+      id: '/_layout/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof LayoutAdminRouteImport
       parentRoute: typeof LayoutRoute
     }
     '/_layout/assistant': {
@@ -232,12 +190,54 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutAssistantRouteImport
       parentRoute: typeof LayoutRoute
     }
-    '/_layout/admin': {
-      id: '/_layout/admin'
-      path: '/admin'
-      fullPath: '/admin'
-      preLoaderRoute: typeof LayoutAdminRouteImport
+    '/_layout/checklists': {
+      id: '/_layout/checklists'
+      path: '/checklists'
+      fullPath: '/checklists'
+      preLoaderRoute: typeof LayoutChecklistsRouteImport
       parentRoute: typeof LayoutRoute
+    }
+    '/_layout/contact': {
+      id: '/_layout/contact'
+      path: '/contact'
+      fullPath: '/contact'
+      preLoaderRoute: typeof LayoutContactRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/dashboard': {
+      id: '/_layout/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof LayoutDashboardRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/saved-suitcases': {
+      id: '/_layout/saved-suitcases'
+      path: '/saved-suitcases'
+      fullPath: '/saved-suitcases'
+      preLoaderRoute: typeof LayoutSavedSuitcasesRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/suitcases': {
+      id: '/_layout/suitcases'
+      path: '/suitcases'
+      fullPath: '/suitcases'
+      preLoaderRoute: typeof LayoutSuitcasesRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/weather': {
+      id: '/_layout/weather'
+      path: '/weather'
+      fullPath: '/weather'
+      preLoaderRoute: typeof LayoutWeatherRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/auth/callback': {
+      id: '/auth/callback'
+      path: '/auth/callback'
+      fullPath: '/auth/callback'
+      preLoaderRoute: typeof AuthCallbackRouteImport
+      parentRoute: typeof rootRouteImport
     }
   }
 }

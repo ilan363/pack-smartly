@@ -1,35 +1,35 @@
-import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const distRoot = "dist";
-const clientDir = join(distRoot, "client");
-const stagingDir = join(distRoot, ".deploy-staging");
+const nitroPublicDir = join(".output", "public");
+const legacyClientDir = join(distRoot, "client");
 
-if (!existsSync(clientDir)) {
-  console.error("[flatten-dist] No se encontró dist/client. ¿Falló el build de Vite?");
+/** @returns {string | undefined} */
+function resolveSourceDir() {
+  if (existsSync(nitroPublicDir)) {
+    return nitroPublicDir;
+  }
+  if (existsSync(legacyClientDir)) {
+    return legacyClientDir;
+  }
+  return undefined;
+}
+
+const sourceDir = resolveSourceDir();
+if (!sourceDir) {
+  console.error(
+    "[flatten-dist] No se encontró .output/public ni dist/client. ¿Falló vite build?",
+  );
   process.exit(1);
 }
 
-if (existsSync(stagingDir)) {
-  rmSync(stagingDir, { recursive: true, force: true });
+if (existsSync(distRoot)) {
+  rmSync(distRoot, { recursive: true, force: true });
 }
 
-cpSync(clientDir, stagingDir, { recursive: true });
-rmSync(join(distRoot, "server"), { recursive: true, force: true });
-rmSync(clientDir, { recursive: true, force: true });
-
-for (const entry of readdirSync(stagingDir)) {
-  const src = join(stagingDir, entry);
-  const dest = join(distRoot, entry);
-
-  if (existsSync(dest)) {
-    rmSync(dest, { recursive: true, force: true });
-  }
-
-  cpSync(src, dest, { recursive: true });
-}
-
-rmSync(stagingDir, { recursive: true, force: true });
+mkdirSync(distRoot, { recursive: true });
+cpSync(sourceDir, distRoot, { recursive: true });
 
 // nginx (Nominalia) only serves real files — copy index.html for legacy /auth/callback links.
 const indexHtmlPath = join(distRoot, "index.html");
@@ -40,4 +40,4 @@ if (existsSync(indexHtmlPath)) {
   writeFileSync(join(callbackDir, "index.html"), indexHtml);
 }
 
-console.log("[flatten-dist] dist/ listo para subir (index.html + assets)");
+console.log(`[flatten-dist] dist/ listo para Vercel (desde ${sourceDir})`);

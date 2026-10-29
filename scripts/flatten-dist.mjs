@@ -2,11 +2,16 @@ import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } fr
 import { join } from "node:path";
 
 const distRoot = "dist";
+const vercelStaticDir = join(".vercel", "output", "static");
 const nitroPublicDir = join(".output", "public");
 const legacyClientDir = join(distRoot, "client");
 
 /** @returns {string | undefined} */
 function resolveSourceDir() {
+  // En CI de Vercel (VERCEL=1) Nitro escribe aquí, no en .output/public.
+  if (existsSync(vercelStaticDir)) {
+    return vercelStaticDir;
+  }
   if (existsSync(nitroPublicDir)) {
     return nitroPublicDir;
   }
@@ -19,7 +24,7 @@ function resolveSourceDir() {
 const sourceDir = resolveSourceDir();
 if (!sourceDir) {
   console.error(
-    "[flatten-dist] No se encontró .output/public ni dist/client. ¿Falló vite build?",
+    "[flatten-dist] No se encontró .vercel/output/static, .output/public ni dist/client. ¿Falló vite build?",
   );
   process.exit(1);
 }

@@ -15,7 +15,7 @@ export const dynamicTranslations = {
     "auth.err.oauth_invalid_email": "No se pudo obtener un email válido del proveedor",
     "auth.err.oauth_admin_password": "Para administrar, ingresá desde el panel de administración con tu contraseña.",
 
-    "auth.oauth.not_configured": "OAuth no está configurado en esta aplicación",
+    "auth.oauth.not_configured": "Firebase Authentication no está configurado en esta aplicación",
     "auth.oauth.failed": "No se pudo completar el inicio de sesión",
     "auth.oauth.success": "Sesión iniciada",
     "auth.oauth.completing": "Completando inicio de sesión…",
@@ -139,7 +139,7 @@ export const dynamicTranslations = {
     "auth.err.oauth_invalid_email": "Could not get a valid email from the provider",
     "auth.err.oauth_admin_password": "To administer, sign in from the admin panel with your password.",
 
-    "auth.oauth.not_configured": "OAuth is not configured in this app",
+    "auth.oauth.not_configured": "Firebase Authentication is not configured in this app",
     "auth.oauth.failed": "Could not complete sign-in",
     "auth.oauth.success": "Signed in",
     "auth.oauth.completing": "Completing sign-in…",
@@ -263,7 +263,7 @@ export const dynamicTranslations = {
     "auth.err.oauth_invalid_email": "Não foi possível obter um email válido do provedor",
     "auth.err.oauth_admin_password": "Para administrar, entre pelo painel de administração com sua senha.",
 
-    "auth.oauth.not_configured": "OAuth não está configurado neste aplicativo",
+    "auth.oauth.not_configured": "O Firebase Authentication não está configurado neste aplicativo",
     "auth.oauth.failed": "Não foi possível concluir o login",
     "auth.oauth.success": "Sessão iniciada",
     "auth.oauth.completing": "Concluindo login…",

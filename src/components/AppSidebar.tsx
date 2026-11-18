@@ -11,7 +11,7 @@ import {
   IconBaggageClaim,
 } from "@/components/ui/icons";
 import { useAuthStore } from "@/lib/auth-store";
-import { logoutWithOAuth } from "@/hooks/use-supabase-auth-sync";
+import { logoutWithFirebase } from "@/hooks/use-firebase-auth-sync";
 import { resetAppState } from "@/lib/reset-app";
 import { toast } from "sonner";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
@@ -119,9 +119,12 @@ function SidebarContent({ onNavigate }: SidebarContentProps) {
             type="button"
             onClick={() =>
               closeAndRun(() => {
-                void logoutWithOAuth();
-                toast.success(t("nav.logoutSuccess"));
-                navigate({ to: "/" });
+                void logoutWithFirebase()
+                  .then(() => {
+                    toast.success(t("nav.logoutSuccess"));
+                    navigate({ to: "/" });
+                  })
+                  .catch(() => toast.error(t("auth.oauthFailed")));
               })
             }
             className="flex w-full cursor-pointer items-center gap-3 rounded-md px-3 py-2 text-xs font-medium text-destructive transition-colors hover:bg-destructive/10"

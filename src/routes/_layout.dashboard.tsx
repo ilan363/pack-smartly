@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { useSuitcasesStore, totalWeight } from "@/lib/suitcases-store";
 import { AuthDialog } from "@/components/AuthDialog";
 import { useAuthStore } from "@/lib/auth-store";
-import { logoutWithOAuth } from "@/hooks/use-supabase-auth-sync";
+import { logoutWithFirebase } from "@/hooks/use-firebase-auth-sync";
 import { useI18n } from "@/hooks/use-i18n";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -60,7 +60,11 @@ function DashboardPage() {
             <div className="flex items-center gap-2 border border-border rounded-lg px-3 py-2 bg-card">
               <ShieldCheck className="h-4 w-4 text-primary" />
               <span className="text-sm font-medium">{authedEmail}</span>
-              <Button variant="ghost" size="sm" onClick={() => { void logoutWithOAuth(); toast.success(t("nav.logoutSuccess")); }}>
+              <Button variant="ghost" size="sm" onClick={() => {
+                void logoutWithFirebase()
+                  .then(() => toast.success(t("nav.logoutSuccess")))
+                  .catch(() => toast.error(t("auth.oauthFailed")));
+              }}>
                 <LogOut className="h-4 w-4 mr-1" /> {t("nav.signOut")}
               </Button>
             </div>

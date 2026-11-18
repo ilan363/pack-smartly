@@ -1,5 +1,4 @@
 import { useEffect, useState, type FormEvent, type KeyboardEvent } from "react";
-import { Eye, EyeOff, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -12,8 +11,16 @@ import {
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { OAuthButtons } from "@/components/OAuthButtons";
-import { useAuthStore } from "@/lib/auth-store";
-import { syncWebEmailUser } from "@/lib/user-registry";
+import { ADMIN_EMAIL, useAuthStore } from "@/lib/auth-store";
+import { mapFirebaseAuthError } from "@/lib/firebase-auth-errors";
+import { auth } from "@/integrations/firebase/client";
+import {
+  createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
+  signInWithEmailAndPassword,
+  signOut,
+} from "firebase/auth";
+import { syncUserToRegistry } from "@/lib/user-registry";
 import { useI18n } from "@/hooks/use-i18n";
 import { toast } from "sonner";
 import { IconEye, IconEyeOff, IconShieldCheck } from "@/components/ui/icons";
@@ -87,10 +94,7 @@ export function AuthDialog({
   onAdminSuccess,
   defaultTab = "login",
 }: AuthDialogProps) {
-  const login = useAuthStore((s) => s.login);
-  const loginAdmin = useAuthStore((s) => s.loginAdmin);
-  const register = useAuthStore((s) => s.register);
-  const resetPassword = useAuthStore((s) => s.resetPassword);
+  const setFirebaseSession = useAuthStore((state) => state.setFirebaseSession);
   const { t, tAuthError } = useI18n();
   const [tab, setTab] = useState<AuthTab>(defaultTab);
   const [email, setEmail] = useState("");
@@ -118,15 +122,20 @@ export function AuthDialog({
   };
 
   const handleLogin = async () => {
-    const res = login(email, password);
-    if (!res.ok) {
-      toast.error(tAuthError(res.error));
+    if (email.trim().toLowerCase() === ADMIN_EMAIL) {
+      toast.error(tAuthError("auth.err.use_admin_login"));
       return;
     }
 
     setSubmitting(true);
     try {
-      const synced = await syncWebEmailUser(email);
+      const credential = await signInWithEmailAndPassword(
+        auth,
+        email.trim().toLowerCase(),
+        password,
+      );
+      setFirebaseSession(credential.user.email ?? email, null);
+      const synced = await syncUserToRegistry(credential.user, "email");
       if (!synced) {
         toast.warning(t("auth.registrySyncWarning"));
       }
@@ -134,20 +143,38 @@ export function AuthDialog({
       resetForm();
       onOpenChange(false);
       onSuccess?.();
+    } catch (error) {
+      toast.error(tAuthError(mapFirebaseAuthError(error)));
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleAdminLogin = () => {
-    const res = loginAdmin(email, password);
-    if (res.ok) {
+  const handleAdminLogin = async () => {
+    setSubmitting(true);
+    try {
+      const credential = await signInWithEmailAndPassword(
+        auth,
+        email.trim().toLowerCase(),
+        password,
+      );
+      if (credential.user.email?.trim().toLowerCase() !== ADMIN_EMAIL) {
+        await signOut(auth);
+        toast.error(tAuthError("auth.err.access_denied"));
+        return;
+      }
+
+      setFirebaseSession(credential.user.email, null);
+      const synced = await syncUserToRegistry(credential.user, "email");
+      if (!synced) toast.warning(t("auth.registrySyncWarning"));
       toast.success(t("auth.adminSuccess"));
       resetForm();
       onOpenChange(false);
       onAdminSuccess?.();
-    } else {
-      toast.error(tAuthError(res.error));
+    } catch (error) {
+      toast.error(tAuthError(mapFirebaseAuthError(error)));
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -157,15 +184,20 @@ export function AuthDialog({
       return;
     }
 
-    const res = register(email, password);
-    if (!res.ok) {
-      toast.error(tAuthError(res.error));
+    if (email.trim().toLowerCase() === ADMIN_EMAIL) {
+      toast.error(tAuthError("auth.err.email_cannot_register"));
       return;
     }
 
     setSubmitting(true);
     try {
-      const synced = await syncWebEmailUser(email, password, { isRegistration: true });
+      const credential = await createUserWithEmailAndPassword(
+        auth,
+        email.trim().toLowerCase(),
+        password,
+      );
+      setFirebaseSession(credential.user.email ?? email, null);
+      const synced = await syncUserToRegistry(credential.user, "email");
       if (!synced) {
         toast.warning(t("auth.registrySyncWarning"));
       }
@@ -173,33 +205,22 @@ export function AuthDialog({
       resetForm();
       onOpenChange(false);
       onSuccess?.();
+    } catch (error) {
+      toast.error(tAuthError(mapFirebaseAuthError(error)));
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleResetPassword = async () => {
-    if (password !== confirmPassword) {
-      toast.error(t("auth.passwordMismatch"));
-      return;
-    }
-
-    const res = resetPassword(email, password);
-    if (!res.ok) {
-      toast.error(tAuthError(res.error));
-      return;
-    }
-
     setSubmitting(true);
     try {
-      const synced = await syncWebEmailUser(email, password, { isRegistration: true });
-      if (!synced) {
-        toast.warning(t("auth.registrySyncWarning"));
-      }
-      toast.success(t("auth.resetPasswordSuccess"), { description: email });
+      await sendPasswordResetEmail(auth, email.trim());
+      toast.success(t("auth.resetPasswordSuccess"), { description: email.trim() });
       resetForm();
       onOpenChange(false);
-      onSuccess?.();
+    } catch (error) {
+      toast.error(tAuthError(mapFirebaseAuthError(error)));
     } finally {
       setSubmitting(false);
     }
@@ -209,7 +230,7 @@ export function AuthDialog({
     e?.preventDefault();
     if (submitting) return;
     if (tab === "login") void handleLogin();
-    else if (tab === "admin") handleAdminLogin();
+    else if (tab === "admin") void handleAdminLogin();
     else if (tab === "forgot") void handleResetPassword();
     else void handleRegister();
   };
@@ -255,7 +276,7 @@ export function AuthDialog({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder={t("auth.adminEmailPlaceholder")}
-                onKeyDown={(e) => e.key === "Enter" && handleAdminLogin()}
+                onKeyDown={(e) => e.key === "Enter" && void handleAdminLogin()}
               />
             </div>
             <PasswordField
@@ -267,7 +288,7 @@ export function AuthDialog({
               onToggleShow={() => setShowPassword((prev) => !prev)}
               showLabel={t("auth.showPassword")}
               hideLabel={t("auth.hidePassword")}
-              onKeyDown={(e) => e.key === "Enter" && handleAdminLogin()}
+              onKeyDown={(e) => e.key === "Enter" && void handleAdminLogin()}
             />
           </div>
         ) : tab === "forgot" ? (
@@ -281,28 +302,6 @@ export function AuthDialog({
                 placeholder={t("auth.emailPlaceholder")}
               />
             </div>
-            <PasswordField
-              id="forgot-password"
-              label={t("auth.newPassword")}
-              value={password}
-              onChange={setPassword}
-              showPassword={showPassword}
-              onToggleShow={() => setShowPassword((prev) => !prev)}
-              showLabel={t("auth.showPassword")}
-              hideLabel={t("auth.hidePassword")}
-              placeholder={t("auth.passwordPlaceholder")}
-            />
-            <PasswordField
-              id="forgot-confirm-password"
-              label={t("auth.confirmPassword")}
-              value={confirmPassword}
-              onChange={setConfirmPassword}
-              showPassword={showConfirmPassword}
-              onToggleShow={() => setShowConfirmPassword((prev) => !prev)}
-              showLabel={t("auth.showPassword")}
-              hideLabel={t("auth.hidePassword")}
-              onKeyDown={(e) => e.key === "Enter" && handleResetPassword()}
-            />
           </div>
         ) : (
           <Tabs

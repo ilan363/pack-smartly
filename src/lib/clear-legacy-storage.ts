@@ -3,6 +3,7 @@ const LEGACY_STORAGE_KEYS = [
   "travel-wolf-chat",
   "travel-wolf-suitcases",
   "travel-wolf-checklists",
+  "pack-smartly-auth",
 ];
 
 /** Copia datos de claves viejas a las actuales si aún no existen. */

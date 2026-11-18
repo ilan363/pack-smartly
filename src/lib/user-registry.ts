@@ -1,5 +1,18 @@
+import {
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
+  orderBy,
+  query,
+  serverTimestamp,
+  setDoc,
+  type Timestamp,
+} from "firebase/firestore";
+import type { User } from "firebase/auth";
 import type { OAuthProviderId } from "@/lib/oauth";
-import { getSupabase, isSupabaseConfigured } from "@/lib/supabase/client";
+import { db } from "@/integrations/firebase/client";
 
 export type RegistryAuthMethod = "email" | OAuthProviderId;
 
@@ -10,189 +23,94 @@ export type RegistryUser = {
   lastLoginAt: number;
 };
 
-type AppUserRow = {
+type AppUserDocument = {
   email: string;
-  auth_method: string;
-  registered_at: string;
-  last_login_at: string;
+  authMethod: RegistryAuthMethod;
+  registeredAt: number | Timestamp;
+  lastLoginAt: number | Timestamp;
 };
 
-const TABLE = "app_users";
+const USERS_COLLECTION = "app_users";
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
 }
 
-function toRegistryUser(row: AppUserRow): RegistryUser {
-  const authMethod =
-    row.auth_method === "google" || row.auth_method === "github"
-      ? row.auth_method
-      : "email";
+function timestampToMillis(value: number | Timestamp): number {
+  return typeof value === "number" ? value : value.toMillis();
+}
 
+function toRegistryUser(data: AppUserDocument): RegistryUser {
   return {
-    email: row.email,
-    authMethod,
-    registeredAt: new Date(row.registered_at).getTime(),
-    lastLoginAt: new Date(row.last_login_at).getTime(),
+    email: data.email,
+    authMethod:
+      data.authMethod === "google" || data.authMethod === "github"
+        ? data.authMethod
+        : "email",
+    registeredAt: timestampToMillis(data.registeredAt),
+    lastLoginAt: timestampToMillis(data.lastLoginAt),
   };
 }
 
-function resolveAuthMethod(
-  oauthProvider: OAuthProviderId | null | undefined,
-): RegistryAuthMethod {
-  return oauthProvider ?? "email";
-}
-
 export async function syncUserToRegistry(
-  email: string,
+  user: User,
   authMethod: RegistryAuthMethod,
 ): Promise<boolean> {
-  if (!isSupabaseConfigured()) return false;
+  if (!user.email) return false;
 
-  const supabase = getSupabase();
-  if (!supabase) return false;
+  try {
+    const userRef = doc(db, USERS_COLLECTION, user.uid);
+    const existing = await getDoc(userRef);
+    const registeredAt =
+      existing.exists() && existing.data().registeredAt
+        ? existing.data().registeredAt
+        : serverTimestamp();
 
-  const normalized = normalizeEmail(email);
-  const now = new Date().toISOString();
-
-  const { error } = await supabase.from(TABLE).upsert(
-    {
-      email: normalized,
-      auth_method: authMethod,
-      last_login_at: now,
-    },
-    { onConflict: "email" },
-  );
-
-  if (error) {
-    console.warn("[user-registry] No se pudo sincronizar usuario:", error.message);
+    await setDoc(
+      userRef,
+      {
+        email: user.email,
+        authMethod,
+        registeredAt,
+        lastLoginAt: serverTimestamp(),
+      },
+      { merge: true },
+    );
+    return true;
+  } catch (error) {
+    console.warn("[user-registry] No se pudo sincronizar usuario con Firestore:", error);
     return false;
   }
-
-  return true;
-}
-
-async function upsertWithRetry(
-  email: string,
-  authMethod: RegistryAuthMethod,
-): Promise<boolean> {
-  for (let attempt = 0; attempt < 2; attempt++) {
-    if (await syncUserToRegistry(email, authMethod)) {
-      return true;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 400));
-  }
-  return false;
-}
-
-/** Registers or updates an email/password user from the website in the central registry. */
-export async function syncWebEmailUser(
-  email: string,
-  password?: string,
-  options?: { isRegistration?: boolean },
-): Promise<boolean> {
-  if (!isSupabaseConfigured()) return false;
-
-  const supabase = getSupabase();
-  if (!supabase) return false;
-
-  const normalized = normalizeEmail(email);
-  let rpcOk = false;
-
-  const { error: rpcError } = await supabase.rpc("register_web_user", {
-    p_email: normalized,
-  });
-  if (rpcError) {
-    console.warn("[user-registry] register_web_user:", rpcError.message);
-  } else {
-    rpcOk = true;
-  }
-
-  const upserted = await upsertWithRetry(normalized, "email");
-
-  if (options?.isRegistration && password) {
-    const { error: signUpError } = await supabase.auth.signUp({
-      email: normalized,
-      password,
-    });
-    if (
-      signUpError &&
-      !/already|registered|exists|duplicate/i.test(signUpError.message)
-    ) {
-      console.warn("[user-registry] signUp:", signUpError.message);
-    }
-  }
-
-  return rpcOk || upserted;
-}
-
-/** Pulls OAuth users from Supabase Auth into app_users (server-side). */
-export async function refreshRegistryFromAuth(): Promise<boolean> {
-  if (!isSupabaseConfigured()) return false;
-
-  const supabase = getSupabase();
-  if (!supabase) return false;
-
-  const { error } = await supabase.rpc("refresh_app_users_from_auth");
-  if (error) {
-    console.warn("[user-registry] refresh_app_users_from_auth:", error.message);
-    return false;
-  }
-
-  return true;
 }
 
 export async function loadAllRegistryUsers(): Promise<RegistryUser[]> {
-  await refreshRegistryFromAuth();
-  return fetchAllRegistryUsers();
-}
-
-export async function syncLocalUsersToRegistry(
-  users: { email: string; oauthProvider: OAuthProviderId | null }[],
-): Promise<void> {
-  await Promise.all(
-    users.map((user) =>
-      syncUserToRegistry(user.email, resolveAuthMethod(user.oauthProvider)),
-    ),
+  const usersQuery = query(
+    collection(db, USERS_COLLECTION),
+    orderBy("lastLoginAt", "desc"),
+  );
+  const snapshot = await getDocs(usersQuery);
+  return snapshot.docs.map((userDoc) =>
+    toRegistryUser(userDoc.data() as AppUserDocument),
   );
 }
 
-export async function fetchAllRegistryUsers(): Promise<RegistryUser[]> {
-  if (!isSupabaseConfigured()) {
-    return [];
-  }
-
-  const supabase = getSupabase();
-  if (!supabase) {
-    return [];
-  }
-
-  const { data, error } = await supabase
-    .from(TABLE)
-    .select("email, auth_method, registered_at, last_login_at")
-    .order("last_login_at", { ascending: false });
-
-  if (error) {
-    throw error;
-  }
-
-  return (data ?? []).map((row) => toRegistryUser(row as AppUserRow));
-}
-
 export async function removeUserFromRegistry(email: string): Promise<boolean> {
-  if (!isSupabaseConfigured()) return false;
-
-  const supabase = getSupabase();
-  if (!supabase) return false;
-
-  const { error } = await supabase
-    .from(TABLE)
-    .delete()
-    .eq("email", normalizeEmail(email));
-
-  return !error;
+  try {
+    const snapshot = await getDocs(collection(db, USERS_COLLECTION));
+    const normalizedEmail = normalizeEmail(email);
+    const matchingUsers = snapshot.docs.filter(
+      (userDoc) =>
+        typeof userDoc.data().email === "string" &&
+        normalizeEmail(userDoc.data().email) === normalizedEmail,
+    );
+    await Promise.all(matchingUsers.map((userDoc) => deleteDoc(userDoc.ref)));
+    return true;
+  } catch (error) {
+    console.error("[user-registry] No se pudo eliminar usuario de Firestore:", error);
+    return false;
+  }
 }
 
 export function isRegistryAvailable(): boolean {
-  return isSupabaseConfigured();
+  return true;
 }

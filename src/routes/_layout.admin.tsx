@@ -14,12 +14,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ADMIN_EMAIL, useAuthStore } from "@/lib/auth-store";
-import { logoutWithOAuth } from "@/hooks/use-supabase-auth-sync";
+import { logoutWithFirebase } from "@/hooks/use-firebase-auth-sync";
 import {
   isRegistryAvailable,
   loadAllRegistryUsers,
   removeUserFromRegistry,
-  syncLocalUsersToRegistry,
 } from "@/lib/user-registry";
 import { toast } from "sonner";
 import { useI18n } from "@/hooks/use-i18n";
@@ -34,9 +33,6 @@ function AdminPage() {
   const { t, dateLocale } = useI18n();
   const isAdmin = useAuthStore((s) => s.isAdmin);
   const email = useAuthStore((s) => s.email);
-  const localUsers = useAuthStore((s) => s.users);
-  const removeUser = useAuthStore((s) => s.removeUser);
-
   const registryEnabled = isRegistryAvailable();
 
   const {
@@ -58,21 +54,9 @@ function AdminPage() {
     }
   }, [isAdmin, navigate, t]);
 
-  useEffect(() => {
-    if (!isAdmin || !registryEnabled) return;
-    void syncLocalUsersToRegistry(localUsers).then(() => {
-      void queryClient.invalidateQueries({ queryKey: ["admin-registry-users"] });
-    });
-  }, [isAdmin, registryEnabled, localUsers, queryClient]);
-
   if (!isAdmin) return null;
 
-  const displayedUsers = registryEnabled ? registryUsers : localUsers.map((user) => ({
-    email: user.email,
-    authMethod: user.oauthProvider ?? ("email" as const),
-    registeredAt: user.registeredAt,
-    lastLoginAt: user.lastLoginAt,
-  }));
+  const displayedUsers = registryUsers;
 
   const handleRemoveUser = async (userEmail: string) => {
     if (registryEnabled) {
@@ -84,14 +68,17 @@ function AdminPage() {
       await queryClient.invalidateQueries({ queryKey: ["admin-registry-users"] });
     }
 
-    removeUser(userEmail);
     toast.success(t("admin.userRemoved"), { description: userEmail });
   };
 
-  const handleLogout = () => {
-    void logoutWithOAuth();
-    toast.success(t("admin.logoutAdmin"));
-    navigate({ to: "/" });
+  const handleLogout = async () => {
+    try {
+      await logoutWithFirebase();
+      toast.success(t("admin.logoutAdmin"));
+      navigate({ to: "/" });
+    } catch {
+      toast.error(t("auth.oauthFailed"));
+    }
   };
 
   return (

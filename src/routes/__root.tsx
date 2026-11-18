@@ -10,7 +10,7 @@ import {
 import { useEffect } from "react";
 
 import { useOAuthCallbackHandler } from "@/hooks/use-oauth-callback";
-import { useSupabaseAuthSync } from "@/hooks/use-supabase-auth-sync";
+import { useFirebaseAuthSync } from "@/hooks/use-firebase-auth-sync";
 import { Toaster } from "@/components/ui/sonner";
 import { clearLegacyAppStorage } from "@/lib/clear-legacy-storage";
 import { registerChunkLoadRecovery, isRecoverableLoadError, tryRecoverFromStaleChunks } from "@/lib/recoverable-errors";
@@ -134,7 +134,7 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const locale = useLocaleStore((s) => s.locale);
 
-  useSupabaseAuthSync();
+  useFirebaseAuthSync();
   useOAuthCallbackHandler();
 
   useEffect(() => {

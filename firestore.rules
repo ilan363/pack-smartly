@@ -1,0 +1,41 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn()
+        && request.auth.token.email == 'i.manbrut@wolfsohn.edu.ar'
+        && request.auth.token.firebase.sign_in_provider == 'password';
+    }
+
+    function validUserDocument() {
+      return request.resource.data.keys().hasOnly([
+          'email',
+          'authMethod',
+          'registeredAt',
+          'lastLoginAt'
+        ])
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.authMethod in ['email', 'google', 'github']
+        && request.resource.data.registeredAt is timestamp
+        && request.resource.data.lastLoginAt is timestamp;
+    }
+
+    match /app_users/{userId} {
+      allow get, list: if isAdmin()
+        || (signedIn() && request.auth.uid == userId);
+      allow create: if signedIn()
+        && request.auth.uid == userId
+        && validUserDocument();
+      allow update: if signedIn()
+        && request.auth.uid == userId
+        && validUserDocument()
+        && request.resource.data.registeredAt == resource.data.registeredAt;
+      allow delete: if isAdmin();
+    }
+  }
+}

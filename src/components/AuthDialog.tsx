@@ -19,7 +19,9 @@ import {
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut,
+  type UserCredential,
 } from "firebase/auth";
+import { finalizeOAuthLogin } from "@/lib/oauth-session";
 import { syncUserToRegistry } from "@/lib/user-registry";
 import { useI18n } from "@/hooks/use-i18n";
 import { toast } from "sonner";
@@ -226,6 +228,29 @@ export function AuthDialog({
     }
   };
 
+  const handleOAuthSuccess = async (credential: UserCredential) => {
+    setSubmitting(true);
+    try {
+      const result = await finalizeOAuthLogin(credential.user);
+      if (!result.ok) {
+        if (result.reason === "admin_oauth") {
+          toast.error(tAuthError("auth.err.oauth_admin_password"));
+        } else {
+          toast.error(tAuthError("auth.err.oauth_invalid_email"));
+        }
+        return;
+      }
+
+      if (!result.synced) toast.warning(t("auth.registrySyncWarning"));
+      toast.success(t("auth.oauth.success"), { description: result.email });
+      resetForm();
+      onOpenChange(false);
+      onSuccess?.();
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleSubmit = (e?: FormEvent) => {
     e?.preventDefault();
     if (submitting) return;
@@ -384,7 +409,7 @@ export function AuthDialog({
 
         {tab !== "admin" && tab !== "forgot" && (
           <>
-            <OAuthButtons />
+            <OAuthButtons onSuccess={handleOAuthSuccess} />
             <div className="flex justify-center px-2">
               <Button
                 type="button"

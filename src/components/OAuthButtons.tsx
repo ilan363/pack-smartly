@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { UserCredential } from "firebase/auth";
 import { IconLoader } from "@/components/ui/icons";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -11,9 +12,15 @@ import {
 import { toast } from "sonner";
 import { useI18n } from "@/hooks/use-i18n";
 
-export function OAuthButtons() {
+type OAuthButtonsProps = {
+  onSuccess?: (credential: UserCredential) => void | Promise<void>;
+};
+
+export function OAuthButtons({ onSuccess }: OAuthButtonsProps) {
   const { t } = useI18n();
-  const [loadingProvider, setLoadingProvider] = useState<OAuthProviderId | null>(null);
+  const [loadingProvider, setLoadingProvider] = useState<OAuthProviderId | null>(
+    null,
+  );
 
   const handleOAuth = async (providerId: OAuthProviderId) => {
     setLoadingProvider(providerId);
@@ -23,10 +30,16 @@ export function OAuthButtons() {
       if (!result.ok) {
         toast.error(result.error);
         setLoadingProvider(null);
+        return;
       }
-      // On success the browser redirects to the provider; keep loading state.
+
+      // Redirect fallback: the page will unload / reload after the provider.
+      if (result.via === "redirect") return;
+
+      await onSuccess?.(result.credential);
     } catch {
       toast.error(t("auth.oauthFailed"));
+    } finally {
       setLoadingProvider(null);
     }
   };
@@ -52,12 +65,15 @@ export function OAuthButtons() {
               variant="outline"
               className="h-10 w-full justify-start gap-3 border-border bg-background px-3 font-normal shadow-sm transition-colors hover:bg-muted/50"
               disabled={isDisabled}
-              onClick={() => handleOAuth(provider.id)}
+              onClick={() => void handleOAuth(provider.id)}
             >
               {isLoading ? (
                 <IconLoader className="h-5 w-5 shrink-0 animate-spin text-muted-foreground" />
               ) : (
-                <OAuthProviderIcon provider={provider.id} className="h-5 w-5 shrink-0" />
+                <OAuthProviderIcon
+                  provider={provider.id}
+                  className="h-5 w-5 shrink-0"
+                />
               )}
               <span className="truncate">{provider.label}</span>
             </Button>

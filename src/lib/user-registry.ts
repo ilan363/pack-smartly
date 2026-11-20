@@ -66,6 +66,7 @@ export async function syncUserToRegistry(
         ? existing.data().registeredAt
         : serverTimestamp();
 
+    // Email must match auth token exactly (Firestore rules).
     await setDoc(
       userRef,
       {
